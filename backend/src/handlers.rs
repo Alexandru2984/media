@@ -763,6 +763,75 @@ pub async fn upload_avatar(
     Err(StatusCode::BAD_REQUEST)
 }
 
+// Upload Post Image
+pub async fn upload_post_image(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+    mut multipart: axum::extract::Multipart,
+) -> Result<Json<Value>, StatusCode> {
+    use std::fs;
+    use std::path::Path;
+    
+    let user_id = get_current_user(&headers).await?;
+    
+    // Get the file from multipart
+    while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
+        let name = field.name().unwrap_or("").to_string();
+        
+        if name == "image" {
+            let filename = field.file_name()
+                .ok_or(StatusCode::BAD_REQUEST)?
+                .to_string();
+            
+            // Validate file extension
+            let ext = Path::new(&filename)
+                .extension()
+                .and_then(|s| s.to_str())
+                .ok_or(StatusCode::BAD_REQUEST)?
+                .to_lowercase();
+            
+            if !["jpg", "jpeg", "png", "gif", "webp"].contains(&ext.as_str()) {
+                return Err(StatusCode::BAD_REQUEST);
+            }
+            
+            // Generate unique filename
+            let new_filename = format!("post_{}_{}.{}", user_id, Uuid::new_v4(), ext);
+            let upload_path = format!("uploads/posts/{}", new_filename);
+            
+            // Read file data
+            let data = field.bytes().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            
+            // Validate file size (max 10MB for posts)
+            if data.len() > 10 * 1024 * 1024 {
+                return Err(StatusCode::PAYLOAD_TOO_LARGE);
+            }
+            
+            // Create directory if it doesn't exist
+            fs::create_dir_all("uploads/posts")
+                .map_err(|e| {
+                    eprintln!("Failed to create directory: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+            
+            // Save file
+            fs::write(&upload_path, &data)
+                .map_err(|e| {
+                    eprintln!("Failed to save file: {}", e);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+            
+            let image_url = format!("/uploads/posts/{}", new_filename);
+            
+            return Ok(Json(json!({
+                "image_url": image_url,
+                "message": "Image uploaded successfully"
+            })));
+        }
+    }
+    
+    Err(StatusCode::BAD_REQUEST)
+}
+
 // Update Post
 pub async fn update_post(
     State(pool): State<MySqlPool>,

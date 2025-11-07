@@ -3,6 +3,7 @@ import { useNavigate } from '@solidjs/router';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
+import { getImageUrl } from '../utils/urls';
 
 export default function PostCard(props) {
   const auth = useAuth();
@@ -473,7 +474,7 @@ export default function PostCard(props) {
             }
           >
             <img 
-              src={`http://localhost:8082${props.post.user.avatar_url}`}
+              src={getImageUrl(props.post.user.avatar_url)}
               alt={props.post.user.username}
               style={{
                 width: '40px',
@@ -531,7 +532,7 @@ export default function PostCard(props) {
         </p>
         <Show when={props.post.image_url}>
           <img 
-            src={`http://localhost:8082${props.post.image_url}`} 
+            src={getImageUrl(props.post.image_url)} 
             alt="Post image" 
             style={styles().postImage}
           />
@@ -568,7 +569,7 @@ export default function PostCard(props) {
           
           <Show when={!editImagePreview() && props.post.image_url && !removeImage()}>
             <div style={styles().editImagePreview}>
-              <img src={`http://localhost:8082${props.post.image_url}`} alt="Current" style={styles().editImagePreviewImg} />
+              <img src={getImageUrl(props.post.image_url)} alt="Current" style={styles().editImagePreviewImg} />
               <button
                 type="button"
                 style={styles().removeImageBtn}

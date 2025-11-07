@@ -27,6 +27,7 @@ pub fn create_routes(pool: MySqlPool) -> Router {
         // Post routes
         .route("/posts", get(handlers::get_posts))
         .route("/posts", post(handlers::create_post))
+        .route("/posts/upload-image", post(handlers::upload_post_image))
         .route("/posts/:id", put(handlers::update_post))
         .route("/posts/:id", delete(handlers::delete_post))
         .route("/posts/:id/like", post(handlers::like_post))

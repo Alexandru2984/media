@@ -3,6 +3,7 @@ import { useParams, useNavigate } from '@solidjs/router';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
 import { api } from '../api';
+import { getImageUrl } from '../utils/urls';
 import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import ProfileSettings from '../components/ProfileSettings';
@@ -114,7 +115,7 @@ export default function Profile() {
                 }
               >
                 <img 
-                  src={`http://localhost:8082${profile()?.avatar_url}`}
+                  src={getImageUrl(profile()?.avatar_url)}
                   alt="Avatar"
                   style={{
                     width: '100px',

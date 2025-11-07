@@ -2,6 +2,7 @@ import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
 import { useNavigate } from '@solidjs/router';
 import { Show } from 'solid-js';
+import { getImageUrl } from '../utils/urls';
 
 export default function Navbar() {
   const auth = useAuth();
@@ -57,7 +58,7 @@ export default function Navbar() {
                     }
                   >
                     <img 
-                      src={`http://localhost:8082${auth.user()?.avatar_url}`}
+                      src={getImageUrl(auth.user()?.avatar_url)}
                       alt={auth.user()?.username}
                       class="w-8 h-8 rounded-full object-cover border-2 border-primary-500"
                     />
