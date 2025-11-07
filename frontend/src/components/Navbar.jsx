@@ -1,6 +1,7 @@
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
 import { useNavigate } from '@solidjs/router';
+import { Show } from 'solid-js';
 
 export default function Navbar() {
   const auth = useAuth();
@@ -49,7 +50,18 @@ export default function Navbar() {
                   onClick={() => navigate(`/profile/${auth.user()?.id}`)}
                   class="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
                 >
-                  <span class="text-xl">👤</span>
+                  <Show 
+                    when={auth.user()?.avatar_url}
+                    fallback={
+                      <span class="text-xl">👤</span>
+                    }
+                  >
+                    <img 
+                      src={`http://localhost:8082${auth.user()?.avatar_url}`}
+                      alt={auth.user()?.username}
+                      class="w-8 h-8 rounded-full object-cover border-2 border-primary-500"
+                    />
+                  </Show>
                   <span class="font-medium text-gray-700 dark:text-gray-200 hidden sm:inline">
                     {auth.user()?.username}
                   </span>

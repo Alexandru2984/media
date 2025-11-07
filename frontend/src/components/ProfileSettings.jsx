@@ -1,9 +1,11 @@
 import { createSignal, Show, createMemo } from 'solid-js';
 import { api } from '../api';
 import { useTheme } from '../ThemeContext';
+import { useAuth } from '../AuthContext';
 
 export default function ProfileSettings(props) {
   const { theme } = useTheme();
+  const auth = useAuth();
   const [activeTab, setActiveTab] = createSignal('avatar');
   
   // Avatar upload state
@@ -204,6 +206,11 @@ export default function ProfileSettings(props) {
       showMessage('success', 'Avatar actualizat cu succes!');
       setAvatarFile(null);
       setAvatarPreview(null);
+      
+      // Refresh user data to update avatar everywhere
+      const userData = await api.getCurrentUser();
+      auth.setUser(userData);
+      
       if (props.onUpdate) props.onUpdate();
     } catch (error) {
       console.error('Failed to upload avatar:', error);

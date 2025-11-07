@@ -464,9 +464,26 @@ export default function PostCard(props) {
         <div style={styles().userInfo}
              onClick={() => navigate(`/profile/${props.post.user.id}`)}
         >
-          <div style={styles().avatar}>
-            {props.post.user.username.charAt(0).toUpperCase()}
-          </div>
+          <Show 
+            when={props.post.user.avatar_url}
+            fallback={
+              <div style={styles().avatar}>
+                {props.post.user.username.charAt(0).toUpperCase()}
+              </div>
+            }
+          >
+            <img 
+              src={`http://localhost:8082${props.post.user.avatar_url}`}
+              alt={props.post.user.username}
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                border: '2px solid #667eea',
+              }}
+            />
+          </Show>
           <div style={styles().userDetails}>
             <div style={styles().username}>
               {props.post.user.username}

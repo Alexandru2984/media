@@ -60,6 +60,7 @@ export function AuthProvider(props) {
 
   const value = {
     user,
+    setUser,
     loading,
     login,
     register,
