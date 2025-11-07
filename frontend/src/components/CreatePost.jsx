@@ -1,9 +1,32 @@
-import { createSignal } from 'solid-js';
+import { createSignal, Show } from 'solid-js';
 import { api } from '../api';
 
 export default function CreatePost(props) {
   const [content, setContent] = createSignal('');
   const [loading, setLoading] = createSignal(false);
+  const [imageFile, setImageFile] = createSignal(null);
+  const [imagePreview, setImagePreview] = createSignal(null);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Imaginea este prea mare! Max 10MB');
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -11,8 +34,18 @@ export default function CreatePost(props) {
 
     setLoading(true);
     try {
-      await api.createPost(content());
+      let imageUrl = null;
+      
+      // Upload image first if exists
+      if (imageFile()) {
+        const result = await api.uploadPostImage(imageFile());
+        imageUrl = result.image_url;
+      }
+      
+      await api.createPost(content(), imageUrl);
       setContent('');
+      setImageFile(null);
+      setImagePreview(null);
       if (props.onPostCreated) {
         props.onPostCreated();
       }
@@ -93,6 +126,56 @@ export default function CreatePost(props) {
       width: '16px',
       height: '16px',
     },
+    imagePreview: {
+      position: 'relative',
+      marginTop: '16px',
+      borderRadius: '12px',
+      overflow: 'hidden',
+      width: '300px',
+      height: '250px',
+    },
+    previewImg: {
+      width: '300px',
+      height: '250px',
+      objectFit: 'cover',
+      display: 'block',
+      borderRadius: '12px',
+    },
+    removeBtn: {
+      position: 'absolute',
+      top: '12px',
+      right: '12px',
+      background: 'rgba(0,0,0,0.7)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '50%',
+      width: '32px',
+      height: '32px',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '18px',
+      fontWeight: 'bold',
+      transition: 'background 0.2s',
+    },
+    imageBtn: {
+      padding: '8px 16px',
+      borderRadius: '8px',
+      border: '2px solid #667eea',
+      background: 'transparent',
+      color: '#667eea',
+      fontSize: '14px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+    },
+    fileInput: {
+      display: 'none',
+    },
   };
 
   return (
@@ -113,9 +196,48 @@ export default function CreatePost(props) {
             e.target.style.boxShadow = 'none';
           }}
         />
+        
+        <Show when={imagePreview()}>
+          <div style={styles.imagePreview}>
+            <img src={imagePreview()} alt="Preview" style={styles.previewImg} />
+            <button
+              type="button"
+              style={styles.removeBtn}
+              onClick={removeImage}
+              onMouseOver={(e) => e.target.style.background = 'rgba(0,0,0,0.9)'}
+              onMouseOut={(e) => e.target.style.background = 'rgba(0,0,0,0.7)'}
+            >
+              ✕
+            </button>
+          </div>
+        </Show>
+
         <div style={styles.footer}>
-          <div style={content().length > 500 ? styles.charCountOver : styles.charCount}>
-            {content().length > 0 && `${content().length} caractere`}
+          <div style={{display: 'flex', gap: '12px', alignItems: 'center'}}>
+            <input
+              type="file"
+              id="post-image"
+              accept="image/*"
+              style={styles.fileInput}
+              onChange={handleImageChange}
+            />
+            <label 
+              for="post-image" 
+              style={styles.imageBtn}
+              onMouseOver={(e) => {
+                e.target.style.background = '#667eea';
+                e.target.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.background = 'transparent';
+                e.target.style.color = '#667eea';
+              }}
+            >
+              🖼️ {imageFile() ? 'Schimbă' : 'Adaugă'} Imagine
+            </label>
+            <div style={content().length > 500 ? styles.charCountOver : styles.charCount}>
+              {content().length > 0 && `${content().length} caractere`}
+            </div>
           </div>
           <button
             type="submit"

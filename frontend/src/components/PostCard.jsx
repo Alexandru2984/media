@@ -103,6 +103,16 @@ export default function PostCard(props) {
       whiteSpace: 'pre-wrap',
       wordBreak: 'break-word',
     },
+    postImage: {
+      width: '300px',
+      height: '250px',
+      borderRadius: '8px',
+      marginTop: '8px',
+      marginBottom: '12px',
+      objectFit: 'cover',
+      border: theme() === 'dark' ? '1px solid #334155' : '1px solid #e2e8f0',
+      display: 'block',
+    },
     textarea: {
       width: '100%',
       padding: '12px',
@@ -405,6 +415,13 @@ export default function PostCard(props) {
         <p style={styles().content}>
           {props.post.content}
         </p>
+        <Show when={props.post.image_url}>
+          <img 
+            src={`http://localhost:8082${props.post.image_url}`} 
+            alt="Post image" 
+            style={styles().postImage}
+          />
+        </Show>
       </Show>
 
       <Show when={editing()}>

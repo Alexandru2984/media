@@ -217,6 +217,29 @@ class ApiService {
 
     return response.json();
   }
+
+  // Upload post image
+  async uploadPostImage(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const headers = {};
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(`${API_URL}/posts/upload-image`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiService();
