@@ -43,6 +43,12 @@ export default function Profile() {
       await api.updateProfile(username(), bio(), null);
       await loadProfile();
       setEditing(false);
+      
+      // Refresh user data in AuthContext if it's own profile
+      if (isOwnProfile()) {
+        const userData = await api.getCurrentUser();
+        auth.setUser(userData);
+      }
     } catch (error) {
       console.error('Failed to update profile:', error);
       alert('Nu s-a putut actualiza profilul');
