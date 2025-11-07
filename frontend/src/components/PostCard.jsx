@@ -17,6 +17,9 @@ export default function PostCard(props) {
   const [editContent, setEditContent] = createSignal(props.post.content);
   const [editingCommentId, setEditingCommentId] = createSignal(null);
   const [editCommentText, setEditCommentText] = createSignal('');
+  const [editImageFile, setEditImageFile] = createSignal(null);
+  const [editImagePreview, setEditImagePreview] = createSignal(null);
+  const [removeImage, setRemoveImage] = createSignal(false);
 
   const isOwn = () => auth.user()?.id === props.post.user.id;
 
@@ -149,6 +152,61 @@ export default function PostCard(props) {
       fontSize: '14px',
       fontWeight: '500',
       cursor: 'pointer',
+    },
+    editImageContainer: {
+      marginTop: '12px',
+      marginBottom: '12px',
+    },
+    editImagePreview: {
+      position: 'relative',
+      width: '300px',
+      height: '250px',
+      borderRadius: '8px',
+      overflow: 'hidden',
+      marginBottom: '8px',
+    },
+    editImagePreviewImg: {
+      width: '100%',
+      height: '100%',
+      objectFit: 'cover',
+    },
+    removeImageBtn: {
+      position: 'absolute',
+      top: '8px',
+      right: '8px',
+      background: 'rgba(0,0,0,0.7)',
+      color: 'white',
+      border: 'none',
+      borderRadius: '50%',
+      width: '28px',
+      height: '28px',
+      cursor: 'pointer',
+      fontSize: '16px',
+      fontWeight: 'bold',
+    },
+    imageBtn: {
+      padding: '6px 12px',
+      borderRadius: '6px',
+      border: '2px solid #667eea',
+      background: 'transparent',
+      color: '#667eea',
+      fontSize: '13px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      marginRight: '8px',
+    },
+    removeBtn: {
+      padding: '6px 12px',
+      borderRadius: '6px',
+      border: '2px solid #e53e3e',
+      background: 'transparent',
+      color: '#e53e3e',
+      fontSize: '13px',
+      fontWeight: '600',
+      cursor: 'pointer',
+    },
+    fileInput: {
+      display: 'none',
     },
     interactionBar: {
       display: 'flex',
@@ -305,13 +363,52 @@ export default function PostCard(props) {
 
   const handleEditPost = async () => {
     try {
-      await api.updatePost(props.post.id, editContent(), props.post.image_url);
+      let imageUrl = props.post.image_url;
+      
+      // Upload new image if selected
+      if (editImageFile()) {
+        const result = await api.uploadPostImage(editImageFile());
+        imageUrl = result.image_url;
+      }
+      
+      // Remove image if requested
+      if (removeImage()) {
+        imageUrl = null;
+      }
+      
+      await api.updatePost(props.post.id, editContent(), imageUrl);
       setEditing(false);
+      setEditImageFile(null);
+      setEditImagePreview(null);
+      setRemoveImage(false);
       if (props.onUpdate) props.onUpdate();
     } catch (error) {
       console.error('Failed to update post:', error);
       alert('Nu s-a putut actualiza postarea');
     }
+  };
+
+  const handleEditImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Imaginea este prea mare! Max 10MB');
+        return;
+      }
+      setEditImageFile(file);
+      setRemoveImage(false);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveEditImage = () => {
+    setEditImageFile(null);
+    setEditImagePreview(null);
+    setRemoveImage(true);
   };
 
   const handleDeletePost = async () => {
@@ -431,6 +528,83 @@ export default function PostCard(props) {
           rows="4"
           style={styles().textarea}
         />
+        
+        {/* Edit Image Section */}
+        <div style={styles().editImageContainer}>
+          <Show when={editImagePreview()}>
+            <div style={styles().editImagePreview}>
+              <img src={editImagePreview()} alt="Preview" style={styles().editImagePreviewImg} />
+              <button
+                type="button"
+                style={styles().removeImageBtn}
+                onClick={() => {
+                  setEditImageFile(null);
+                  setEditImagePreview(null);
+                }}
+                onMouseOver={(e) => e.target.style.background = 'rgba(0,0,0,0.9)'}
+                onMouseOut={(e) => e.target.style.background = 'rgba(0,0,0,0.7)'}
+              >
+                ✕
+              </button>
+            </div>
+          </Show>
+          
+          <Show when={!editImagePreview() && props.post.image_url && !removeImage()}>
+            <div style={styles().editImagePreview}>
+              <img src={`http://localhost:8082${props.post.image_url}`} alt="Current" style={styles().editImagePreviewImg} />
+              <button
+                type="button"
+                style={styles().removeImageBtn}
+                onClick={handleRemoveEditImage}
+                onMouseOver={(e) => e.target.style.background = 'rgba(0,0,0,0.9)'}
+                onMouseOut={(e) => e.target.style.background = 'rgba(0,0,0,0.7)'}
+              >
+                ✕
+              </button>
+            </div>
+          </Show>
+          
+          <input
+            type="file"
+            id={`edit-image-${props.post.id}`}
+            accept="image/*"
+            style={styles().fileInput}
+            onChange={handleEditImageChange}
+          />
+          <label 
+            for={`edit-image-${props.post.id}`} 
+            style={styles().imageBtn}
+            onMouseOver={(e) => {
+              e.target.style.background = '#667eea';
+              e.target.style.color = 'white';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'transparent';
+              e.target.style.color = '#667eea';
+            }}
+          >
+            🖼️ {props.post.image_url || editImageFile() ? 'Schimbă' : 'Adaugă'} Imagine
+          </label>
+          
+          <Show when={(props.post.image_url || editImageFile()) && !removeImage()}>
+            <button
+              type="button"
+              style={styles().removeBtn}
+              onClick={handleRemoveEditImage}
+              onMouseOver={(e) => {
+                e.target.style.background = '#e53e3e';
+                e.target.style.color = 'white';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.background = 'transparent';
+                e.target.style.color = '#e53e3e';
+              }}
+            >
+              🗑️ Șterge Imagine
+            </button>
+          </Show>
+        </div>
+        
         <div style={styles().buttonGroup}>
           <button
             onClick={handleEditPost}
@@ -444,6 +618,9 @@ export default function PostCard(props) {
             onClick={() => {
               setEditing(false);
               setEditContent(props.post.content);
+              setEditImageFile(null);
+              setEditImagePreview(null);
+              setRemoveImage(false);
             }}
             style={styles().cancelBtn}
             onMouseOver={(e) => e.target.style.background = '#cbd5e0'}
@@ -453,19 +630,6 @@ export default function PostCard(props) {
           </button>
         </div>
       </Show>
-
-      {/* Image */}
-      {props.post.image_url && (
-        <img 
-          src={props.post.image_url} 
-          alt="Post image" 
-          style={{
-            width: '100%',
-            'border-radius': '8px',
-            'margin-bottom': '1rem',
-          }}
-        />
-      )}
 
       {/* Actions */}
       <div style={styles().interactionBar}>
