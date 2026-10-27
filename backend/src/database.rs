@@ -1,11 +1,10 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use sqlx::{mysql::MySqlPoolOptions, MySqlPool};
 
 pub type DbPool = MySqlPool;
 
 pub async fn init_db() -> Result<DbPool> {
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "mysql://root:password@localhost/social_media".to_string());
+    let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL must be configured")?;
 
     let pool = MySqlPoolOptions::new()
         .max_connections(5)
