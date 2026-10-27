@@ -10,7 +10,10 @@ server {
         return 403;
     }
 
-    root /var/www/media.micutu.com/frontend;
+    # Serve only an immutable build release. Keeping the repository itself out
+    # of the document root prevents manifests, source files, and build config
+    # from becoming public after a checkout or source recovery.
+    root /var/lib/media/frontend-current;
     index index.html;
 
     access_log /var/log/nginx/media.access.log;
