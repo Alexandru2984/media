@@ -12,7 +12,10 @@ pub fn create_routes(pool: MySqlPool) -> Router {
         .route("/auth/register", post(handlers::register))
         .route("/auth/login", post(handlers::login))
         .route("/auth/me", get(handlers::me))
-        .route("/auth/send-verification", post(handlers::send_verification_email))
+        .route(
+            "/auth/send-verification",
+            post(handlers::send_verification_email),
+        )
         .route("/auth/verify-email", get(handlers::verify_email))
         .route("/auth/forgot-password", post(handlers::forgot_password))
         .route("/auth/reset-password", post(handlers::reset_password))
@@ -22,7 +25,10 @@ pub fn create_routes(pool: MySqlPool) -> Router {
         .route("/users/me/avatar", post(handlers::upload_avatar))
         .route("/users/me/change-password", post(handlers::change_password))
         .route("/users/me/change-email", post(handlers::change_email))
-        .route("/users/verify-email-change", get(handlers::verify_email_change))
+        .route(
+            "/users/verify-email-change",
+            get(handlers::verify_email_change),
+        )
         .route("/users/:id/posts", get(handlers::get_user_posts))
         // Post routes
         .route("/posts", get(handlers::get_posts))

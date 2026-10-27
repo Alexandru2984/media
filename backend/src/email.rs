@@ -1,9 +1,8 @@
-use lettre::{
-    message::header::ContentType,
-    transport::smtp::authentication::Credentials,
-    Message, SmtpTransport, Transport,
-};
 use anyhow::Result;
+use lettre::{
+    message::header::ContentType, transport::smtp::authentication::Credentials, Message,
+    SmtpTransport, Transport,
+};
 
 pub struct EmailService {
     smtp_username: String,
@@ -16,15 +15,14 @@ pub struct EmailService {
 impl EmailService {
     pub fn new() -> Self {
         // Determine app URL based on environment
-        let environment = std::env::var("ENVIRONMENT")
-            .unwrap_or_else(|_| "development".to_string());
+        let environment =
+            std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string());
 
         let app_url = if environment == "production" {
             std::env::var("APP_URL_PRODUCTION")
                 .unwrap_or_else(|_| "http://localhost:3005".to_string())
         } else {
-            std::env::var("APP_URL_LOCAL")
-                .unwrap_or_else(|_| "http://localhost:3005".to_string())
+            std::env::var("APP_URL_LOCAL").unwrap_or_else(|_| "http://localhost:3005".to_string())
         };
 
         Self {
@@ -40,7 +38,12 @@ impl EmailService {
         }
     }
 
-    pub async fn send_verification_email(&self, to_email: &str, username: &str, token: &str) -> Result<()> {
+    pub async fn send_verification_email(
+        &self,
+        to_email: &str,
+        username: &str,
+        token: &str,
+    ) -> Result<()> {
         let verification_url = format!("{}/verify-email?token={}", self.app_url, token);
 
         let html_body = format!(
@@ -81,10 +84,16 @@ impl EmailService {
             username, verification_url, verification_url
         );
 
-        self.send_email(to_email, "Verifică-ți contul", &html_body).await
+        self.send_email(to_email, "Verifică-ți contul", &html_body)
+            .await
     }
 
-    pub async fn send_password_reset_email(&self, to_email: &str, username: &str, token: &str) -> Result<()> {
+    pub async fn send_password_reset_email(
+        &self,
+        to_email: &str,
+        username: &str,
+        token: &str,
+    ) -> Result<()> {
         let reset_url = format!("{}/reset-password?token={}", self.app_url, token);
 
         let html_body = format!(
@@ -128,7 +137,8 @@ impl EmailService {
             username, reset_url, reset_url
         );
 
-        self.send_email(to_email, "Resetare Parolă", &html_body).await
+        self.send_email(to_email, "Resetare Parolă", &html_body)
+            .await
     }
 
     async fn send_email(&self, to_email: &str, subject: &str, html_body: &str) -> Result<()> {
@@ -139,10 +149,7 @@ impl EmailService {
             .header(ContentType::TEXT_HTML)
             .body(html_body.to_string())?;
 
-        let creds = Credentials::new(
-            self.smtp_username.clone(),
-            self.smtp_password.clone(),
-        );
+        let creds = Credentials::new(self.smtp_username.clone(), self.smtp_password.clone());
 
         let mailer = SmtpTransport::starttls_relay(&self.smtp_server)?
             .credentials(creds)

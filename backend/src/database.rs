@@ -1,5 +1,5 @@
-use sqlx::{MySqlPool, mysql::MySqlPoolOptions};
 use anyhow::Result;
+use sqlx::{mysql::MySqlPoolOptions, MySqlPool};
 
 pub type DbPool = MySqlPool;
 
@@ -24,7 +24,7 @@ pub async fn init_db() -> Result<DbPool> {
             avatar_url VARCHAR(512),
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        )"
+        )",
     )
     .execute(&pool)
     .await?;
@@ -40,7 +40,7 @@ pub async fn init_db() -> Result<DbPool> {
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )"
+        )",
     )
     .execute(&pool)
     .await?;
@@ -55,7 +55,7 @@ pub async fn init_db() -> Result<DbPool> {
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )"
+        )",
     )
     .execute(&pool)
     .await?;
@@ -69,7 +69,7 @@ pub async fn init_db() -> Result<DbPool> {
             UNIQUE KEY unique_like (post_id, user_id),
             FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )"
+        )",
     )
     .execute(&pool)
     .await?;
@@ -84,7 +84,7 @@ pub async fn init_db() -> Result<DbPool> {
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
-        )"
+        )",
     )
     .execute(&pool)
     .await?;
@@ -98,22 +98,29 @@ pub async fn init_db() -> Result<DbPool> {
             expires_at TIMESTAMP NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )"
+        )",
     )
     .execute(&pool)
     .await?;
 
     // Create indexes
     let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)")
-        .execute(&pool).await;
-    let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC)")
-        .execute(&pool).await;
+        .execute(&pool)
+        .await;
+    let _ =
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC)")
+            .execute(&pool)
+            .await;
     let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id)")
-        .execute(&pool).await;
+        .execute(&pool)
+        .await;
     let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_likes_post_id ON likes(post_id)")
-        .execute(&pool).await;
-    let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id)")
-        .execute(&pool).await;
+        .execute(&pool)
+        .await;
+    let _ =
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id)")
+            .execute(&pool)
+            .await;
 
     println!("✅ Database initialized successfully");
 

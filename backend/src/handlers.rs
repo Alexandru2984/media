@@ -3,17 +3,17 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::Json,
 };
-use serde_json::{json, Value};
-use sqlx::{MySqlPool, query, query_as, query_scalar};
-use uuid::Uuid;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::Utc;
+use serde_json::{json, Value};
+use sqlx::{query, query_as, query_scalar, MySqlPool};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use crate::{
-    auth::{create_jwt, verify_jwt, get_user_id_from_headers},
-    models::*,
+    auth::{create_jwt, get_user_id_from_headers, verify_jwt},
     email::EmailService,
+    models::*,
 };
 use rand::Rng;
 
@@ -23,8 +23,8 @@ pub async fn register(
     Json(payload): Json<CreateUser>,
 ) -> Result<Json<Value>, StatusCode> {
     let user_id = Uuid::new_v4().to_string();
-    let password_hash = hash(&payload.password, DEFAULT_COST)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let password_hash =
+        hash(&payload.password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let now = Utc::now();
 
@@ -57,7 +57,7 @@ pub async fn register(
             // Save verification token to database
             let _ = query(
                 "INSERT INTO email_tokens (id, user_id, token, token_type, expires_at)
-                 VALUES (?, ?, ?, 'verification', ?)"
+                 VALUES (?, ?, ?, 'verification', ?)",
             )
             .bind(&token_id)
             .bind(&user_id)
@@ -80,8 +80,8 @@ pub async fn register(
                 }
             });
 
-            let token = create_jwt(user_id.clone())
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let token =
+                create_jwt(user_id.clone()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
             Ok(Json(json!({
                 "token": token,
@@ -101,13 +101,11 @@ pub async fn login(
     State(pool): State<MySqlPool>,
     Json(payload): Json<LoginUser>,
 ) -> Result<Json<Value>, StatusCode> {
-    let user = query_as::<_, User>(
-        "SELECT * FROM users WHERE email = ?"
-    )
-    .bind(&payload.email)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let user = query_as::<_, User>("SELECT * FROM users WHERE email = ?")
+        .bind(&payload.email)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     match user {
         Some(user) => {
@@ -115,8 +113,8 @@ pub async fn login(
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
             if is_valid {
-                let token = create_jwt(user.id.clone())
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let token =
+                    create_jwt(user.id.clone()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
                 Ok(Json(json!({
                     "token": token,
@@ -143,14 +141,12 @@ pub async fn me(
 ) -> Result<Json<Value>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
 
-    let user = query_as::<_, User>(
-        "SELECT * FROM users WHERE id = ?"
-    )
-    .bind(&user_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+        .bind(&user_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(json!({
         "id": user.id,
@@ -181,22 +177,18 @@ pub async fn get_profile(
     State(pool): State<MySqlPool>,
     Path(user_id): Path<String>,
 ) -> Result<Json<UserProfile>, StatusCode> {
-    let user = query_as::<_, User>(
-        "SELECT * FROM users WHERE id = ?"
-    )
-    .bind(&user_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+        .bind(&user_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
-    let posts_count: i64 = query_scalar(
-        "SELECT COUNT(*) FROM posts WHERE user_id = ?"
-    )
-    .bind(&user_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let posts_count: i64 = query_scalar("SELECT COUNT(*) FROM posts WHERE user_id = ?")
+        .bind(&user_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(UserProfile {
         id: user.id,
@@ -220,7 +212,7 @@ pub async fn create_post(
 
     query(
         "INSERT INTO posts (id, user_id, content, image_url, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&post_id)
     .bind(&user_id)
@@ -235,16 +227,14 @@ pub async fn create_post(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    let post = query_as::<_, Post>(
-        "SELECT * FROM posts WHERE id = ?"
-    )
-    .bind(&post_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| {
-        eprintln!("Error fetching created post: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let post = query_as::<_, Post>("SELECT * FROM posts WHERE id = ?")
+        .bind(&post_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| {
+            eprintln!("Error fetching created post: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(post))
 }
@@ -255,54 +245,50 @@ pub async fn get_posts(
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
     let current_user_id = get_current_user(&headers).await.ok();
-    let limit: i64 = params.get("limit")
+    let limit: i64 = params
+        .get("limit")
         .and_then(|l| l.parse().ok())
         .unwrap_or(10);
-    let offset: i64 = params.get("offset")
+    let offset: i64 = params
+        .get("offset")
         .and_then(|o| o.parse().ok())
         .unwrap_or(0);
 
     // First get all posts
-    let posts = query_as::<_, Post>(
-        "SELECT * FROM posts ORDER BY created_at DESC LIMIT ? OFFSET ?"
-    )
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let posts =
+        query_as::<_, Post>("SELECT * FROM posts ORDER BY created_at DESC LIMIT ? OFFSET ?")
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut result = Vec::new();
 
     for post in posts {
         // Get user info
-        let user = query_as::<_, User>(
-            "SELECT * FROM users WHERE id = ?"
-        )
-        .bind(&post.user_id)
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        // Get user posts count
-        let user_posts_count: i64 = query_scalar(
-            "SELECT COUNT(*) FROM posts WHERE user_id = ?"
-        )
-        .bind(&post.user_id)
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        // Check if liked by current user
-        let is_liked = if let Some(ref uid) = current_user_id {
-            let count: i64 = query_scalar(
-                "SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?"
-            )
-            .bind(&post.id)
-            .bind(uid)
+        let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+            .bind(&post.user_id)
             .fetch_one(&pool)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        // Get user posts count
+        let user_posts_count: i64 = query_scalar("SELECT COUNT(*) FROM posts WHERE user_id = ?")
+            .bind(&post.user_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        // Check if liked by current user
+        let is_liked = if let Some(ref uid) = current_user_id {
+            let count: i64 =
+                query_scalar("SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?")
+                    .bind(&post.id)
+                    .bind(uid)
+                    .fetch_one(&pool)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             count > 0
         } else {
             false
@@ -340,55 +326,45 @@ pub async fn like_post(
     let now = Utc::now();
 
     // Check if already liked
-    let count: i64 = query_scalar(
-        "SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?"
-    )
-    .bind(&post_id)
-    .bind(&user_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let count: i64 = query_scalar("SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?")
+        .bind(&post_id)
+        .bind(&user_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if count > 0 {
         // Unlike
-        query(
-            "DELETE FROM likes WHERE post_id = ? AND user_id = ?"
-        )
-        .bind(&post_id)
-        .bind(&user_id)
-        .execute(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        query("DELETE FROM likes WHERE post_id = ? AND user_id = ?")
+            .bind(&post_id)
+            .bind(&user_id)
+            .execute(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        query(
-            "UPDATE posts SET likes_count = likes_count - 1 WHERE id = ?"
-        )
-        .bind(&post_id)
-        .execute(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        query("UPDATE posts SET likes_count = likes_count - 1 WHERE id = ?")
+            .bind(&post_id)
+            .execute(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         Ok(Json(json!({"liked": false})))
     } else {
         // Like
-        query(
-            "INSERT INTO likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)"
-        )
-        .bind(&like_id)
-        .bind(&post_id)
-        .bind(&user_id)
-        .bind(&now)
-        .execute(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        query("INSERT INTO likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)")
+            .bind(&like_id)
+            .bind(&post_id)
+            .bind(&user_id)
+            .bind(&now)
+            .execute(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        query(
-            "UPDATE posts SET likes_count = likes_count + 1 WHERE id = ?"
-        )
-        .bind(&post_id)
-        .execute(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        query("UPDATE posts SET likes_count = likes_count + 1 WHERE id = ?")
+            .bind(&post_id)
+            .execute(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         Ok(Json(json!({"liked": true})))
     }
@@ -407,7 +383,7 @@ pub async fn create_comment(
 
     query(
         "INSERT INTO comments (id, post_id, user_id, content, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&comment_id)
     .bind(&post_id)
@@ -419,22 +395,18 @@ pub async fn create_comment(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let comment = query_as::<_, Comment>(
-        "SELECT * FROM comments WHERE id = ?"
-    )
-    .bind(&comment_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let comment = query_as::<_, Comment>("SELECT * FROM comments WHERE id = ?")
+        .bind(&comment_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Update comments count
-    query(
-        "UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?"
-    )
-    .bind(&post_id)
-    .execute(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    query("UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?")
+        .bind(&post_id)
+        .execute(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(comment))
 }
@@ -443,24 +415,21 @@ pub async fn get_comments(
     State(pool): State<MySqlPool>,
     Path(post_id): Path<String>,
 ) -> Result<Json<Vec<Value>>, StatusCode> {
-    let comments = query_as::<_, Comment>(
-        "SELECT * FROM comments WHERE post_id = ? ORDER BY created_at ASC"
-    )
-    .bind(&post_id)
-    .fetch_all(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let comments =
+        query_as::<_, Comment>("SELECT * FROM comments WHERE post_id = ? ORDER BY created_at ASC")
+            .bind(&post_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut result = Vec::new();
 
     for comment in comments {
-        let user = query_as::<_, User>(
-            "SELECT * FROM users WHERE id = ?"
-        )
-        .bind(&comment.user_id)
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+            .bind(&comment.user_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         result.push(json!({
             "id": comment.id,
@@ -475,8 +444,8 @@ pub async fn get_comments(
     }
 
     Ok(Json(result))
-}// Fișier temporar pentru handler-ele noi - voi merge manual
-// Update User Profile
+} // Fișier temporar pentru handler-ele noi - voi merge manual
+  // Update User Profile
 pub async fn update_profile(
     State(pool): State<MySqlPool>,
     headers: HeaderMap,
@@ -516,7 +485,9 @@ pub async fn update_profile(
     }
     q = q.bind(now).bind(&user_id);
 
-    q.execute(&pool).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    q.execute(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Return updated user
     let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
@@ -552,8 +523,8 @@ pub async fn change_password(
     }
 
     // Hash new password
-    let new_password_hash = hash(&payload.new_password, DEFAULT_COST)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let new_password_hash =
+        hash(&payload.new_password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Update password
     query("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
@@ -618,7 +589,7 @@ pub async fn change_email(
     // For now, let's just save to email_tokens with special type
     query(
         "INSERT INTO email_tokens (id, user_id, token, token_type, expires_at)
-         VALUES (?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?)",
     )
     .bind(&token_id)
     .bind(&user_id)
@@ -651,7 +622,7 @@ pub async fn verify_email_change(
     // Find token with prefix search
     let tokens: Vec<(String, String, chrono::DateTime<Utc>)> = query_as(
         "SELECT id, token, user_id FROM email_tokens
-         WHERE token_type = 'email_change' AND expires_at > ? AND token LIKE ?"
+         WHERE token_type = 'email_change' AND expires_at > ? AND token LIKE ?",
     )
     .bind(Utc::now())
     .bind(format!("{}:%", token))
@@ -705,11 +676,16 @@ pub async fn upload_avatar(
     let user_id = get_current_user(&headers).await?;
 
     // Get the file from multipart
-    while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+    {
         let name = field.name().unwrap_or("").to_string();
 
         if name == "avatar" {
-            let filename = field.file_name()
+            let filename = field
+                .file_name()
                 .ok_or(StatusCode::BAD_REQUEST)?
                 .to_string();
 
@@ -729,7 +705,10 @@ pub async fn upload_avatar(
             let upload_path = format!("uploads/avatars/{}", new_filename);
 
             // Read file data
-            let data = field.bytes().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let data = field
+                .bytes()
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
             // Validate file size (max 5MB)
             if data.len() > 5 * 1024 * 1024 {
@@ -737,11 +716,10 @@ pub async fn upload_avatar(
             }
 
             // Save file
-            fs::write(&upload_path, &data)
-                .map_err(|e| {
-                    eprintln!("Failed to save file: {}", e);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
+            fs::write(&upload_path, &data).map_err(|e| {
+                eprintln!("Failed to save file: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
             // Update user avatar_url in database
             let avatar_url = format!("/uploads/avatars/{}", new_filename);
@@ -775,11 +753,16 @@ pub async fn upload_post_image(
     let user_id = get_current_user(&headers).await?;
 
     // Get the file from multipart
-    while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+    {
         let name = field.name().unwrap_or("").to_string();
 
         if name == "image" {
-            let filename = field.file_name()
+            let filename = field
+                .file_name()
                 .ok_or(StatusCode::BAD_REQUEST)?
                 .to_string();
 
@@ -799,7 +782,10 @@ pub async fn upload_post_image(
             let upload_path = format!("uploads/posts/{}", new_filename);
 
             // Read file data
-            let data = field.bytes().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let data = field
+                .bytes()
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
             // Validate file size (max 10MB for posts)
             if data.len() > 10 * 1024 * 1024 {
@@ -807,18 +793,16 @@ pub async fn upload_post_image(
             }
 
             // Create directory if it doesn't exist
-            fs::create_dir_all("uploads/posts")
-                .map_err(|e| {
-                    eprintln!("Failed to create directory: {}", e);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
+            fs::create_dir_all("uploads/posts").map_err(|e| {
+                eprintln!("Failed to create directory: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
             // Save file
-            fs::write(&upload_path, &data)
-                .map_err(|e| {
-                    eprintln!("Failed to save file: {}", e);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
+            fs::write(&upload_path, &data).map_err(|e| {
+                eprintln!("Failed to save file: {}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
 
             let image_url = format!("/uploads/posts/{}", new_filename);
 
@@ -990,7 +974,7 @@ pub async fn send_message(
 
     query(
         "INSERT INTO messages (id, sender_id, receiver_id, content, created_at)
-         VALUES (?, ?, ?, ?, ?)"
+         VALUES (?, ?, ?, ?, ?)",
     )
     .bind(&message_id)
     .bind(&sender_id)
@@ -1001,13 +985,11 @@ pub async fn send_message(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let message = query_as::<_, Message>(
-        "SELECT * FROM messages WHERE id = ?"
-    )
-    .bind(&message_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let message = query_as::<_, Message>("SELECT * FROM messages WHERE id = ?")
+        .bind(&message_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(message))
 }
@@ -1024,7 +1006,7 @@ pub async fn get_messages(
     let messages = query_as::<_, Message>(
         "SELECT * FROM messages
          WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
-         ORDER BY created_at ASC"
+         ORDER BY created_at ASC",
     )
     .bind(&user_id)
     .bind(other_user_id)
@@ -1074,13 +1056,12 @@ pub async fn get_user_posts(
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
     let current_user_id = get_current_user(&headers).await.ok();
 
-    let posts = query_as::<_, Post>(
-        "SELECT * FROM posts WHERE user_id = ? ORDER BY created_at DESC"
-    )
-    .bind(&user_id)
-    .fetch_all(&pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let posts =
+        query_as::<_, Post>("SELECT * FROM posts WHERE user_id = ? ORDER BY created_at DESC")
+            .bind(&user_id)
+            .fetch_all(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut result = Vec::new();
 
@@ -1098,14 +1079,13 @@ pub async fn get_user_posts(
 
     for post in posts {
         let is_liked = if let Some(ref uid) = current_user_id {
-            let count: i64 = query_scalar(
-                "SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?"
-            )
-            .bind(&post.id)
-            .bind(uid)
-            .fetch_one(&pool)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let count: i64 =
+                query_scalar("SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?")
+                    .bind(&post.id)
+                    .bind(uid)
+                    .fetch_one(&pool)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             count > 0
         } else {
             false
@@ -1164,7 +1144,7 @@ pub async fn send_verification_email(
     // Save token to database
     query(
         "INSERT INTO email_tokens (id, user_id, token, token_type, expires_at)
-         VALUES (?, ?, ?, 'verification', ?)"
+         VALUES (?, ?, ?, 'verification', ?)",
     )
     .bind(&token_id)
     .bind(&user_id)
@@ -1195,7 +1175,7 @@ pub async fn verify_email(
     // Find token
     let token_record: (String, String, chrono::DateTime<Utc>) = query_as(
         "SELECT id, user_id, expires_at FROM email_tokens
-         WHERE token = ? AND token_type = 'verification'"
+         WHERE token = ? AND token_type = 'verification'",
     )
     .bind(token)
     .fetch_one(&pool)
@@ -1252,7 +1232,7 @@ pub async fn forgot_password(
     // Save token to database
     query(
         "INSERT INTO email_tokens (id, user_id, token, token_type, expires_at)
-         VALUES (?, ?, ?, 'password_reset', ?)"
+         VALUES (?, ?, ?, 'password_reset', ?)",
     )
     .bind(&token_id)
     .bind(&user.id)
@@ -1284,7 +1264,7 @@ pub async fn reset_password(
     // Find token
     let token_record: (String, String, chrono::DateTime<Utc>) = query_as(
         "SELECT id, user_id, expires_at FROM email_tokens
-         WHERE token = ? AND token_type = 'password_reset'"
+         WHERE token = ? AND token_type = 'password_reset'",
     )
     .bind(token)
     .fetch_one(&pool)
@@ -1297,8 +1277,8 @@ pub async fn reset_password(
     }
 
     // Hash new password
-    let password_hash = hash(new_password, DEFAULT_COST)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let password_hash =
+        hash(new_password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Update password
     query("UPDATE users SET password_hash = ? WHERE id = ?")

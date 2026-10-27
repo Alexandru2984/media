@@ -1,5 +1,5 @@
-use sqlx::{MySqlPool, Row};
 use bcrypt::{hash, DEFAULT_COST};
+use sqlx::{MySqlPool, Row};
 use uuid::Uuid;
 
 #[tokio::main]
@@ -12,9 +12,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Sample usernames
     let usernames = vec![
-        "alex_cool", "maria_2024", "ion_dev", "ana_art", "mihai_tech",
-        "elena_photo", "radu_music", "diana_travel", "cosmin_gaming", "sofia_books",
-        "andrei_fitness", "laura_food", "vlad_movies", "cristina_fashion", "bogdan_sports"
+        "alex_cool",
+        "maria_2024",
+        "ion_dev",
+        "ana_art",
+        "mihai_tech",
+        "elena_photo",
+        "radu_music",
+        "diana_travel",
+        "cosmin_gaming",
+        "sofia_books",
+        "andrei_fitness",
+        "laura_food",
+        "vlad_movies",
+        "cristina_fashion",
+        "bogdan_sports",
     ];
 
     // Sample post contents
@@ -38,13 +50,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Cineva joacă ceva diseară? 🎮",
         "Producti vitatea = 📈",
         "2025 goes hard! 🔥",
-        "Learning never stops! 🧠"
+        "Learning never stops! 🧠",
     ];
 
     let comments = vec![
-        "Super tare!", "Nice!", "Interesant 🤔", "Subscriu!",
-        "Complet de acord!", "👍👍👍", "Wow!", "Genial!",
-        "Same here! 😄", "Facts! 💯", "Relatable", "Goals! 🎯"
+        "Super tare!",
+        "Nice!",
+        "Interesant 🤔",
+        "Subscriu!",
+        "Complet de acord!",
+        "👍👍👍",
+        "Wow!",
+        "Genial!",
+        "Same here! 😄",
+        "Facts! 💯",
+        "Relatable",
+        "Goals! 🎯",
     ];
 
     // Create users
@@ -57,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let id = uuid::Uuid::new_v4().to_string();
 
         let result = sqlx::query(
-            "INSERT INTO users (id, username, email, password_hash, bio) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO users (id, username, email, password_hash, bio) VALUES (?, ?, ?, ?, ?)",
         )
         .bind(&id)
         .bind(username)
@@ -71,16 +92,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(_) => {
                 user_ids.push(id);
                 println!("✅ Created user: {}", username);
-            },
+            }
             Err(e) => println!("⚠️  User {} already exists: {}", username, e),
         }
     }
 
     if user_ids.is_empty() {
         // If no new users created, get existing users
-        let existing = sqlx::query("SELECT id FROM users")
-            .fetch_all(&pool)
-            .await?;
+        let existing = sqlx::query("SELECT id FROM users").fetch_all(&pool).await?;
 
         for row in existing {
             user_ids.push(row.get::<String, _>("id"));
@@ -100,14 +119,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let content = &posts[rand::random::<usize>() % posts.len()];
         let id = uuid::Uuid::new_v4().to_string();
 
-        sqlx::query(
-            "INSERT INTO posts (id, user_id, content) VALUES (?, ?, ?)"
-        )
-        .bind(&id)
-        .bind(user_id)
-        .bind(content)
-        .execute(&pool)
-        .await?;
+        sqlx::query("INSERT INTO posts (id, user_id, content) VALUES (?, ?, ?)")
+            .bind(&id)
+            .bind(user_id)
+            .bind(content)
+            .execute(&pool)
+            .await?;
 
         post_ids.push(id);
     }
@@ -120,15 +137,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let content = &comments[rand::random::<usize>() % comments.len()];
         let id = uuid::Uuid::new_v4().to_string();
 
-        sqlx::query(
-            "INSERT INTO comments (id, post_id, user_id, content) VALUES (?, ?, ?, ?)"
-        )
-        .bind(&id)
-        .bind(post_id)
-        .bind(user_id)
-        .bind(content)
-        .execute(&pool)
-        .await?;
+        sqlx::query("INSERT INTO comments (id, post_id, user_id, content) VALUES (?, ?, ?, ?)")
+            .bind(&id)
+            .bind(post_id)
+            .bind(user_id)
+            .bind(content)
+            .execute(&pool)
+            .await?;
     }
     println!("✅ Created 50 comments");
 
@@ -137,13 +152,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let user_id = &user_ids[rand::random::<usize>() % user_ids.len()];
         let post_id = &post_ids[rand::random::<usize>() % post_ids.len()];
 
-        let _ = sqlx::query(
-            "INSERT OR IGNORE INTO likes (post_id, user_id) VALUES (?, ?)"
-        )
-        .bind(post_id)
-        .bind(user_id)
-        .execute(&pool)
-        .await;
+        let _ = sqlx::query("INSERT OR IGNORE INTO likes (post_id, user_id) VALUES (?, ?)")
+            .bind(post_id)
+            .bind(user_id)
+            .execute(&pool)
+            .await;
     }
     println!("✅ Created ~80 likes");
 
