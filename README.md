@@ -15,7 +15,8 @@ comments.
 
 ```text
 Browser
-  -> Cloudflare
+  -> Cloudflare edge
+  -> Cloudflare Tunnel (loopback transport)
   -> Nginx (TLS, static SPA, uploads, reverse proxy)
      |-> compiled frontend SPA
      `-> Rust/Axum API -> MySQL
@@ -28,7 +29,7 @@ Browser
 - Data: MySQL
 - Authentication: JWT-based authentication and bcrypt password hashes
 - Email: SMTP for verification and password-reset messages
-- Edge and origin: Cloudflare, Nginx, and a systemd-managed API process
+- Edge and origin: Cloudflare Tunnel, Nginx, and a systemd-managed API process
 
 ## Repository layout
 
