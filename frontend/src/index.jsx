@@ -1,0 +1,36 @@
+/* @refresh reload */
+import { render } from 'solid-js/web';
+import { Router, Route } from '@solidjs/router';
+import { AuthProvider } from './AuthContext';
+import { ThemeProvider } from './ThemeContext';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Profile from './pages/Profile';
+import VerifyEmail from './pages/VerifyEmail';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import VerifyEmailChange from './pages/VerifyEmailChange';
+import './index.css';
+
+const root = document.getElementById('root');
+
+render(
+  () => (
+    <ThemeProvider>
+      <AuthProvider>
+        <Router>
+          <Route path="/" component={Home} />
+          <Route path="/login" component={Login} />
+          <Route path="/register" component={Register} />
+          <Route path="/profile/:id" component={Profile} />
+          <Route path="/verify-email" component={VerifyEmail} />
+          <Route path="/forgot-password" component={ForgotPassword} />
+          <Route path="/reset-password" component={ResetPassword} />
+          <Route path="/verify-email-change" component={VerifyEmailChange} />
+        </Router>
+      </AuthProvider>
+    </ThemeProvider>
+  ),
+  root
+);
