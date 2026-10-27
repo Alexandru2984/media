@@ -31,15 +31,14 @@ bind locally, the database account is not root, dotfiles are denied, SQLx bound
 queries are visible in the binary, passwords use bcrypt, secrets are not short
 placeholders, and core tables have foreign keys and uniqueness constraints.
 
-The system is nevertheless not ready for broad feature development. The locked
-production dependency graph still matches nine RustSec vulnerabilities, browser
+The system is nevertheless not ready for broad feature development. Browser
 sessions are exposed to XSS through `localStorage`, and recovery tokens may still
 enter URLs and browser history. Follow-up containment on 2026-10-28 recovered the
-source, replaced a publicly known hard-coded JWT key, blocked direct-origin
-access, added edge limits, restricted CORS, stopped access logging on
-secret-bearing routes, sandboxed the API service, and repaired upload ownership.
-Application-level authorization, upload validation, session security, dependency
-upgrades, and observability remain open.
+source, replaced a publicly known hard-coded JWT key, eliminated the nine known
+RustSec findings, blocked direct-origin access, added edge limits, restricted
+CORS, stopped access logging on secret-bearing routes, sandboxed the API service,
+and repaired upload ownership. Application-level authorization, upload
+validation, session security, and observability remain open.
 
 ## Findings
 
@@ -51,7 +50,7 @@ upgrades, and observability remain open.
 legacy Git history was imported after removing user uploads from every imported
 commit. Backend source, migrations, `Cargo.lock`, unit tests, and a reproducible
 release command are tracked; the deployed binary was built from commit
-`8b408f1`. Frontend source and `package-lock.json` are recovered, but its build
+`aa4353a`. Frontend source and `package-lock.json` are recovered, but its build
 output still needs separation from the live document root and a verified release.
 
 - At initial review, only a minified frontend bundle and an unstripped backend
@@ -82,10 +81,14 @@ activity for evidence of forged-session use.
 
 #### SEC-002 — Known vulnerable Rust dependency set in production
 
-The backend was rebuilt from `Cargo.lock`; `cargo audit` still matches nine
-vulnerabilities against the RustSec database on 2026-10-28.
+**Status (2026-10-28): mitigated and deployed.** The recovered graph originally
+matched the nine advisories below. SQLx was upgraded from 0.7.4 to 0.9.0 with
+default features disabled and only the required Tokio, MySQL, derive, UUID, and
+Chrono features enabled. This removed the unused Rustls, WebPKI, RSA, Paste, and
+PEM dependency branches. The unmaintained `dotenv` crate was replaced by
+`dotenvy`, and unused direct dependencies were removed.
 
-| Package | Deployed | Advisory | Notes |
+| Package | Original version | Advisory | Notes |
 | --- | ---: | --- | --- |
 | `rsa` | 0.9.10 | RUSTSEC-2023-0071 | Timing side channel; no patched stable release listed |
 | `rustls` | 0.21.12 | RUSTSEC-2026-0346 | Conditional client-session secret disclosure |
@@ -97,9 +100,15 @@ vulnerabilities against the RustSec database on 2026-10-28.
 | `sqlx` | 0.7.4 | RUSTSEC-2024-0363 | Binary protocol integer cast issue; fixed in 0.8.1+ |
 | `webpki-roots` | 0.25.4 | RUSTSEC-2026-0381 | Bundled trust store includes distrusted intermediates |
 
-Additional warnings cover unmaintained `dotenv 0.15.0`, `paste 1.0.15`, and
-`rustls-pemfile 1.0.4`. Reachability must be reviewed, and the dependency set
-should be upgraded as a unit and regression-tested.
+The locked graph dropped from 296 to 260 packages. `cargo clippy --all-targets
+-- -D warnings`, unit tests, a release build, and `cargo audit` all pass. The
+candidate connected to the production database and passed API, JWT, CORS, and
+upload-serving smoke tests before atomic deployment. RustSec reported no known
+vulnerabilities or maintenance warnings in the deployed lockfile.
+
+**Follow-up:** enforce the same locked checks in CI, schedule recurring advisory
+scans, review SMTP TLS separately, and reassess the feature set if the database
+ever moves off loopback or changes authentication method.
 
 #### SEC-003 — XSS can become immediate account takeover
 

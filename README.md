@@ -59,12 +59,11 @@ Generated artifacts and runtime data must stay out of Git.
 
 The immediate project goals are:
 
-1. Upgrade the recovered dependency graph and close the remaining RustSec
-   findings.
-2. Separate frontend source from production build output and reproduce the SPA.
-3. Expand automated tests, linting, dependency auditing, and CI.
-4. Harden authentication, authorization, uploads, CORS, rate limits, Nginx,
+1. Separate frontend source from production build output and reproduce the SPA.
+2. Expand automated tests, linting, dependency auditing, and CI.
+3. Harden authentication, authorization, uploads, CORS, rate limits, Nginx,
    and the systemd sandbox.
+4. Replace browser-readable JWT storage with revocable, cookie-based sessions.
 5. Rebuild the interface as an accessible, responsive, mobile-first product.
 6. Add complete technical SEO, social metadata, structured data, and public
    indexable pages where appropriate.
@@ -92,6 +91,7 @@ Backend checks and a release build can now be reproduced with Cargo:
 
 ```bash
 cargo fmt --check --manifest-path backend/Cargo.toml
+cargo clippy --locked --manifest-path backend/Cargo.toml --all-targets -- -D warnings
 cargo test --locked --manifest-path backend/Cargo.toml
 cargo build --release --locked --manifest-path backend/Cargo.toml
 cargo audit --file backend/Cargo.lock

@@ -35,6 +35,12 @@ unpatchable or weakly isolated service only increases the blast radius.
 
 ## Phase 1 — Recover a maintainable application
 
+Progress on 2026-10-28: the sanitized legacy history, backend and frontend
+source, manifests, lockfiles, and migrations are recovered. The backend has a
+locked SQLx 0.9 build, zero known RustSec findings, strict linting, initial unit
+tests, a validated canary flow, and a deployed rollback artifact. Frontend build
+separation, broader tests, CI, staging, and release provenance remain open.
+
 1. Recover the original Git history or reconstruct the backend and frontend.
 2. Restore Rust manifests and lockfile; use a supported Rust toolchain.
 3. Restore the frontend manifest and lockfile with a documented framework.
