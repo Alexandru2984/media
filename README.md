@@ -22,7 +22,8 @@ Browser
                        `-> SMTP provider
 ```
 
-- Frontend: compiled React single-page application
+- Frontend: compiled JavaScript single-page application (the source framework
+  is not recoverable from the current snapshot with sufficient confidence)
 - API: Rust with Axum
 - Data: MySQL
 - Authentication: JWT-based authentication and bcrypt password hashes
