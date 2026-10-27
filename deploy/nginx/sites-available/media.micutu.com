@@ -1,0 +1,161 @@
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name media.micutu.com;
+
+    # Reject traffic sent directly to the origin. The variable is derived from
+    # the TCP peer before real-IP rewriting and allows Cloudflare plus loopback.
+    if ($from_cloudflare_origin = 0) {
+        return 403;
+    }
+
+    root /var/www/media.micutu.com/frontend;
+    index index.html;
+
+    access_log /var/log/nginx/media.access.log;
+    error_log /var/log/nginx/media.error.log warn;
+    server_tokens off;
+
+    client_max_body_size 64k;
+    client_body_timeout 30s;
+    client_header_timeout 10s;
+    send_timeout 30s;
+    limit_conn media_conn 30;
+    limit_conn_status 429;
+    limit_req_status 429;
+
+    include snippets/block-dotfiles.conf;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
+
+    location ^~ /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        include snippets/security-headers.conf;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    # These routes currently carry one-time secrets in the query string. Keep
+    # them out of origin logs and browser caches until the application moves the
+    # token exchange to a POST body.
+    location ~ ^/(reset-password|verify-email|verify-email-change)$ {
+        access_log off;
+        try_files $uri $uri/ /index.html;
+        include snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    # Missing machine-readable files must not become successful SPA soft-404s.
+    location = /sitemap.xml {
+        try_files $uri =404;
+    }
+
+    location = /manifest.webmanifest {
+        try_files $uri =404;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+        include snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    location ~ ^/api/auth/(login|register|forgot-password|reset-password|send-verification)$ {
+        limit_req zone=media_auth burst=5 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    location = /api/auth/verify-email {
+        access_log off;
+        limit_req zone=media_auth burst=5 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    location = /api/users/verify-email-change {
+        access_log off;
+        limit_req zone=media_auth burst=5 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    location = /api/users/me/avatar {
+        client_max_body_size 5m;
+        limit_req zone=media_upload burst=2 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    location = /api/posts/upload-image {
+        client_max_body_size 11m;
+        limit_req zone=media_upload burst=2 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    location /api/ {
+        limit_req zone=media_api burst=60 nodelay;
+        limit_req zone=media_write burst=15 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    location /uploads/ {
+        alias /var/www/media.micutu.com/backend/uploads/;
+        autoindex off;
+        limit_except GET HEAD { deny all; }
+
+        types {
+            image/jpeg jpg jpeg;
+            image/png png;
+            image/webp webp;
+        }
+        default_type application/octet-stream;
+
+        add_header Cache-Control "public, max-age=2592000, immutable" always;
+        add_header Content-Security-Policy "default-src 'none'; sandbox" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    include snippets/robots.conf;
+
+    ssl_certificate /etc/letsencrypt/live/media.micutu.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/media.micutu.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name media.micutu.com;
+
+    if ($from_cloudflare_origin = 0) {
+        return 403;
+    }
+
+    include snippets/block-dotfiles.conf;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        default_type "text/plain";
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
