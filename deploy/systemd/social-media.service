@@ -1,0 +1,67 @@
+[Unit]
+Description=Media Rust API
+Documentation=https://github.com/Alexandru2984/media
+After=network-online.target mysql.service
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/media.micutu.com/backend
+EnvironmentFile=/var/www/media.micutu.com/backend/.env
+ExecStart=/var/www/media.micutu.com/backend/social-media-backend
+Restart=always
+RestartSec=3s
+TimeoutStartSec=30s
+TimeoutStopSec=15s
+
+# The API release is immutable. User uploads are its only writable path.
+UMask=0027
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/media.micutu.com/backend/uploads
+PrivateTmp=true
+PrivateDevices=true
+PrivateMounts=true
+
+# Prevent privilege acquisition and access to host control surfaces.
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RemoveIPC=true
+KeyringMode=private
+
+# Rust/Axum needs local and Internet TCP sockets for MySQL, DNS, and SMTP.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+ProtectProc=invisible
+ProcSubset=pid
+
+# Bound damage from leaks, thread storms, and file-descriptor exhaustion.
+LimitNOFILE=8192
+TasksMax=256
+MemoryHigh=384M
+MemoryMax=512M
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=media-api
+
+[Install]
+WantedBy=multi-user.target

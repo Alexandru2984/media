@@ -31,11 +31,13 @@ placeholders, and core tables have foreign keys and uniqueness constraints.
 
 The system is nevertheless not ready for broad feature development. The source
 and reproducible build are missing, the production binary matches nine RustSec
-vulnerabilities, browser sessions are exposed to XSS through `localStorage`, the
-origin bypasses Cloudflare, auth endpoints have no observed rate limit, CORS is
-wildcard, the service sandbox scores `9.2 UNSAFE`, and recovery tokens may enter
-URLs, analytics, browser history, and access logs. Uploads are both insufficiently
-verifiable and currently not writable by the service user.
+vulnerabilities, browser sessions are exposed to XSS through `localStorage`, and
+recovery tokens may still enter URLs, analytics, and browser history. Follow-up
+containment on 2026-10-28 blocked direct-origin access, added edge limits, hid the
+backend's wildcard CORS headers, stopped access logging on secret-bearing routes,
+sandboxed the API service, and repaired upload ownership. Application-level
+authorization, upload validation, session security, dependency upgrades, and
+observability remain open.
 
 ## Findings
 
@@ -91,9 +93,14 @@ screen. Remove inline code/styles and deploy a nonce- or hash-based CSP.
 
 #### SEC-004 — Cloudflare can be bypassed and auth abuse is not throttled
 
-- Direct-origin HTTP/TLS requests return the application.
-- The Nginx Cloudflare-origin variable exists but is not enforced by this vhost.
-- No Media-specific Nginx rate/connection zones were found.
+**Status (2026-10-28): partially mitigated at the origin.** Nginx now rejects
+direct external origin traffic, preserves loopback access for Cloudflare Tunnel,
+and applies separate connection, auth, write, upload, and general API limits.
+The backend still needs account-aware throttling and abuse telemetry.
+
+- At initial review, direct-origin HTTP/TLS requests returned the application.
+- The Nginx Cloudflare-origin variable existed but was not enforced by the vhost.
+- No Media-specific Nginx rate/connection zones existed at initial review.
 - No application-level throttling dependency or response was observable.
 
 **Remediation:** allow the public application only from verified Cloudflare edge
@@ -103,10 +110,16 @@ connections. Add account-aware throttling and abuse telemetry in the application
 
 #### SEC-005 — systemd process has almost no sandbox
 
-`systemd-analyze security` reports `9.2 UNSAFE`. The service lacks
-`NoNewPrivileges`, `ProtectSystem`, `ProtectHome`, `PrivateTmp`, `PrivateDevices`,
-capability restrictions, namespace restrictions, syscall filtering, and a
-restrictive `UMask`.
+**Status (2026-10-28): mitigated and deployed.** The tracked production unit now
+uses an empty capability set, strict filesystem protection with one explicit
+writable path, private temp/devices/mounts, namespace and syscall restrictions,
+resource ceilings, and a restrictive umask. `systemd-analyze security` reports
+`1.5 OK`; local and tunneled API smoke checks pass after restart.
+
+At initial review, `systemd-analyze security` reported `9.2 UNSAFE`. The service
+lacked `NoNewPrivileges`, `ProtectSystem`, `ProtectHome`, `PrivateTmp`,
+`PrivateDevices`, capability restrictions, namespace restrictions, syscall
+filtering, and a restrictive `UMask`.
 
 **Remediation:** start with `NoNewPrivileges=true`, an empty capability set,
 `ProtectSystem=strict`, explicit read/write paths, home/kernel/control-group
@@ -114,6 +127,12 @@ protection, private temp/devices, restricted address families/namespaces, and
 resource limits. Validate email, MySQL, DNS, and uploads on staging before rollout.
 
 #### SEC-006 — Recovery and verification secrets travel in query strings
+
+**Status (2026-10-28): partially mitigated at Nginx.** Access logging is disabled
+for the known recovery and verification routes, and those responses receive
+`Cache-Control: no-store` and `Referrer-Policy: no-referrer`. URL tokens,
+analytics collection, storage design, and the POST exchange still require source
+changes.
 
 The frontend routes use `?token=` for password reset, email verification, and
 email change. Query strings can enter Nginx logs, browser history, screenshots,
@@ -124,14 +143,20 @@ rest, make them single-use and short-lived, immediately remove secrets from the
 address bar, disable analytics on secret-bearing routes, redact request logging,
 and return `Referrer-Policy: no-referrer` plus `Cache-Control: no-store`.
 
-#### SEC-007 — Upload boundary is unsafe and currently broken
+#### SEC-007 — Upload validation is unverifiable
 
-- The UI permits files up to 10 MB, but no explicit Nginx body limit was found.
+**Status (2026-10-28): filesystem and edge limits mitigated.** The upload tree is
+now owned by `www-data:www-data` with `0750` directories and `0640` files, is the
+service's only writable application path, and remains readable through Nginx.
+Nginx enforces route-specific body limits and serves only selected image media
+types. Content validation and re-encoding remain unverified without source.
+
+- The UI permits files up to 10 MB; the initial vhost had no explicit body limit.
 - Extension, MIME, magic-byte, decoded-image, dimension, and decompression limits
   cannot be verified without source.
 - Uploads are served from the primary origin, increasing active-content risk.
-- Upload directories are `755 micu:micu`, while the service runs as `www-data`;
-  the backend cannot write new files under the current permissions.
+- At initial review, upload directories were `755 micu:micu` while the service
+  ran as `www-data`, preventing backend writes.
 
 **Remediation:** use a dedicated writable directory owned by the service, outside
 the release tree; accept a minimal image allowlist; inspect magic bytes; decode
