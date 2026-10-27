@@ -4,7 +4,7 @@
 
 **Audit date:** 2026-10-28
 
-**Status:** Initial unauthenticated production audit
+**Status:** Living audit; P0 remediation in progress
 
 **Verdict:** 🔴 Mitigate P0 risks before feature expansion
 
@@ -15,12 +15,14 @@ public HTTP behavior, Nginx virtual-host configuration, the systemd service,
 filesystem permissions, TLS behavior, and recoverable Rust dependency metadata.
 Only low-volume, non-destructive public requests were made.
 
-The original source, lockfiles, tests, database migrations, authenticated test
-accounts, and a staging environment are absent. Consequently, this review does
-not claim complete code coverage and could not safely test IDOR, privilege
-boundaries, authenticated uploads, account recovery, message privacy, or
-destructive actions. No evidence of compromise was found, but absence of
-evidence is not evidence of absence.
+The legacy source and history were recovered on 2026-10-28, sanitized to remove
+real user uploads, and merged with the hardened deployment repository. A Rust
+lockfile and minimal unit tests now exist, and the backend was rebuilt and
+deployed from the tracked source. Authenticated test accounts and a staging
+environment remain absent, so IDOR, privilege boundaries, authenticated uploads,
+account recovery, message privacy, and destructive actions are not yet safely
+covered. No evidence of compromise was found, but absence of evidence is not
+evidence of absence.
 
 ## Executive summary
 
@@ -29,55 +31,75 @@ bind locally, the database account is not root, dotfiles are denied, SQLx bound
 queries are visible in the binary, passwords use bcrypt, secrets are not short
 placeholders, and core tables have foreign keys and uniqueness constraints.
 
-The system is nevertheless not ready for broad feature development. The source
-and reproducible build are missing, the production binary matches nine RustSec
-vulnerabilities, browser sessions are exposed to XSS through `localStorage`, and
-recovery tokens may still enter URLs, analytics, and browser history. Follow-up
-containment on 2026-10-28 blocked direct-origin access, added edge limits, hid the
-backend's wildcard CORS headers, stopped access logging on secret-bearing routes,
-sandboxed the API service, and repaired upload ownership. Application-level
-authorization, upload validation, session security, dependency upgrades, and
-observability remain open.
+The system is nevertheless not ready for broad feature development. The locked
+production dependency graph still matches nine RustSec vulnerabilities, browser
+sessions are exposed to XSS through `localStorage`, and recovery tokens may still
+enter URLs and browser history. Follow-up containment on 2026-10-28 recovered the
+source, replaced a publicly known hard-coded JWT key, blocked direct-origin
+access, added edge limits, restricted CORS, stopped access logging on
+secret-bearing routes, sandboxed the API service, and repaired upload ownership.
+Application-level authorization, upload validation, session security, dependency
+upgrades, and observability remain open.
 
 ## Findings
 
 ### Critical
 
-#### SEC-001 — Production cannot be reproduced or patched from source
+#### SEC-001 — Production source and build history were missing
 
-- Only a minified frontend bundle and an unstripped backend executable exist.
-- There is no `Cargo.toml`, `Cargo.lock`, package manifest, source tree, migration
-  history, test suite, CI, or release procedure.
-- A security patch cannot currently be reviewed, rebuilt, or rolled back with
-  confidence.
+**Status (2026-10-28): backend mitigated; frontend partially mitigated.** The
+legacy Git history was imported after removing user uploads from every imported
+commit. Backend source, migrations, `Cargo.lock`, unit tests, and a reproducible
+release command are tracked; the deployed binary was built from commit
+`8b408f1`. Frontend source and `package-lock.json` are recovered, but its build
+output still needs separation from the live document root and a verified release.
+
+- At initial review, only a minified frontend bundle and an unstripped backend
+  executable existed in this checkout.
+- The initial checkout had no manifest, source, migration, test, or CI history.
+- CI, staging, complete integration tests, and a consolidated release procedure
+  remain open.
 
 **Remediation:** recover the exact source and history if possible. Otherwise,
 reconstruct behind a new test suite and migrate through a staging/canary release.
 Require locked builds, checksums, an SBOM, migrations, and a rollback artifact.
 
+#### SEC-001A — JWTs used a public hard-coded signing key
+
+**Status (2026-10-28): critical issue mitigated and deployed.** Recovered source
+revealed that `JWT_SECRET` was ignored and every token used the literal example
+key `your-secret-key-here-change-in-production`. A non-destructive token for an
+inexistent UUID proved that the live backend accepted that key. The backend now
+requires a configured secret of at least 32 bytes, validates it at startup, pins
+HS256 explicitly, and uses the production environment secret. The old key now
+returns `401`; previous sessions were invalidated by the rotation.
+
+**Follow-up:** migrate to revocable server-side sessions, add key versioning and
+rotation procedures, alert on invalid-token spikes, and review logs and account
+activity for evidence of forged-session use.
+
 ### High
 
 #### SEC-002 — Known vulnerable Rust dependency set in production
 
-`cargo audit bin` recovered 95 dependencies and matched nine vulnerabilities
-against a RustSec database updated on 2026-10-27.
+The backend was rebuilt from `Cargo.lock`; `cargo audit` still matches nine
+vulnerabilities against the RustSec database on 2026-10-28.
 
 | Package | Deployed | Advisory | Notes |
 | --- | ---: | --- | --- |
-| `bytes` | 1.10.1 | RUSTSEC-2026-0007 | Memory corruption; fixed in 1.11.1+ |
-| `lettre` | 0.11.19 | RUSTSEC-2026-0141 | BoringTLS-only; that feature was not observed |
-| `rsa` | 0.9.8 | RUSTSEC-2023-0071 | Timing side channel; no patched stable release listed |
+| `rsa` | 0.9.10 | RUSTSEC-2023-0071 | Timing side channel; no patched stable release listed |
 | `rustls` | 0.21.12 | RUSTSEC-2026-0346 | Conditional client-session secret disclosure |
 | `rustls` | 0.21.12 | RUSTSEC-2026-0349 | Conditional key-exchange downgrade |
 | `rustls-webpki` | 0.101.7 | RUSTSEC-2026-0382 | Distrusted intermediates may be accepted |
 | `rustls-webpki` | 0.101.7 | RUSTSEC-2026-0099 | Incorrect wildcard name constraints |
 | `rustls-webpki` | 0.101.7 | RUSTSEC-2026-0098 | URI name constraints ignored |
 | `rustls-webpki` | 0.101.7 | RUSTSEC-2026-0104 | Conditional CRL parsing panic |
+| `sqlx` | 0.7.4 | RUSTSEC-2024-0363 | Binary protocol integer cast issue; fixed in 0.8.1+ |
+| `webpki-roots` | 0.25.4 | RUSTSEC-2026-0381 | Bundled trust store includes distrusted intermediates |
 
-Additional warnings include unsound versions of `anyhow 1.0.100`, `rand 0.8.5`,
-and `tokio 1.48.0`; unmaintained `dotenv 0.15.0` and `rustls-pemfile 1.0.4`;
-and yanked `spin 0.9.8`. Reachability must be confirmed from restored source, but
-the dependency set should be upgraded as a unit and regression-tested.
+Additional warnings cover unmaintained `dotenv 0.15.0`, `paste 1.0.15`, and
+`rustls-pemfile 1.0.4`. Reachability must be reviewed, and the dependency set
+should be upgraded as a unit and regression-tested.
 
 #### SEC-003 — XSS can become immediate account takeover
 
@@ -152,17 +174,18 @@ rest, make them single-use and short-lived, immediately remove secrets from the
 address bar, disable analytics on secret-bearing routes, redact request logging,
 and return `Referrer-Policy: no-referrer` plus `Cache-Control: no-store`.
 
-#### SEC-007 — Upload validation is unverifiable
+#### SEC-007 — Upload validation is insufficient
 
 **Status (2026-10-28): filesystem and edge limits mitigated.** The upload tree is
 now owned by `www-data:www-data` with `0750` directories and `0640` files, is the
 service's only writable application path, and remains readable through Nginx.
 Nginx enforces route-specific body limits and serves only selected image media
-types. Content validation and re-encoding remain unverified without source.
+types. Recovered source confirms that content validation and re-encoding are
+absent.
 
 - The UI permits files up to 10 MB; the initial vhost had no explicit body limit.
-- Extension, MIME, magic-byte, decoded-image, dimension, and decompression limits
-  cannot be verified without source.
+- Upload handling trusts filename extensions and does not verify MIME, magic
+  bytes, decoded-image dimensions, or decompression cost.
 - Uploads are served from the primary origin, increasing active-content risk.
 - At initial review, upload directories were `755 micu:micu` while the service
   ran as `www-data`, preventing backend writes.
@@ -211,8 +234,12 @@ processors, and test the GDPR incident workflow.
 
 #### SEC-011 — CORS trusts every origin, method, and header
 
-Preflights from an unrelated origin receive wildcard origin, methods, and headers
-on auth and content endpoints, despite a configured production origin.
+**Status (2026-10-28): mitigated and deployed.** The backend now requires one
+configured origin and an explicit method/header set. Nginx continues to hide
+backend CORS headers from undocumented cross-origin clients.
+
+At initial review, preflights from an unrelated origin received wildcard origin,
+methods, and headers on auth and content endpoints.
 
 **Remediation:** same-origin browser traffic needs no CORS. Disable it by default
 or use an exact allowlist only for documented external clients. Never combine a
@@ -229,9 +256,13 @@ separate migration role/job, transaction-safe data changes, and restore tests.
 
 #### SEC-013 — Insecure configuration fallbacks are embedded
 
-The executable includes development defaults for the database, JWT key, SMTP,
-and application URL. Production currently supplies stronger values, but a missing
-environment file may start an unsafe configuration instead of failing closed.
+**Status (2026-10-28): partially mitigated.** JWT and CORS configuration now fail
+closed at startup, and server bind configuration is validated. Database, SMTP,
+and application-URL fallbacks still require removal.
+
+The executable still includes development defaults for the database, SMTP, and
+application URL. Production supplies stronger values, but a missing environment
+variable may still start an unsafe partial configuration.
 
 **Remediation:** make production secrets and URLs mandatory, validate them at
 startup, reject placeholders and non-loopback database defaults, and emit only
@@ -328,7 +359,8 @@ service; ownership, DPAs, retention, regions, and last security review are unkno
 
 ## Exit criteria for the P0 gate
 
-- Source and locked builds are recoverable from a clean checkout.
+- Source and a locked backend build are recoverable from a clean checkout;
+  frontend release reproduction remains open.
 - Critical dependencies are upgraded and `cargo audit` has no unaccepted finding.
 - Origin bypass, wildcard CORS, auth abuse, and upload permissions are fixed.
 - Session migration and token-log containment are designed and tested.
