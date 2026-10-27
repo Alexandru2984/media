@@ -46,7 +46,9 @@ server {
     # token exchange to a POST body.
     location ~ ^/(reset-password|verify-email|verify-email-change)$ {
         access_log off;
-        try_files $uri $uri/ /index.html;
+        # Serve the SPA entry in this location instead of internally redirecting
+        # to /index.html, which would replace this route's security policy.
+        try_files /index.html =404;
         include snippets/security-headers.conf;
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
@@ -58,10 +60,14 @@ server {
     # Missing machine-readable files must not become successful SPA soft-404s.
     location = /sitemap.xml {
         try_files $uri =404;
+        include snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
     }
 
     location = /manifest.webmanifest {
         try_files $uri =404;
+        include snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;
     }
 
     location / {
