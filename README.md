@@ -58,8 +58,9 @@ The immediate project goals are:
 6. Add complete technical SEO, social metadata, structured data, and public
    indexable pages where appropriate.
 
-Detailed findings and the implementation roadmap will be added after the
-baseline audit is complete.
+See the [security audit](docs/SECURITY_AUDIT.md) and the
+[implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,
+and planned product work.
 
 ## Configuration
 
