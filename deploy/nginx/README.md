@@ -7,17 +7,19 @@ conf.d/media-rate-limit.conf
   -> /etc/nginx/conf.d/media-rate-limit.conf
 snippets/media-api-proxy.conf
   -> /etc/nginx/snippets/media-api-proxy.conf
+snippets/media-security-headers.conf
+  -> /etc/nginx/snippets/media-security-headers.conf
 sites-available/media.micutu.com
   -> /etc/nginx/sites-available/media.micutu.com
 ```
 
 The vhost depends on the host-managed `cloudflare-origin-guard.conf`,
-`cloudflare-realip.conf`, `security-headers.conf`, `block-dotfiles.conf`, and
-`robots.conf` files. It must not be enabled on a host without those dependencies.
+`cloudflare-realip.conf`, and `block-dotfiles.conf` files. It must not be enabled
+on a host without those dependencies.
 
 ## Validation and rollout
 
-1. Back up all three target files outside the repository.
+1. Back up every existing target file outside the repository.
 2. Install the files as root with mode `0644` and owner `root:root`.
 3. Run `nginx -t`; restore the backups immediately on failure.
 4. Reload, do not restart, Nginx.

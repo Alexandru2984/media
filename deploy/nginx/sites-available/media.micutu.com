@@ -36,7 +36,7 @@ server {
     location ^~ /assets/ {
         try_files $uri =404;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
-        include snippets/security-headers.conf;
+        include snippets/media-security-headers.conf;
         add_header Cross-Origin-Resource-Policy "same-origin" always;
         add_header X-Permitted-Cross-Domain-Policies "none" always;
     }
@@ -49,9 +49,8 @@ server {
         # Serve the SPA entry in this location instead of internally redirecting
         # to /index.html, which would replace this route's security policy.
         try_files /index.html =404;
-        include snippets/security-headers.conf;
+        include snippets/media-security-headers.conf;
         add_header Cache-Control "no-store" always;
-        add_header Referrer-Policy "no-referrer" always;
         add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
         add_header Cross-Origin-Opener-Policy "same-origin" always;
         add_header Cross-Origin-Resource-Policy "same-origin" always;
@@ -62,7 +61,7 @@ server {
     # directly so the route keeps this response policy.
     location ~ ^/(login|register|forgot-password|profile/[^/]+)/?$ {
         try_files /index.html =404;
-        include snippets/security-headers.conf;
+        include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
         add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
         add_header Cross-Origin-Opener-Policy "same-origin" always;
@@ -73,14 +72,14 @@ server {
     location = /sitemap.xml {
         try_files $uri =404;
         default_type application/xml;
-        include snippets/security-headers.conf;
+        include snippets/media-security-headers.conf;
         add_header Cache-Control "public, max-age=3600" always;
     }
 
     location = /manifest.webmanifest {
         try_files $uri =404;
         default_type application/manifest+json;
-        include snippets/security-headers.conf;
+        include snippets/media-security-headers.conf;
         add_header Cache-Control "public, max-age=3600" always;
     }
 
@@ -88,13 +87,13 @@ server {
         try_files $uri =404;
         access_log off;
         default_type text/plain;
-        include snippets/security-headers.conf;
+        include snippets/media-security-headers.conf;
         add_header Cache-Control "public, max-age=3600" always;
     }
 
     location / {
         try_files $uri $uri/ /index.html;
-        include snippets/security-headers.conf;
+        include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
         add_header Cross-Origin-Opener-Policy "same-origin" always;
         add_header Cross-Origin-Resource-Policy "same-origin" always;

@@ -81,8 +81,16 @@ the dependency set should be upgraded as a unit and regression-tested.
 
 #### SEC-003 — XSS can become immediate account takeover
 
+**Status (2026-10-28): defense in depth improved; core risk remains.** The
+site-specific CSP now denies objects, base URL changes, foreign form actions,
+inline event-handler attributes, and inline style elements. Cloudflare injects a
+dynamic inline challenge script at the edge, so `script-src 'unsafe-inline'`
+cannot yet be removed without changing that Cloudflare feature. The compiled app
+also relies heavily on inline style attributes. JWT storage remains unchanged.
+
 - The frontend stores the bearer JWT in `localStorage`.
-- The CSP permits `'unsafe-inline'` for scripts and styles.
+- The CSP still permits inline scripts and style attributes for the compatibility
+  constraints above.
 - The token persists across browser sessions and is available to any JavaScript
   executing on the origin.
 
