@@ -450,7 +450,7 @@ pub async fn update_profile(
     State(pool): State<MySqlPool>,
     headers: HeaderMap,
     Json(payload): Json<UpdateUser>,
-) -> Result<Json<User>, StatusCode> {
+) -> Result<Json<Value>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
     let now = Utc::now();
 
@@ -489,7 +489,13 @@ pub async fn update_profile(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(Json(user))
+    Ok(Json(json!({
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "bio": user.bio,
+        "avatar_url": user.avatar_url
+    })))
 }
 
 // Change Password

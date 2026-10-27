@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+// Database-only model. Deliberately not serializable: responses must opt in to
+// safe fields instead of accidentally exposing password_hash or internal flags.
+#[derive(Debug, sqlx::FromRow)]
 pub struct User {
     pub id: String,
     pub username: String,
@@ -11,7 +13,6 @@ pub struct User {
     pub bio: Option<String>,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
