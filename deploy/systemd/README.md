@@ -10,7 +10,9 @@ The service intentionally writes only to
 `/var/www/media.micutu.com/backend/uploads`. Before rollout, that directory and
 its descendants must be owned by `www-data:www-data`; use mode `0750` for
 directories and `0640` for files. The environment file remains root-readable by
-systemd and must never be committed.
+systemd, is deployed as `root:root` with mode `0600`, and must never be
+committed. The service process receives the parsed environment from systemd and
+does not need read access to the file itself.
 
 ## Validation and rollout
 

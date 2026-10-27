@@ -36,6 +36,7 @@ Browser
 ```text
 backend/
   .env                  # local production secrets; never committed
+  .env.example          # safe variable-name and development-value template
   social-media-backend  # generated executable; never committed
   uploads/              # user-generated content; never committed
 frontend/
@@ -75,7 +76,8 @@ JWT signing secret, SMTP, and server binding.
 
 - Never commit `.env` files, credentials, tokens, database dumps, private keys,
   email-provider secrets, or real user uploads.
-- A redacted `.env.example` must be added alongside the restored source.
+- Copy `backend/.env.example` for local development and replace every placeholder
+  with environment-specific values; never reuse production credentials locally.
 - Production secrets must be generated independently and rotated if exposure is
   suspected; examples and tests must use non-production values.
 
