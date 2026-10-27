@@ -39,7 +39,11 @@ backend/
   social-media-backend  # generated executable; never committed
   uploads/              # user-generated content; never committed
 frontend/
-  index.html            # current SPA entry document
+  index.html            # current SPA entry document and global metadata
+  icon.svg              # scalable application mark
+  manifest.webmanifest  # browser/PWA metadata
+  robots.txt            # crawler policy for this hostname
+  sitemap.xml           # currently indexable public URLs
   assets/               # generated hashed bundles; never committed
 ```
 

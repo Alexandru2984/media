@@ -131,8 +131,9 @@ resource limits. Validate email, MySQL, DNS, and uploads on staging before rollo
 **Status (2026-10-28): partially mitigated at Nginx.** Access logging is disabled
 for the known recovery and verification routes, and those responses receive
 `Cache-Control: no-store` and `Referrer-Policy: no-referrer`. URL tokens,
-analytics collection, storage design, and the POST exchange still require source
-changes.
+storage design, browser history, and the POST exchange still require source
+changes. Umami query-string collection is disabled globally, and sensitive
+routes are marked `noindex`.
 
 The frontend routes use `?token=` for password reset, email verification, and
 email change. Query strings can enter Nginx logs, browser history, screenshots,

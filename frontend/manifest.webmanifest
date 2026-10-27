@@ -1,0 +1,20 @@
+{
+  "name": "Media",
+  "short_name": "Media",
+  "description": "Conectează-te, distribuie postări și imagini și participă la conversații.",
+  "lang": "ro",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

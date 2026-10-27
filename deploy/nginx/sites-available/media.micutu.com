@@ -44,7 +44,7 @@ server {
     # These routes currently carry one-time secrets in the query string. Keep
     # them out of origin logs and browser caches until the application moves the
     # token exchange to a POST body.
-    location ~ ^/(reset-password|verify-email|verify-email-change)$ {
+    location ~ ^/(reset-password|verify-email|verify-email-change)/?$ {
         access_log off;
         # Serve the SPA entry in this location instead of internally redirecting
         # to /index.html, which would replace this route's security policy.
@@ -52,22 +52,44 @@ server {
         include snippets/security-headers.conf;
         add_header Cache-Control "no-store" always;
         add_header Referrer-Policy "no-referrer" always;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
         add_header Cross-Origin-Opener-Policy "same-origin" always;
         add_header Cross-Origin-Resource-Policy "same-origin" always;
         add_header X-Permitted-Cross-Domain-Policies "none" always;
     }
 
-    # Missing machine-readable files must not become successful SPA soft-404s.
+    # Private application routes must not enter a search index. Serve the SPA
+    # directly so the route keeps this response policy.
+    location ~ ^/(login|register|forgot-password|profile/[^/]+)/?$ {
+        try_files /index.html =404;
+        include snippets/security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
     location = /sitemap.xml {
         try_files $uri =404;
+        default_type application/xml;
         include snippets/security-headers.conf;
-        add_header Cache-Control "no-store" always;
+        add_header Cache-Control "public, max-age=3600" always;
     }
 
     location = /manifest.webmanifest {
         try_files $uri =404;
+        default_type application/manifest+json;
         include snippets/security-headers.conf;
-        add_header Cache-Control "no-store" always;
+        add_header Cache-Control "public, max-age=3600" always;
+    }
+
+    location = /robots.txt {
+        try_files $uri =404;
+        access_log off;
+        default_type text/plain;
+        include snippets/security-headers.conf;
+        add_header Cache-Control "public, max-age=3600" always;
     }
 
     location / {
@@ -135,8 +157,6 @@ server {
         add_header X-Frame-Options "DENY" always;
         add_header X-Permitted-Cross-Domain-Policies "none" always;
     }
-
-    include snippets/robots.conf;
 
     ssl_certificate /etc/letsencrypt/live/media.micutu.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/media.micutu.com/privkey.pem;
