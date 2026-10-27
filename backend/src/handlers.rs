@@ -14,6 +14,7 @@ use crate::{
     auth::{create_jwt, get_user_id_from_headers, verify_jwt},
     email::EmailService,
     models::*,
+    uploads::validated_image_extension,
 };
 use rand::Rng;
 
@@ -670,8 +671,6 @@ pub async fn upload_avatar(
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<Value>, StatusCode> {
     use std::fs;
-    use std::path::Path;
-
     let user_id = get_current_user(&headers).await?;
 
     // Get the file from multipart
@@ -687,21 +686,7 @@ pub async fn upload_avatar(
                 .file_name()
                 .ok_or(StatusCode::BAD_REQUEST)?
                 .to_string();
-
-            // Validate file extension
-            let ext = Path::new(&filename)
-                .extension()
-                .and_then(|s| s.to_str())
-                .ok_or(StatusCode::BAD_REQUEST)?
-                .to_lowercase();
-
-            if !["jpg", "jpeg", "png", "gif", "webp"].contains(&ext.as_str()) {
-                return Err(StatusCode::BAD_REQUEST);
-            }
-
-            // Generate unique filename
-            let new_filename = format!("{}_{}.{}", user_id, Uuid::new_v4(), ext);
-            let upload_path = format!("uploads/avatars/{}", new_filename);
+            let content_type = field.content_type().map(ToString::to_string);
 
             // Read file data
             let data = field
@@ -713,6 +698,13 @@ pub async fn upload_avatar(
             if data.len() > 5 * 1024 * 1024 {
                 return Err(StatusCode::PAYLOAD_TOO_LARGE);
             }
+
+            let extension = validated_image_extension(&filename, content_type.as_deref(), &data)
+                .ok_or(StatusCode::UNSUPPORTED_MEDIA_TYPE)?;
+
+            // Generate a server-controlled filename after validation.
+            let new_filename = format!("{}_{}.{}", user_id, Uuid::new_v4(), extension);
+            let upload_path = format!("uploads/avatars/{}", new_filename);
 
             // Save file
             fs::write(&upload_path, &data).map_err(|e| {
@@ -746,8 +738,6 @@ pub async fn upload_post_image(
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<Value>, StatusCode> {
     use std::fs;
-    use std::path::Path;
-
     let user_id = get_current_user(&headers).await?;
 
     // Get the file from multipart
@@ -763,21 +753,7 @@ pub async fn upload_post_image(
                 .file_name()
                 .ok_or(StatusCode::BAD_REQUEST)?
                 .to_string();
-
-            // Validate file extension
-            let ext = Path::new(&filename)
-                .extension()
-                .and_then(|s| s.to_str())
-                .ok_or(StatusCode::BAD_REQUEST)?
-                .to_lowercase();
-
-            if !["jpg", "jpeg", "png", "gif", "webp"].contains(&ext.as_str()) {
-                return Err(StatusCode::BAD_REQUEST);
-            }
-
-            // Generate unique filename
-            let new_filename = format!("post_{}_{}.{}", user_id, Uuid::new_v4(), ext);
-            let upload_path = format!("uploads/posts/{}", new_filename);
+            let content_type = field.content_type().map(ToString::to_string);
 
             // Read file data
             let data = field
@@ -789,6 +765,13 @@ pub async fn upload_post_image(
             if data.len() > 10 * 1024 * 1024 {
                 return Err(StatusCode::PAYLOAD_TOO_LARGE);
             }
+
+            let extension = validated_image_extension(&filename, content_type.as_deref(), &data)
+                .ok_or(StatusCode::UNSUPPORTED_MEDIA_TYPE)?;
+
+            // Generate a server-controlled filename after validation.
+            let new_filename = format!("post_{}_{}.{}", user_id, Uuid::new_v4(), extension);
+            let upload_path = format!("uploads/posts/{}", new_filename);
 
             // Create directory if it doesn't exist
             fs::create_dir_all("uploads/posts").map_err(|e| {

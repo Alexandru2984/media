@@ -316,7 +316,7 @@ export default function ProfileSettings(props) {
                   <input
                     type="file"
                     id="avatar-upload"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                     style={styles().fileInput}
                     onChange={handleAvatarChange}
                   />
@@ -324,7 +324,7 @@ export default function ProfileSettings(props) {
                     {avatarFile() ? '✅ Imagine selectată' : '📁 Selectează Imagine'}
                   </label>
                   <div style={styles().hint}>
-                    Format acceptat: JPG, PNG, GIF, WEBP (max 5MB)
+                    Formate acceptate: JPG, PNG, WEBP (max. 5 MB)
                   </div>
                 </div>
 

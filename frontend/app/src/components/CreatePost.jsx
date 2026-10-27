@@ -217,7 +217,7 @@ export default function CreatePost(props) {
             <input
               type="file"
               id="post-image"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
               style={styles.fileInput}
               onChange={handleImageChange}
             />

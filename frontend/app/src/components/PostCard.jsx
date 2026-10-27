@@ -585,7 +585,7 @@ export default function PostCard(props) {
           <input
             type="file"
             id={`edit-image-${props.post.id}`}
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
             style={styles().fileInput}
             onChange={handleEditImageChange}
           />
