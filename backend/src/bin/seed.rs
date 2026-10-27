@@ -1,6 +1,5 @@
 use bcrypt::{hash, DEFAULT_COST};
 use sqlx::{MySqlPool, Row};
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

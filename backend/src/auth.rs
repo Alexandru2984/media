@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 const MINIMUM_JWT_SECRET_BYTES: usize = 32;
 
 fn validate_secret(secret: String) -> Result<String> {
-    if secret.as_bytes().len() < MINIMUM_JWT_SECRET_BYTES {
+    if secret.len() < MINIMUM_JWT_SECRET_BYTES {
         bail!(
             "JWT_SECRET must contain at least {} bytes",
             MINIMUM_JWT_SECRET_BYTES

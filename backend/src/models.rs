@@ -119,14 +119,6 @@ pub struct MessageWithUser {
     pub sender_avatar: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Like {
-    pub id: String,
-    pub post_id: String,
-    pub user_id: String,
-    pub created_at: DateTime<Utc>,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserProfile {
     pub id: String,

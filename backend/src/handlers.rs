@@ -6,7 +6,7 @@ use axum::{
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::Utc;
 use serde_json::{json, Value};
-use sqlx::{query, query_as, query_scalar, MySqlPool};
+use sqlx::{query, query_as, query_scalar, MySql, MySqlPool, QueryBuilder};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -37,8 +37,8 @@ pub async fn register(
     .bind(&payload.email)
     .bind(&password_hash)
     .bind(&payload.bio)
-    .bind(&now)
-    .bind(&now)
+    .bind(now)
+    .bind(now)
     .execute(&pool)
     .await;
 
@@ -62,7 +62,7 @@ pub async fn register(
             .bind(&token_id)
             .bind(&user_id)
             .bind(&verification_token)
-            .bind(&expires_at)
+            .bind(expires_at)
             .execute(&pool)
             .await;
 
@@ -218,8 +218,8 @@ pub async fn create_post(
     .bind(&user_id)
     .bind(&payload.content)
     .bind(&payload.image_url)
-    .bind(&now)
-    .bind(&now)
+    .bind(now)
+    .bind(now)
     .execute(&pool)
     .await
     .map_err(|e| {
@@ -355,7 +355,7 @@ pub async fn like_post(
             .bind(&like_id)
             .bind(&post_id)
             .bind(&user_id)
-            .bind(&now)
+            .bind(now)
             .execute(&pool)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -389,8 +389,8 @@ pub async fn create_comment(
     .bind(&post_id)
     .bind(&user_id)
     .bind(&payload.content)
-    .bind(&now)
-    .bind(&now)
+    .bind(now)
+    .bind(now)
     .execute(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -454,38 +454,31 @@ pub async fn update_profile(
     let user_id = get_current_user(&headers).await?;
     let now = Utc::now();
 
-    // Build dynamic update query
-    let mut updates = Vec::new();
-    let mut bindings = Vec::new();
-
-    if let Some(username) = &payload.username {
-        updates.push("username = ?");
-        bindings.push(username.clone());
-    }
-    if let Some(bio) = &payload.bio {
-        updates.push("bio = ?");
-        bindings.push(bio.clone());
-    }
-    if let Some(avatar_url) = &payload.avatar_url {
-        updates.push("avatar_url = ?");
-        bindings.push(avatar_url.clone());
-    }
-
-    if updates.is_empty() {
+    if payload.username.is_none() && payload.bio.is_none() && payload.avatar_url.is_none() {
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    updates.push("updated_at = ?");
+    let mut builder = QueryBuilder::<MySql>::new("UPDATE users SET ");
+    {
+        let mut updates = builder.separated(", ");
 
-    let query_str = format!("UPDATE users SET {} WHERE id = ?", updates.join(", "));
-    let mut q = query(&query_str);
+        if let Some(username) = &payload.username {
+            updates.push("username = ").push_bind(username);
+        }
+        if let Some(bio) = &payload.bio {
+            updates.push("bio = ").push_bind(bio);
+        }
+        if let Some(avatar_url) = &payload.avatar_url {
+            updates.push("avatar_url = ").push_bind(avatar_url);
+        }
 
-    for binding in bindings {
-        q = q.bind(binding);
+        updates.push("updated_at = ").push_bind(now);
     }
-    q = q.bind(now).bind(&user_id);
+    builder.push(" WHERE id = ").push_bind(&user_id);
 
-    q.execute(&pool)
+    builder
+        .build()
+        .execute(&pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -593,9 +586,9 @@ pub async fn change_email(
     )
     .bind(&token_id)
     .bind(&user_id)
-    .bind(&format!("{}:{}", token, payload.new_email)) // Store email with token
+    .bind(format!("{}:{}", token, payload.new_email)) // Store email with token
     .bind("email_change")
-    .bind(&expires_at)
+    .bind(expires_at)
     .execute(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -743,7 +736,6 @@ pub async fn upload_avatar(
 
 // Upload Post Image
 pub async fn upload_post_image(
-    State(pool): State<MySqlPool>,
     headers: HeaderMap,
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<Value>, StatusCode> {
@@ -841,7 +833,7 @@ pub async fn update_post(
     query("UPDATE posts SET content = ?, image_url = ?, updated_at = ? WHERE id = ?")
         .bind(&payload.content)
         .bind(&payload.image_url)
-        .bind(&now)
+        .bind(now)
         .bind(&post_id)
         .execute(&pool)
         .await
@@ -909,7 +901,7 @@ pub async fn update_comment(
 
     query("UPDATE comments SET content = ?, updated_at = ? WHERE id = ?")
         .bind(&payload.content)
-        .bind(&now)
+        .bind(now)
         .bind(&comment_id)
         .execute(&pool)
         .await
@@ -980,7 +972,7 @@ pub async fn send_message(
     .bind(&sender_id)
     .bind(&payload.receiver_id)
     .bind(&payload.content)
-    .bind(&now)
+    .bind(now)
     .execute(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -1149,7 +1141,7 @@ pub async fn send_verification_email(
     .bind(&token_id)
     .bind(&user_id)
     .bind(&token)
-    .bind(&expires_at)
+    .bind(expires_at)
     .execute(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -1237,7 +1229,7 @@ pub async fn forgot_password(
     .bind(&token_id)
     .bind(&user.id)
     .bind(&token)
-    .bind(&expires_at)
+    .bind(expires_at)
     .execute(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

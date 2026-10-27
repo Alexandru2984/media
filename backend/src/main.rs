@@ -12,7 +12,7 @@ use tower_http::services::ServeDir;
 
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
     auth::validate_configuration().expect("Invalid JWT configuration");
