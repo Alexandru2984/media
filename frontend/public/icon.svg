@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Media</title>
+  <defs>
+    <linearGradient id="background" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8" />
+      <stop offset="1" stop-color="#2563eb" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#background)" />
+  <path d="M16 46V18h8l8 11 8-11h8v28h-8V30l-8 10-8-10v16z" fill="#fff" />
+</svg>
