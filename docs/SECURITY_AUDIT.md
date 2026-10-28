@@ -18,12 +18,14 @@ Only low-volume, non-destructive public requests were made.
 The legacy source and history were recovered on 2026-10-28, sanitized to remove
 real user uploads, and merged with the hardened deployment repository. A Rust
 lockfile and minimal unit tests now exist, and the backend was rebuilt and
-deployed from the tracked source. A disposable account exercised login, session
-lookup, logout, revoked-cookie rejection, and cleanup against a canary process;
-the production database returned to zero users and sessions afterward. A staging
-environment remains absent, so IDOR, privilege boundaries, message privacy, and
-destructive actions are not yet safely covered end to end. No evidence of
-compromise was found, but absence of evidence is not evidence of absence.
+deployed from the tracked source. Disposable accounts exercised login, session
+lookup, individual/bulk remote logout, cross-account IDOR rejection, the
+20-session cap, idle expiry, revoked-cookie rejection, and cleanup against canary
+processes; the production database returned to zero users and sessions afterward.
+A staging environment remains absent, so IDOR for other objects, privilege
+boundaries, message privacy, and destructive actions are not yet safely covered
+end to end. No evidence of compromise was found, but absence of evidence is not
+evidence of absence.
 
 ## Executive summary
 
@@ -45,11 +47,13 @@ were also repaired. Browser-readable session storage was removed, unsafe API
 methods now require the exact configured origin, one-time tokens are hashed at
 rest, input boundaries are enforced server-side, engagement writes are
 transactional, and feed N+1 queries were collapsed. Embedded versioned MySQL
-migrations now replace startup DDL. Centralized authorization tests, session
-device management, image re-encoding, metrics/alerting, and tested recovery remain
-open. One-time links now keep secrets in URL fragments, scrub them from browser
-history, and exchange them through POST bodies. API requests emit redacted JSON
-events with request IDs, status, path, and latency.
+migrations now replace startup DDL. Session inventory, scoped remote logout,
+24-hour idle expiry, seven-day absolute expiry, and a 20-session account cap are
+deployed. Centralized authorization tests, security-event history, image
+re-encoding, metrics/alerting, and tested recovery remain open. One-time links now
+keep secrets in URL fragments, scrub them from browser history, and exchange them
+through POST bodies. API requests emit redacted JSON events with request IDs,
+status, path, and latency.
 
 ## Findings
 
@@ -141,11 +145,12 @@ The compiled app also relies heavily on inline style attributes.
   constraints above.
 - Only a SHA-256 digest of each high-entropy token is stored. Logout revokes the
   current session; password and verified-email changes revoke all sessions.
-- Device inventory, idle timeout, and remote logout are not yet available.
+- Active-session inventory, individual/bulk remote logout, a 24-hour idle timeout,
+  seven-day absolute timeout, and a 20-session cap are deployed. IP addresses and
+  User-Agent strings are deliberately not retained, so device labels are absent.
 
-**Remediation:** add synchronizer CSRF tokens, idle expiry, a session-management
-screen, and anomaly alerts. Remove inline code/styles and deploy a nonce- or
-hash-based CSP.
+**Remediation:** add synchronizer CSRF tokens, security-event history, and anomaly
+alerts. Remove inline code/styles and deploy a nonce- or hash-based CSP.
 
 #### SEC-004 — Cloudflare can be bypassed and auth abuse is not throttled
 
@@ -250,12 +255,14 @@ baseline improved.**
   exact production origin.
 - Server-side logout revocation is deployed; password and verified-email changes
   revoke every active session and password change rotates into a fresh session.
-- No MFA/passkeys, recovery codes, breached-password check, security event
-  history, device inventory, remote logout, or login alert was observed.
+- Users can inspect active sessions and revoke one or all other sessions. Inactive
+  sessions expire after 24 hours and each account is capped at 20.
+- No MFA/passkeys, recovery codes, breached-password check, security-event
+  history, or login alert was observed.
 
 **Remediation:** adopt modern password guidance, Argon2id for new hashes with
 transparent migration, email verification gates, optional passkeys/TOTP, hashed
-recovery codes, device/session management, reauthentication for risk events, and
+recovery codes, reauthentication for risk events, security-event history, and
 generic auth/recovery responses.
 
 #### SEC-009 — Detection, response, and recovery are not demonstrated
@@ -435,7 +442,7 @@ DPAs, retention, regions, and last security review are unknown.
 - Critical dependencies are upgraded and `cargo audit` has no unaccepted finding.
 - Origin bypass, wildcard CORS, auth abuse, and upload permissions are fixed.
 - Opaque cookie sessions, CSRF origin enforcement, token-log containment, and
-  server-side revocation are deployed; device management remains open.
+  server-side revocation, inventory, idle expiry, and remote logout are deployed.
 - systemd sandbox score is materially reduced without breaking required I/O.
 - Health checks, alerts, backup restore, rollback, and incident ownership work.
 - Authz/IDOR, recovery, upload, and data lifecycle tests pass on staging.

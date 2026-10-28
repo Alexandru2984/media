@@ -43,7 +43,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-28: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 25 unit
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 26 unit
 tests, embedded versioned MySQL migrations, a validated canary flow, and deployed
 rollback artifacts. The frontend has
 a locked dependency graph with zero npm audit findings and builds from a source
@@ -73,15 +73,17 @@ They use a hardened `__Host-` HttpOnly cookie; JWT and browser-readable credenti
 support have been removed. Logout revokes the current session, while password
 reset/change and verified email changes revoke every session. Unsafe methods
 enforce the exact configured origin. Recovery links use non-transmitted URL
-fragments, scrub browser history, and exchange through POST. Device management,
-idle expiry, security event history, MFA, and explicit synchronizer CSRF tokens
-remain open.
+fragments, scrub browser history, and exchange through POST. An active-session
+dashboard supports scoped remote logout without collecting IP or User-Agent data;
+sessions have a 24-hour idle timeout, a seven-day absolute timeout, and a limit of
+20 per account. Security event history, MFA, login alerts, and explicit
+synchronizer CSRF tokens remain open.
 
 - Opaque server-side sessions in `__Host-` HttpOnly cookies. ✅
 - Origin checks, absolute timeout, password-change rotation, and revocation on
   password reset or verified email change. ✅
-- Synchronizer CSRF tokens and idle expiry.
-- Session/device dashboard with remote logout and security event history.
+- Idle expiry and a session dashboard with scoped remote logout. ✅
+- Synchronizer CSRF tokens and security event history.
 - Passkeys/WebAuthn, optional TOTP, hashed recovery codes, and login alerts.
 - Strong password policy, breached-password screening, Argon2id migration, and
   reauthentication for high-risk changes.

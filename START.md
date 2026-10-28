@@ -58,7 +58,8 @@ aplicația nu acceptă `Authorization: Bearer` și nu păstrează credentiale î
 
 În baza de date se stochează numai hashul SHA-256 al tokenului aleator. Logoutul
 revocă sesiunea curentă. Schimbarea sau resetarea parolei și confirmarea unei noi
-adrese de email revocă sesiunile existente.
+adrese de email revocă sesiunile existente. O sesiune expiră după 24 de ore de
+inactivitate sau după maximum șapte zile.
 
 Requesturile nesigure (`POST`, `PUT`, `DELETE`) trebuie să aibă exact originea
 configurată în `CORS_ORIGIN`. Clienții de dezvoltare trebuie să folosească proxy-ul
@@ -67,7 +68,8 @@ Vite sau să trimită originea locală configurată.
 ## Endpointuri principale
 
 - `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`
-- `GET /api/auth/me`
+- `GET /api/auth/me`, `GET|DELETE /api/auth/sessions`
+- `DELETE /api/auth/sessions/:id`
 - `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
 - `GET /api/posts`, `POST /api/posts`, `PUT|DELETE /api/posts/:id`
 - `POST /api/posts/:id/like`

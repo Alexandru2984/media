@@ -62,7 +62,7 @@ Generated artifacts and runtime data must stay out of Git.
 
 The next project goals are:
 
-1. Add session/device management, idle expiry, login alerts, and stronger
+1. Add security-event history, login alerts, MFA/passkeys, and stronger
    reauthentication for high-risk account changes.
 2. Add database integration tests, browser CI, migration checks, and automated
    release/rollback workflows around the deployed versioned migrations.
