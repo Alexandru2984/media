@@ -18,7 +18,7 @@ export default function ForgotPassword() {
       await api.forgotPassword(email());
       setSent(true);
     } catch (err) {
-      setError('Email-ul nu a fost găsit');
+      setError('Solicitarea nu a putut fi procesată. Încearcă din nou.');
     } finally {
       setLoading(false);
     }
@@ -119,7 +119,7 @@ export default function ForgotPassword() {
         {sent() ? (
           <>
             <div style={styles.success}>
-              ✅ Email trimis! Verifică inbox-ul pentru instrucțiuni.
+              Dacă există un cont pentru această adresă, vei primi instrucțiunile de resetare.
             </div>
             <div style={styles.backLink} onClick={() => navigate('/login')}>
               ← Înapoi la autentificare

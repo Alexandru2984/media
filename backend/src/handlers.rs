@@ -1201,47 +1201,55 @@ pub async fn forgot_password(
     State(pool): State<MySqlPool>,
     Json(payload): Json<HashMap<String, String>>,
 ) -> Result<Json<Value>, StatusCode> {
-    let email = payload.get("email").ok_or(StatusCode::BAD_REQUEST)?;
+    let email = payload
+        .get("email")
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .ok_or(StatusCode::BAD_REQUEST)?;
+    let email_service = EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Find user
-    let user: User = query_as("SELECT * FROM users WHERE email = ?")
-        .bind(email)
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| StatusCode::NOT_FOUND)?;
-
-    // Generate random token
-    let token: String = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(32)
-        .map(char::from)
-        .collect();
-
-    let token_id = Uuid::new_v4().to_string();
-    let expires_at = Utc::now() + chrono::Duration::hours(1);
-
-    // Save token to database
-    query(
-        "INSERT INTO email_tokens (id, user_id, token, token_type, expires_at)
-         VALUES (?, ?, ?, 'password_reset', ?)",
+    // A missing account is intentionally indistinguishable from an existing one.
+    let user = query_as::<_, (String, String, String)>(
+        "SELECT id, email, username FROM users WHERE email = ?",
     )
-    .bind(&token_id)
-    .bind(&user.id)
-    .bind(&token)
-    .bind(expires_at)
-    .execute(&pool)
+    .bind(email)
+    .fetch_optional(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Send email
-    let email_service = EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    email_service
-        .send_password_reset_email(&user.email, &user.username, &token)
+    if let Some((user_id, user_email, username)) = user {
+        let token: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(48)
+            .map(char::from)
+            .collect();
+        let token_id = Uuid::new_v4().to_string();
+        let expires_at = Utc::now() + chrono::Duration::hours(1);
+
+        query(
+            "INSERT INTO email_tokens (id, user_id, token, token_type, expires_at)
+             VALUES (?, ?, ?, 'password_reset', ?)",
+        )
+        .bind(&token_id)
+        .bind(&user_id)
+        .bind(&token)
+        .bind(expires_at)
+        .execute(&pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+        tokio::spawn(async move {
+            if let Err(error) = email_service
+                .send_password_reset_email(&user_email, &username, &token)
+                .await
+            {
+                eprintln!("Failed to send password reset email: {}", error);
+            }
+        });
+    }
+
     Ok(Json(json!({
-        "message": "Email de resetare trimis"
+        "message": "Dacă există un cont pentru această adresă, vei primi instrucțiunile de resetare"
     })))
 }
 
