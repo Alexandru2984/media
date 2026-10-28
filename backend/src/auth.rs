@@ -117,6 +117,10 @@ fn cookie_token(headers: &HeaderMap) -> Option<&str> {
     } else {
         DEVELOPMENT_COOKIE_NAME
     };
+    cookie_token_for_name(headers, expected_name)
+}
+
+fn cookie_token_for_name<'a>(headers: &'a HeaderMap, expected_name: &str) -> Option<&'a str> {
     headers
         .get(header::COOKIE)?
         .to_str()
@@ -144,8 +148,10 @@ pub fn get_user_id_from_headers(headers: &HeaderMap) -> Result<String, StatusCod
 #[cfg(test)]
 mod tests {
     use super::{
-        build_clear_session_cookie, build_session_cookie, validate_secret, MINIMUM_JWT_SECRET_BYTES,
+        build_clear_session_cookie, build_session_cookie, cookie_token_for_name, validate_secret,
+        MINIMUM_JWT_SECRET_BYTES,
     };
+    use axum::http::{header, HeaderMap, HeaderValue};
 
     #[test]
     fn short_secrets_are_rejected() {
@@ -174,5 +180,19 @@ mod tests {
         assert!(cookie.contains("Max-Age=0"));
         assert!(cookie.contains("HttpOnly"));
         assert!(cookie.ends_with("; Secure"));
+    }
+
+    #[test]
+    fn reads_only_the_expected_cookie_name() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("theme=dark; __Host-media_session=signed.jwt; other=value"),
+        );
+        assert_eq!(
+            cookie_token_for_name(&headers, "__Host-media_session"),
+            Some("signed.jwt")
+        );
+        assert_eq!(cookie_token_for_name(&headers, "media_session"), None);
     }
 }

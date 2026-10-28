@@ -11,9 +11,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::{
-    auth::{
-        clear_session_cookie, create_jwt, get_user_id_from_headers, session_cookie, verify_jwt,
-    },
+    auth::{clear_session_cookie, create_jwt, get_user_id_from_headers, session_cookie},
     email::EmailService,
     models::*,
     tokens::{generate_one_time_token, hash_one_time_token},
@@ -219,17 +217,7 @@ pub async fn logout() -> Result<(HeaderMap, Json<Value>), StatusCode> {
 
 // Helper function to extract user from token
 pub async fn get_current_user(headers: &HeaderMap) -> Result<String, StatusCode> {
-    let auth_header = headers
-        .get("authorization")
-        .and_then(|h| h.to_str().ok())
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    let token = auth_header
-        .strip_prefix("Bearer ")
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-
-    let claims = verify_jwt(token).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    Ok(claims.sub)
+    get_user_id_from_headers(headers)
 }
 
 // User handlers
