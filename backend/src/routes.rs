@@ -4,10 +4,13 @@ use axum::{
 };
 use sqlx::MySqlPool;
 
-use crate::handlers;
+use crate::{handlers, health};
 
 pub fn create_routes(pool: MySqlPool) -> Router {
     let api_routes = Router::new()
+        // Operational health routes expose no dependency detail.
+        .route("/health/live", get(health::live))
+        .route("/health/ready", get(health::ready))
         // Auth routes
         .route("/auth/register", post(handlers::register))
         .route("/auth/login", post(handlers::login))

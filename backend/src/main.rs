@@ -2,6 +2,7 @@ mod auth;
 mod database;
 mod email;
 mod handlers;
+mod health;
 mod models;
 mod routes;
 mod uploads;
