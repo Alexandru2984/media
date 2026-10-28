@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::{json, Value};
 use sqlx::{query, query_as, query_scalar, MySql, MySqlPool, QueryBuilder};
-use std::{collections::HashMap, path::Path as FileSystemPath};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::{
@@ -23,6 +23,11 @@ use crate::{
         SECURITY_EVENT_RETENTION_DAYS,
     },
     tokens::{generate_one_time_token, hash_one_time_token},
+    upload_lifecycle::{
+        attach_avatar_upload, claim_post_upload, discard_upload, finish_deleting_upload_by_url,
+        mark_post_upload_deleting, mark_post_upload_pending, reserve_upload, ManagedUploadKind,
+        UploadLifecycleError,
+    },
     uploads::{process_uploaded_image, ImageProcessingError, ImagePurpose},
     validation::{
         bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
@@ -39,6 +44,17 @@ fn image_processing_status(error: ImageProcessingError) -> StatusCode {
         ImageProcessingError::OutputTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
         ImageProcessingError::WorkerUnavailable => {
             tracing::error!("image processing worker unavailable");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+fn upload_lifecycle_status(error: UploadLifecycleError) -> StatusCode {
+    match error {
+        UploadLifecycleError::AccountQuotaExceeded => StatusCode::INSUFFICIENT_STORAGE,
+        UploadLifecycleError::PendingLimitExceeded => StatusCode::TOO_MANY_REQUESTS,
+        UploadLifecycleError::Database(error) => {
+            tracing::error!(error = %error, "managed upload operation failed");
             StatusCode::INTERNAL_SERVER_ERROR
         }
     }
@@ -108,30 +124,6 @@ fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
     }
 }
 
-async fn remove_managed_upload(url: Option<&str>, expected_prefix: &str, filename_prefix: &str) {
-    let Some(url) = url else {
-        return;
-    };
-    if !stored_image_path_belongs_to_user(url, expected_prefix, filename_prefix) {
-        return;
-    }
-
-    let Some(filename) = url.strip_prefix(expected_prefix) else {
-        return;
-    };
-    if filename.is_empty() || filename.contains('/') {
-        return;
-    }
-
-    let directory = expected_prefix.trim_matches('/');
-    let upload_path = FileSystemPath::new(directory).join(filename);
-    if let Err(error) = tokio::fs::remove_file(&upload_path).await {
-        if error.kind() != std::io::ErrorKind::NotFound {
-            tracing::error!(error = %error, "failed to remove superseded upload");
-        }
-    }
-}
-
 async fn remove_unreferenced_post_upload(pool: &MySqlPool, url: Option<&str>, user_id: &str) {
     let Some(url) = url else {
         return;
@@ -146,7 +138,7 @@ async fn remove_unreferenced_post_upload(pool: &MySqlPool, url: Option<&str>, us
         .fetch_one(pool)
         .await;
     match references {
-        Ok(0) => remove_managed_upload(Some(url), "/uploads/posts/", &filename_prefix).await,
+        Ok(0) => finish_deleting_upload_by_url(pool, url).await,
         Ok(_) => {}
         Err(error) => tracing::error!(error = %error, "failed to check upload references"),
     }
@@ -575,6 +567,10 @@ pub async fn create_post(
 
     let post_id = Uuid::new_v4().to_string();
     let now = Utc::now();
+    let mut transaction = pool.begin().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to begin post creation transaction");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     query(
         "INSERT INTO posts (id, user_id, content, image_url, created_at, updated_at)
@@ -586,10 +582,27 @@ pub async fn create_post(
     .bind(&payload.image_url)
     .bind(now)
     .bind(now)
-    .execute(&pool)
+    .execute(&mut *transaction)
     .await
     .map_err(|e| {
         tracing::error!(error = %e, "failed to create post");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if let Some(image_url) = payload.image_url.as_deref() {
+        let claimed = claim_post_upload(&mut transaction, &user_id, image_url, &post_id)
+            .await
+            .map_err(|error| {
+                tracing::error!(error = %error, "failed to claim post upload");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+        if !claimed {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+
+    transaction.commit().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to commit post creation");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -1204,53 +1217,42 @@ pub async fn upload_avatar(
             // Generate a server-controlled filename after validation.
             let new_filename = format!("{}_{}.{}", user_id, Uuid::new_v4(), processed.extension);
             let upload_path = format!("uploads/avatars/{}", new_filename);
-            let avatar_filename_prefix = format!("{}_", user_id);
-            let previous_avatar: Option<String> =
-                query_scalar("SELECT avatar_url FROM users WHERE id = ?")
-                    .bind(&user_id)
-                    .fetch_one(&pool)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-            tokio::fs::create_dir_all("uploads/avatars")
-                .await
-                .map_err(|error| {
-                    tracing::error!(error = %error, "failed to create avatar upload directory");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
-            tokio::fs::write(&upload_path, &processed.data)
-                .await
-                .map_err(|error| {
-                    tracing::error!(error = %error, "failed to save avatar");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
-
-            // Update user avatar_url in database
             let avatar_url = format!("/uploads/avatars/{}", new_filename);
-            let update_result =
-                query("UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?")
-                    .bind(&avatar_url)
-                    .bind(Utc::now())
-                    .bind(&user_id)
-                    .execute(&pool)
-                    .await;
-            if !update_result.is_ok_and(|result| result.rows_affected() == 1) {
-                remove_managed_upload(
-                    Some(&avatar_url),
-                    "/uploads/avatars/",
-                    &avatar_filename_prefix,
-                )
-                .await;
+            let upload_id = reserve_upload(
+                &pool,
+                &user_id,
+                &avatar_url,
+                ManagedUploadKind::Avatar,
+                processed.data.len(),
+            )
+            .await
+            .map_err(upload_lifecycle_status)?;
+
+            if let Err(error) = tokio::fs::create_dir_all("uploads/avatars").await {
+                tracing::error!(error = %error, "failed to create avatar upload directory");
+                discard_upload(&pool, &upload_id).await;
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+            if let Err(error) = tokio::fs::write(&upload_path, &processed.data).await {
+                tracing::error!(error = %error, "failed to save avatar");
+                discard_upload(&pool, &upload_id).await;
                 return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
 
+            let previous_avatar =
+                match attach_avatar_upload(&pool, &upload_id, &user_id, &avatar_url).await {
+                    Ok(previous_avatar) => previous_avatar,
+                    Err(error) => {
+                        tracing::error!(error = %error, "failed to attach avatar upload");
+                        discard_upload(&pool, &upload_id).await;
+                        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                    }
+                };
+
             if previous_avatar.as_deref() != Some(avatar_url.as_str()) {
-                remove_managed_upload(
-                    previous_avatar.as_deref(),
-                    "/uploads/avatars/",
-                    &avatar_filename_prefix,
-                )
-                .await;
+                if let Some(previous_avatar) = previous_avatar.as_deref() {
+                    finish_deleting_upload_by_url(&pool, previous_avatar).await;
+                }
             }
 
             return Ok(Json(json!({
@@ -1315,23 +1317,34 @@ pub async fn upload_post_image(
                 processed.extension
             );
             let upload_path = format!("uploads/posts/{}", new_filename);
-
-            // Create directory if it doesn't exist
-            tokio::fs::create_dir_all("uploads/posts")
-                .await
-                .map_err(|error| {
-                    tracing::error!(error = %error, "failed to create post upload directory");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
-
-            tokio::fs::write(&upload_path, &processed.data)
-                .await
-                .map_err(|error| {
-                    tracing::error!(error = %error, "failed to save post image");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
-
             let image_url = format!("/uploads/posts/{}", new_filename);
+            let upload_id = reserve_upload(
+                &pool,
+                &user_id,
+                &image_url,
+                ManagedUploadKind::Post,
+                processed.data.len(),
+            )
+            .await
+            .map_err(upload_lifecycle_status)?;
+
+            if let Err(error) = tokio::fs::create_dir_all("uploads/posts").await {
+                tracing::error!(error = %error, "failed to create post upload directory");
+                discard_upload(&pool, &upload_id).await;
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+
+            if let Err(error) = tokio::fs::write(&upload_path, &processed.data).await {
+                tracing::error!(error = %error, "failed to save post image");
+                discard_upload(&pool, &upload_id).await;
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+
+            if let Err(error) = mark_post_upload_pending(&pool, &upload_id).await {
+                tracing::error!(error = %error, "failed to mark post upload ready");
+                discard_upload(&pool, &upload_id).await;
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
 
             return Ok(Json(json!({
                 "image_url": image_url,
@@ -1362,11 +1375,15 @@ pub async fn update_post(
     }
 
     let now = Utc::now();
+    let mut transaction = pool.begin().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to begin post update transaction");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Check ownership
-    let post = query_as::<_, Post>("SELECT * FROM posts WHERE id = ?")
+    let post = query_as::<_, Post>("SELECT * FROM posts WHERE id = ? FOR UPDATE")
         .bind(&post_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
@@ -1376,14 +1393,44 @@ pub async fn update_post(
     }
     let previous_image_url = post.image_url.clone();
 
+    if previous_image_url != payload.image_url {
+        if let Some(previous_image_url) = previous_image_url.as_deref() {
+            mark_post_upload_deleting(&mut transaction, &post_id, previous_image_url)
+                .await
+                .map_err(|error| {
+                    tracing::error!(error = %error, "failed to release previous post upload");
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+        }
+    }
+
     query("UPDATE posts SET content = ?, image_url = ?, updated_at = ? WHERE id = ?")
         .bind(content)
         .bind(&payload.image_url)
         .bind(now)
         .bind(&post_id)
-        .execute(&pool)
+        .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if previous_image_url != payload.image_url {
+        if let Some(image_url) = payload.image_url.as_deref() {
+            let claimed = claim_post_upload(&mut transaction, &user_id, image_url, &post_id)
+                .await
+                .map_err(|error| {
+                    tracing::error!(error = %error, "failed to claim replacement post upload");
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+            if !claimed {
+                return Err(StatusCode::BAD_REQUEST);
+            }
+        }
+    }
+
+    transaction.commit().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to commit post update");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let updated_post = query_as::<_, Post>("SELECT * FROM posts WHERE id = ?")
         .bind(&post_id)
@@ -1405,11 +1452,15 @@ pub async fn delete_post(
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
     let user_id = get_current_user(&pool, &headers).await?;
+    let mut transaction = pool.begin().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to begin post deletion transaction");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     // Check ownership
-    let post = query_as::<_, Post>("SELECT * FROM posts WHERE id = ?")
+    let post = query_as::<_, Post>("SELECT * FROM posts WHERE id = ? FOR UPDATE")
         .bind(&post_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
@@ -1419,11 +1470,25 @@ pub async fn delete_post(
     }
     let image_url = post.image_url.clone();
 
+    if let Some(image_url) = image_url.as_deref() {
+        mark_post_upload_deleting(&mut transaction, &post_id, image_url)
+            .await
+            .map_err(|error| {
+                tracing::error!(error = %error, "failed to release deleted post upload");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    }
+
     query("DELETE FROM posts WHERE id = ?")
         .bind(&post_id)
-        .execute(&pool)
+        .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction.commit().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to commit post deletion");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     remove_unreferenced_post_upload(&pool, image_url.as_deref(), &user_id).await;
 

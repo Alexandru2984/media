@@ -9,6 +9,7 @@ mod routes;
 mod security;
 mod security_events;
 mod tokens;
+mod upload_lifecycle;
 mod uploads;
 mod validation;
 
@@ -51,6 +52,7 @@ async fn main() {
     let db_pool = database::init_db()
         .await
         .expect("Failed to initialize database");
+    upload_lifecycle::spawn_upload_maintenance(db_pool.clone());
 
     // Build our application with routes
     let cors = CorsLayer::new()
