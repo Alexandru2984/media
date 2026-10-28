@@ -2,11 +2,12 @@ use crate::tokens::{generate_one_time_token, hash_one_time_token, ONE_TIME_TOKEN
 use anyhow::{bail, Context, Result};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use chrono::{Duration, Utc};
-use sqlx::{query, query_scalar, MySqlPool};
+use sqlx::{query, query_as, query_scalar, MySqlPool};
 use uuid::Uuid;
 
 const SESSION_MAX_AGE_SECONDS: usize = 7 * 24 * 60 * 60;
 const SESSION_ACTIVITY_WRITE_INTERVAL_MINUTES: i64 = 5;
+const MAXIMUM_ACTIVE_SESSIONS_PER_USER: usize = 20;
 const PRODUCTION_COOKIE_NAME: &str = "__Host-media_session";
 const DEVELOPMENT_COOKIE_NAME: &str = "media_session";
 
@@ -90,23 +91,54 @@ fn session_token_is_valid(token: &str) -> bool {
 pub async fn issue_session(pool: &MySqlPool, user_id: &str) -> Result<String> {
     let token = generate_one_time_token();
     let token_hash = hash_one_time_token(&token);
+    let session_id = Uuid::new_v4().to_string();
     let now = Utc::now();
     let expires_at = now + Duration::seconds(SESSION_MAX_AGE_SECONDS as i64);
+    let mut transaction = pool.begin().await.context("Failed to begin session")?;
 
     query(
         "INSERT INTO sessions
             (id, user_id, token_hash, created_at, last_seen_at, expires_at)
          VALUES (?, ?, ?, ?, ?, ?)",
     )
-    .bind(Uuid::new_v4().to_string())
+    .bind(&session_id)
     .bind(user_id)
     .bind(token_hash)
     .bind(now)
     .bind(now)
     .bind(expires_at)
-    .execute(pool)
+    .execute(&mut *transaction)
     .await
     .context("Failed to create session")?;
+
+    let excess_session_ids = query_scalar::<_, String>(
+        "SELECT id FROM sessions
+         WHERE user_id = ? AND id != ? AND revoked_at IS NULL AND expires_at > ?
+         ORDER BY last_seen_at DESC, created_at DESC
+         LIMIT ? OFFSET ?",
+    )
+    .bind(user_id)
+    .bind(&session_id)
+    .bind(now)
+    .bind(100_u32)
+    .bind((MAXIMUM_ACTIVE_SESSIONS_PER_USER - 1) as u32)
+    .fetch_all(&mut *transaction)
+    .await
+    .context("Failed to enforce the active session limit")?;
+
+    for excess_session_id in excess_session_ids {
+        query("DELETE FROM sessions WHERE id = ? AND user_id = ?")
+            .bind(excess_session_id)
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .context("Failed to remove an excess session")?;
+    }
+
+    transaction
+        .commit()
+        .await
+        .context("Failed to commit session")?;
 
     let cleanup_before = now - Duration::days(1);
     if let Err(error) = query(
@@ -125,10 +157,16 @@ pub async fn issue_session(pool: &MySqlPool, user_id: &str) -> Result<String> {
     Ok(token)
 }
 
-pub async fn get_user_id_from_headers(
+#[derive(Debug)]
+pub struct AuthenticatedSession {
+    pub user_id: String,
+    pub session_id: String,
+}
+
+pub async fn get_authenticated_session(
     pool: &MySqlPool,
     headers: &HeaderMap,
-) -> Result<String, StatusCode> {
+) -> Result<AuthenticatedSession, StatusCode> {
     let token = cookie_token(headers).ok_or(StatusCode::UNAUTHORIZED)?;
     if !session_token_is_valid(token) {
         return Err(StatusCode::UNAUTHORIZED);
@@ -136,8 +174,8 @@ pub async fn get_user_id_from_headers(
 
     let token_hash = hash_one_time_token(token);
     let now = Utc::now();
-    let user_id = query_scalar::<_, String>(
-        "SELECT user_id FROM sessions
+    let (user_id, session_id) = query_as::<_, (String, String)>(
+        "SELECT user_id, id FROM sessions
          WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?
          LIMIT 1",
     )
@@ -165,7 +203,19 @@ pub async fn get_user_id_from_headers(
         tracing::warn!(error = %error, "failed to update session activity");
     }
 
-    Ok(user_id)
+    Ok(AuthenticatedSession {
+        user_id,
+        session_id,
+    })
+}
+
+pub async fn get_user_id_from_headers(
+    pool: &MySqlPool,
+    headers: &HeaderMap,
+) -> Result<String, StatusCode> {
+    get_authenticated_session(pool, headers)
+        .await
+        .map(|session| session.user_id)
 }
 
 pub async fn revoke_current_session(pool: &MySqlPool, headers: &HeaderMap) -> Result<()> {

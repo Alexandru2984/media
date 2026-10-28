@@ -20,6 +20,11 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/auth/logout", post(handlers::logout))
         .route("/auth/me", get(handlers::me))
         .route(
+            "/auth/sessions",
+            get(handlers::list_sessions).delete(handlers::revoke_other_sessions),
+        )
+        .route("/auth/sessions/:id", delete(handlers::revoke_session))
+        .route(
             "/auth/send-verification",
             post(handlers::send_verification_email),
         )

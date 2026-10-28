@@ -5,6 +5,7 @@ use axum::{
 };
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use serde_json::{json, Value};
 use sqlx::{query, query_as, query_scalar, MySql, MySqlPool, QueryBuilder};
 use std::{collections::HashMap, path::Path as FileSystemPath};
@@ -12,8 +13,8 @@ use uuid::Uuid;
 
 use crate::{
     auth::{
-        clear_session_cookie, get_user_id_from_headers, issue_session, revoke_current_session,
-        session_cookie,
+        clear_session_cookie, get_authenticated_session, get_user_id_from_headers, issue_session,
+        revoke_current_session, session_cookie,
     },
     email::EmailService,
     models::*,
@@ -53,6 +54,23 @@ struct CommentFeedRow {
     user_id: String,
     username: String,
     avatar_url: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct ActiveSessionRow {
+    id: String,
+    created_at: DateTime<Utc>,
+    last_seen_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+struct ActiveSessionResponse {
+    id: String,
+    created_at: DateTime<Utc>,
+    last_seen_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+    current: bool,
 }
 
 fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
@@ -311,6 +329,92 @@ pub async fn logout(
         clear_session_cookie().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
     );
     Ok((headers, Json(json!({ "message": "Sesiune încheiată" }))))
+}
+
+pub async fn list_sessions(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let current_session = get_authenticated_session(&pool, &headers).await?;
+    let rows = query_as::<_, ActiveSessionRow>(
+        "SELECT id, created_at, last_seen_at, expires_at
+         FROM sessions
+         WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?
+         ORDER BY last_seen_at DESC, created_at DESC",
+    )
+    .bind(&current_session.user_id)
+    .bind(Utc::now())
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let sessions: Vec<ActiveSessionResponse> = rows
+        .into_iter()
+        .map(|row| ActiveSessionResponse {
+            current: row.id == current_session.session_id,
+            id: row.id,
+            created_at: row.created_at,
+            last_seen_at: row.last_seen_at,
+            expires_at: row.expires_at,
+        })
+        .collect();
+
+    Ok(Json(json!({ "sessions": sessions })))
+}
+
+pub async fn revoke_session(
+    State(pool): State<MySqlPool>,
+    Path(session_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    if Uuid::parse_str(&session_id).is_err() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let current_session = get_authenticated_session(&pool, &headers).await?;
+    if session_id == current_session.session_id {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let result = query(
+        "UPDATE sessions SET revoked_at = ?
+         WHERE id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?",
+    )
+    .bind(Utc::now())
+    .bind(&session_id)
+    .bind(&current_session.user_id)
+    .bind(Utc::now())
+    .execute(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if result.rows_affected() != 1 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    Ok(Json(json!({ "message": "Sesiunea a fost revocată" })))
+}
+
+pub async fn revoke_other_sessions(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let current_session = get_authenticated_session(&pool, &headers).await?;
+    let result = query(
+        "UPDATE sessions SET revoked_at = ?
+         WHERE user_id = ? AND id != ? AND revoked_at IS NULL AND expires_at > ?",
+    )
+    .bind(Utc::now())
+    .bind(&current_session.user_id)
+    .bind(&current_session.session_id)
+    .bind(Utc::now())
+    .execute(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(json!({
+        "message": "Celelalte sesiuni au fost revocate",
+        "revoked": result.rows_affected()
+    })))
 }
 
 // Helper function to extract user from token
