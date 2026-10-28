@@ -76,7 +76,7 @@ The next project goals are:
 5. Expand the responsive product with relationships, notifications, moderation,
    privacy controls, cursor pagination, and richer discovery.
 6. Add server-rendered or pre-rendered public profiles/posts, privacy/terms/help
-   pages, share images, and Core Web Vitals monitoring.
+   pages, Search Console integration, and real-user Core Web Vitals monitoring.
 
 See the [security audit](docs/SECURITY_AUDIT.md) and the
 [implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,

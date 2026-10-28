@@ -137,8 +137,11 @@ authenticated three-column feed, navigation, composer, post/comment cards,
 profiles, account settings, recovery/verification flows, skeletons, empty/error
 states, accessible SVG controls, reduced-motion handling, and mobile layouts are
 deployed. The mobile bottom navigation, responsive search, expanded landing,
-public about/community pages, footer, and branded 404 state are also live.
-Browser-based visual regression, toasts, dialogs, accessibility automation, and
+public about/community pages, footer, and branded 404 state are also live. The
+landing now explains the real product flow and exposes session, security-history,
+and upload controls without promising unimplemented relationship features. Its
+light desktop, light mobile, dark mobile, and 320 px layouts were visually checked
+in Chromium. Automated visual regression, toasts, dialogs, accessibility CI, and
 the remaining product pages are open.
 
 ### Design system
@@ -210,19 +213,29 @@ the remaining product pages are open.
 ## Phase 5 — SEO and shareability
 
 **Progress (2026-10-28):** the public shell has Romanian language metadata,
-canonical and social tags, WebSite JSON-LD, manifest, favicon, crawler policy,
-and a valid XML sitemap. Route-aware titles, descriptions, canonical URLs, and
-client-side robots directives are implemented; Nginx also returns real
-`X-Robots-Tag: noindex` headers for private and token-bearing routes. The public
-landing, about and community-rules pages are in the sitemap, while unknown paths
-render the branded SPA state with HTTP 404 and `noindex`. Public SSR or
-prerendering, share images, public profile/post URLs, privacy/terms/help content,
-Search Console, and Core Web Vitals monitoring remain open.
+canonical and social tags, route-appropriate JSON-LD, manifest, favicon, crawler
+policy, and a valid XML sitemap. The production build emits distinct initial HTML
+for the landing, about, and community-rules routes, including unique titles,
+descriptions, canonical/hreflang URLs, Open Graph/Twitter cards, and a dedicated
+1200×630 share image. Client-side navigation keeps that metadata synchronized.
+Nginx serves the pre-rendered route documents, returns real `X-Robots-Tag:
+noindex` headers for private and token-bearing routes, and keeps unknown paths at
+HTTP 404. Public profile/post rendering, privacy/terms/help content, Search
+Console, and real-user Core Web Vitals monitoring remain open.
+
+A mobile Lighthouse snapshot against the Cloudflare-served production page
+scored SEO 100, accessibility 100, performance 80, and best practices 77, with
+2.0 s LCP and 0.005 CLS. Most measured blocking time and both deprecation notices
+came from Cloudflare Challenge/RUM code injected at the edge; the remaining
+console finding is the expected anonymous `401` from `/api/auth/me`. Review the
+Cloudflare bot/challenge and analytics settings before treating those two scores
+as application-bundle regressions.
 
 1. Render public profiles/posts on the server or pre-render them; keep private and
    application-only routes out of the index.
 2. Use `lang="ro"`, route-specific title/description, canonical URL, robots,
-   Open Graph, Twitter cards, and high-quality share images.
+   Open Graph, Twitter cards, and high-quality share images. ✅ for the landing,
+   about, and community-rules pages.
 3. Add appropriate JSON-LD for the site, breadcrumbs, people, and public posts;
    validate against current Google guidance rather than emitting unsupported data.
 4. Keep sitemap timestamps and XML/content types valid; add deliberate `410`
@@ -237,9 +250,11 @@ Search Console, and Core Web Vitals monitoring remain open.
 9. Monitor Search Console, crawl/index coverage, rich-result validity, 404s,
    sitemap freshness, and real-user CWV.
 
-The original urgent metadata, MIME-routing, and soft-404 defects are closed. The
-highest remaining SEO constraint is architectural: public content is still a
-client-side SPA, and profiles/posts do not yet have server-rendered public pages.
+The original urgent metadata, MIME-routing, public-route metadata, share-image,
+and soft-404 defects are closed. The highest remaining SEO constraint is
+architectural: user-generated profiles/posts still have no server-rendered public
+pages, and the build-time route list is intentionally limited to stable editorial
+content.
 
 ## Phase 6 — Reliability, observability, and operations
 
