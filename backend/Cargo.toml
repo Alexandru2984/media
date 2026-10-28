@@ -22,3 +22,4 @@ lettre = "0.11"
 dotenvy = "0.15"
 url = "2.5"
 sha2 = "0.10"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }

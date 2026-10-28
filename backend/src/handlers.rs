@@ -23,7 +23,7 @@ use crate::{
         SECURITY_EVENT_RETENTION_DAYS,
     },
     tokens::{generate_one_time_token, hash_one_time_token},
-    uploads::validated_image_extension,
+    uploads::{process_uploaded_image, ImageProcessingError, ImagePurpose},
     validation::{
         bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
         one_time_token_is_valid, password_is_safe_to_verify, password_is_valid,
@@ -32,6 +32,17 @@ use crate::{
         MAXIMUM_POST_CHARACTERS,
     },
 };
+
+fn image_processing_status(error: ImageProcessingError) -> StatusCode {
+    match error {
+        ImageProcessingError::InvalidImage => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        ImageProcessingError::OutputTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+        ImageProcessingError::WorkerUnavailable => {
+            tracing::error!("image processing worker unavailable");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
 
 #[derive(sqlx::FromRow)]
 struct PostFeedRow {
@@ -1180,11 +1191,18 @@ pub async fn upload_avatar(
                 return Err(StatusCode::PAYLOAD_TOO_LARGE);
             }
 
-            let extension = validated_image_extension(&filename, content_type.as_deref(), &data)
-                .ok_or(StatusCode::UNSUPPORTED_MEDIA_TYPE)?;
+            let processed = process_uploaded_image(
+                &filename,
+                content_type.as_deref(),
+                data,
+                ImagePurpose::Avatar,
+                5 * 1024 * 1024,
+            )
+            .await
+            .map_err(image_processing_status)?;
 
             // Generate a server-controlled filename after validation.
-            let new_filename = format!("{}_{}.{}", user_id, Uuid::new_v4(), extension);
+            let new_filename = format!("{}_{}.{}", user_id, Uuid::new_v4(), processed.extension);
             let upload_path = format!("uploads/avatars/{}", new_filename);
             let avatar_filename_prefix = format!("{}_", user_id);
             let previous_avatar: Option<String> =
@@ -1200,7 +1218,7 @@ pub async fn upload_avatar(
                     tracing::error!(error = %error, "failed to create avatar upload directory");
                     StatusCode::INTERNAL_SERVER_ERROR
                 })?;
-            tokio::fs::write(&upload_path, &data)
+            tokio::fs::write(&upload_path, &processed.data)
                 .await
                 .map_err(|error| {
                     tracing::error!(error = %error, "failed to save avatar");
@@ -1279,11 +1297,23 @@ pub async fn upload_post_image(
                 return Err(StatusCode::PAYLOAD_TOO_LARGE);
             }
 
-            let extension = validated_image_extension(&filename, content_type.as_deref(), &data)
-                .ok_or(StatusCode::UNSUPPORTED_MEDIA_TYPE)?;
+            let processed = process_uploaded_image(
+                &filename,
+                content_type.as_deref(),
+                data,
+                ImagePurpose::Post,
+                10 * 1024 * 1024,
+            )
+            .await
+            .map_err(image_processing_status)?;
 
             // Generate a server-controlled filename after validation.
-            let new_filename = format!("post_{}_{}.{}", user_id, Uuid::new_v4(), extension);
+            let new_filename = format!(
+                "post_{}_{}.{}",
+                user_id,
+                Uuid::new_v4(),
+                processed.extension
+            );
             let upload_path = format!("uploads/posts/{}", new_filename);
 
             // Create directory if it doesn't exist
@@ -1294,7 +1324,7 @@ pub async fn upload_post_image(
                     StatusCode::INTERNAL_SERVER_ERROR
                 })?;
 
-            tokio::fs::write(&upload_path, &data)
+            tokio::fs::write(&upload_path, &processed.data)
                 .await
                 .map_err(|error| {
                     tracing::error!(error = %error, "failed to save post image");

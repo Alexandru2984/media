@@ -288,9 +288,11 @@ add a separately protected audit pipeline before relying on it for investigation
   and latency. Query strings and bodies are deliberately excluded.
 - API failures use non-cacheable problem JSON and repeat the request ID for
   support correlation without disclosing internal errors.
-- No Media-specific alert, dashboard, on-call path, incident runbook, retention
-  policy, or tested restore was found. Per-release rollback artifacts exist, but
-  the process is not yet automated.
+- A Media-specific incident runbook now covers classification, containment,
+  evidence handling, upload rollback, secret rotation, recovery, and GDPR
+  escalation. No alert, dashboard, named backup on-call, retention policy, live
+  restore drill, or multi-person tabletop exists yet. Per-release rollback
+  artifacts exist, but the process is not automated.
 
 **Remediation:** define SLOs, metrics, actionable alerts, log retention,
 backup/restore tests, a rollback command, and tabletop-tested incident runbooks.
@@ -429,7 +431,7 @@ revenue, incident cost, and control frequency before assigning an ALE.
 
 ### Response
 
-- Incident response runbook: ❌ not found
+- Incident response runbook: ✅ documented; live drill remains open
 - Tested restore procedure: ❌ not found
 - Tabletop exercise: ❌ not documented
 - Pre-written user/regulator communications: ❌ not found
