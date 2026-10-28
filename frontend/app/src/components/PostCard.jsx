@@ -68,7 +68,12 @@ export default function PostCard(props) {
       const wasLiked = liked();
       const isLiked = Boolean(result.liked);
       setLiked(isLiked);
-      if (isLiked !== wasLiked) setLikesCount((count) => Math.max(0, count + (isLiked ? 1 : -1)));
+      const confirmedCount = Number(result.likes_count);
+      if (Number.isFinite(confirmedCount)) {
+        setLikesCount(Math.max(0, confirmedCount));
+      } else if (isLiked !== wasLiked) {
+        setLikesCount((count) => Math.max(0, count + (isLiked ? 1 : -1)));
+      }
     } catch (requestError) {
       console.error('Failed to like post:', requestError);
       setError('Aprecierea nu a putut fi salvată.');

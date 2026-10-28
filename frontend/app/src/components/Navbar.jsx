@@ -36,9 +36,17 @@ export default function Navbar() {
     navigate('/');
   };
 
+  const handleCompose = () => {
+    if (location.pathname !== '/') navigate('/');
+    window.setTimeout(() => {
+      document.getElementById('new-post-content')?.focus();
+    }, 100);
+  };
+
   return (
-    <header class="site-header">
-      <nav class="site-nav app-container" aria-label="Navigație principală">
+    <>
+      <header class="site-header">
+        <nav class="site-nav app-container" aria-label="Navigație principală">
         <A href="/" class="brand" aria-label="Media — pagina principală">
           <span class="brand-mark"><BrandIcon /></span>
           <span class="brand-name">Media</span>
@@ -101,7 +109,32 @@ export default function Navbar() {
             </button>
           </Show>
         </div>
-      </nav>
-    </header>
+        </nav>
+      </header>
+
+      <Show when={auth.isAuthenticated()}>
+        <nav class="mobile-bottom-nav" aria-label="Navigație mobilă">
+          <A href="/" class={location.pathname === '/' ? 'is-active' : ''}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+            </svg>
+            <span>Acasă</span>
+          </A>
+          <button type="button" class="mobile-compose" onClick={handleCompose}>
+            <span class="mobile-compose-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+            </span>
+            <span>Publică</span>
+          </button>
+          <A href={`/profile/${auth.user()?.id}`} class={location.pathname.startsWith('/profile/') ? 'is-active' : ''}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" />
+              <path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            <span>Profil</span>
+          </A>
+        </nav>
+      </Show>
+    </>
   );
 }

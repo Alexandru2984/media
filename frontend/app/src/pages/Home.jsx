@@ -8,6 +8,8 @@ import PostCard from '../components/PostCard';
 import PageMeta from '../components/PageMeta';
 import { getImageUrl } from '../utils/urls';
 
+const FEED_PAGE_SIZE = 10;
+
 function LoadingFeed() {
   return (
     <div class="loading-stack" aria-label="Se încarcă postările" aria-busy="true">
@@ -99,21 +101,47 @@ function Landing() {
 export default function Home() {
   const [posts, setPosts] = createSignal([]);
   const [loading, setLoading] = createSignal(false);
+  const [loadingMore, setLoadingMore] = createSignal(false);
+  const [hasMore, setHasMore] = createSignal(true);
+  const [loadMoreError, setLoadMoreError] = createSignal('');
   const [error, setError] = createSignal('');
   const [loadedForUser, setLoadedForUser] = createSignal(null);
   const auth = useAuth();
 
-  const loadPosts = async () => {
+  const loadPosts = async ({ append = false } = {}) => {
+    if (append && (loadingMore() || !hasMore())) return;
+
     try {
-      setLoading(true);
-      setError('');
-      const data = await api.getPosts(20, 0);
-      setPosts(data);
+      if (append) {
+        setLoadingMore(true);
+        setLoadMoreError('');
+      } else {
+        setLoading(true);
+        setError('');
+        setLoadMoreError('');
+      }
+
+      const offset = append ? posts().length : 0;
+      const data = await api.getPosts(FEED_PAGE_SIZE, offset);
+      if (append) {
+        setPosts((currentPosts) => {
+          const knownIds = new Set(currentPosts.map((post) => post.id));
+          return [...currentPosts, ...data.filter((post) => !knownIds.has(post.id))];
+        });
+      } else {
+        setPosts(data);
+      }
+      setHasMore(data.length === FEED_PAGE_SIZE);
     } catch (requestError) {
       console.error('Failed to load posts:', requestError);
-      setError('Nu am putut încărca feedul. Verifică conexiunea și încearcă din nou.');
+      if (append) {
+        setLoadMoreError('Nu am putut încărca următoarele postări. Încearcă din nou.');
+      } else {
+        setError('Nu am putut încărca feedul. Verifică conexiunea și încearcă din nou.');
+      }
     } finally {
-      setLoading(false);
+      if (append) setLoadingMore(false);
+      else setLoading(false);
     }
   };
 
@@ -210,7 +238,25 @@ export default function Home() {
 
                 <Show when={!loading() && !error()}>
                   <div class="feed-list">
-                    <For each={posts()}>{(post) => <PostCard post={post} onDelete={loadPosts} onUpdate={loadPosts} />}</For>
+                    <For each={posts()}>{(post) => <PostCard post={post} onDelete={() => loadPosts()} onUpdate={() => loadPosts()} />}</For>
+                  </div>
+                </Show>
+
+                <Show when={!loading() && !error() && posts().length > 0}>
+                  <div class="feed-pagination">
+                    <Show when={loadMoreError()}>
+                      <p class="inline-error" role="alert">{loadMoreError()}</p>
+                    </Show>
+                    <Show when={hasMore()}>
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        onClick={() => loadPosts({ append: true })}
+                        disabled={loadingMore()}
+                      >
+                        {loadingMore() ? 'Se încarcă…' : 'Încarcă mai multe'}
+                      </button>
+                    </Show>
                   </div>
                 </Show>
               </section>
