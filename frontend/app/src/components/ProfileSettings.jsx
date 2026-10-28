@@ -301,7 +301,7 @@ export default function ProfileSettings(props) {
           <Show when={activeTab() === 'sessions'}>
             <div class="settings-section">
               <h3>Sesiuni active</h3>
-              <p class="settings-description">Poți avea cel mult 20 de sesiuni, fiecare valabilă maximum șapte zile. Nu stocăm adresa IP sau modelul dispozitivului.</p>
+              <p class="settings-description">Poți avea cel mult 20 de sesiuni. Fiecare expiră după 24 de ore de inactivitate sau cel târziu după șapte zile. Nu stocăm adresa IP sau modelul dispozitivului.</p>
 
               <div class="sessions-toolbar">
                 <span>{sessions().length} {sessions().length === 1 ? 'sesiune activă' : 'sesiuni active'}</span>

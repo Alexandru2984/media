@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::{
     auth::{
         clear_session_cookie, get_authenticated_session, get_user_id_from_headers, issue_session,
-        revoke_current_session, session_cookie,
+        revoke_current_session, session_cookie, session_idle_cutoff,
     },
     email::EmailService,
     models::*,
@@ -336,14 +336,17 @@ pub async fn list_sessions(
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
     let current_session = get_authenticated_session(&pool, &headers).await?;
+    let now = Utc::now();
     let rows = query_as::<_, ActiveSessionRow>(
         "SELECT id, created_at, last_seen_at, expires_at
          FROM sessions
-         WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ?
+         WHERE user_id = ? AND revoked_at IS NULL
+           AND expires_at > ? AND last_seen_at > ?
          ORDER BY last_seen_at DESC, created_at DESC",
     )
     .bind(&current_session.user_id)
-    .bind(Utc::now())
+    .bind(now)
+    .bind(session_idle_cutoff(now))
     .fetch_all(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -376,14 +379,17 @@ pub async fn revoke_session(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let now = Utc::now();
     let result = query(
         "UPDATE sessions SET revoked_at = ?
-         WHERE id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > ?",
+         WHERE id = ? AND user_id = ? AND revoked_at IS NULL
+           AND expires_at > ? AND last_seen_at > ?",
     )
-    .bind(Utc::now())
+    .bind(now)
     .bind(&session_id)
     .bind(&current_session.user_id)
-    .bind(Utc::now())
+    .bind(now)
+    .bind(session_idle_cutoff(now))
     .execute(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -399,14 +405,17 @@ pub async fn revoke_other_sessions(
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
     let current_session = get_authenticated_session(&pool, &headers).await?;
+    let now = Utc::now();
     let result = query(
         "UPDATE sessions SET revoked_at = ?
-         WHERE user_id = ? AND id != ? AND revoked_at IS NULL AND expires_at > ?",
+         WHERE user_id = ? AND id != ? AND revoked_at IS NULL
+           AND expires_at > ? AND last_seen_at > ?",
     )
-    .bind(Utc::now())
+    .bind(now)
     .bind(&current_session.user_id)
     .bind(&current_session.session_id)
-    .bind(Utc::now())
+    .bind(now)
+    .bind(session_idle_cutoff(now))
     .execute(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

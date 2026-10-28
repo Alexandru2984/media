@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 const SESSION_MAX_AGE_SECONDS: usize = 7 * 24 * 60 * 60;
 const SESSION_ACTIVITY_WRITE_INTERVAL_MINUTES: i64 = 5;
+const SESSION_IDLE_TIMEOUT_HOURS: i64 = 24;
 const MAXIMUM_ACTIVE_SESSIONS_PER_USER: usize = 20;
 const PRODUCTION_COOKIE_NAME: &str = "__Host-media_session";
 const DEVELOPMENT_COOKIE_NAME: &str = "media_session";
@@ -88,6 +89,10 @@ fn session_token_is_valid(token: &str) -> bool {
     token.len() == ONE_TIME_TOKEN_LENGTH && token.bytes().all(|byte| byte.is_ascii_alphanumeric())
 }
 
+pub fn session_idle_cutoff(now: chrono::DateTime<Utc>) -> chrono::DateTime<Utc> {
+    now - Duration::hours(SESSION_IDLE_TIMEOUT_HOURS)
+}
+
 pub async fn issue_session(pool: &MySqlPool, user_id: &str) -> Result<String> {
     let token = generate_one_time_token();
     let token_hash = hash_one_time_token(&token);
@@ -113,13 +118,15 @@ pub async fn issue_session(pool: &MySqlPool, user_id: &str) -> Result<String> {
 
     let excess_session_ids = query_scalar::<_, String>(
         "SELECT id FROM sessions
-         WHERE user_id = ? AND id != ? AND revoked_at IS NULL AND expires_at > ?
+         WHERE user_id = ? AND id != ? AND revoked_at IS NULL
+           AND expires_at > ? AND last_seen_at > ?
          ORDER BY last_seen_at DESC, created_at DESC
          LIMIT ? OFFSET ?",
     )
     .bind(user_id)
     .bind(&session_id)
     .bind(now)
+    .bind(session_idle_cutoff(now))
     .bind(100_u32)
     .bind((MAXIMUM_ACTIVE_SESSIONS_PER_USER - 1) as u32)
     .fetch_all(&mut *transaction)
@@ -143,10 +150,12 @@ pub async fn issue_session(pool: &MySqlPool, user_id: &str) -> Result<String> {
     let cleanup_before = now - Duration::days(1);
     if let Err(error) = query(
         "DELETE FROM sessions
-         WHERE expires_at <= ? OR (revoked_at IS NOT NULL AND revoked_at <= ?)
+         WHERE expires_at <= ? OR last_seen_at <= ?
+            OR (revoked_at IS NOT NULL AND revoked_at <= ?)
          LIMIT 100",
     )
     .bind(now)
+    .bind(session_idle_cutoff(now))
     .bind(cleanup_before)
     .execute(pool)
     .await
@@ -176,11 +185,13 @@ pub async fn get_authenticated_session(
     let now = Utc::now();
     let (user_id, session_id) = query_as::<_, (String, String)>(
         "SELECT user_id, id FROM sessions
-         WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?
+         WHERE token_hash = ? AND revoked_at IS NULL
+           AND expires_at > ? AND last_seen_at > ?
          LIMIT 1",
     )
     .bind(&token_hash)
     .bind(now)
+    .bind(session_idle_cutoff(now))
     .fetch_optional(pool)
     .await
     .map_err(|error| {
@@ -236,9 +247,16 @@ pub async fn revoke_current_session(pool: &MySqlPool, headers: &HeaderMap) -> Re
 mod tests {
     use super::{
         build_clear_session_cookie, build_session_cookie, cookie_token_for_name,
-        session_token_is_valid, ONE_TIME_TOKEN_LENGTH,
+        session_idle_cutoff, session_token_is_valid, ONE_TIME_TOKEN_LENGTH,
     };
     use axum::http::{header, HeaderMap, HeaderValue};
+    use chrono::{Duration, Utc};
+
+    #[test]
+    fn sessions_expire_after_one_day_without_activity() {
+        let now = Utc::now();
+        assert_eq!(now - session_idle_cutoff(now), Duration::hours(24));
+    }
 
     #[test]
     fn production_cookie_is_host_bound_and_script_inaccessible() {
