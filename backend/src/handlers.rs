@@ -68,7 +68,8 @@ pub async fn register(
             .await;
 
             // Send verification email (don't block registration if email fails)
-            let email_service = EmailService::new();
+            let email_service =
+                EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             let email = payload.email.clone();
             let username = payload.username.clone();
             tokio::spawn(async move {
@@ -601,7 +602,7 @@ pub async fn change_email(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Send verification email to NEW email
-    let email_service = EmailService::new();
+    let email_service = EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     email_service
         .send_verification_email(&payload.new_email, &user.username, &token)
         .await
@@ -1136,7 +1137,7 @@ pub async fn send_verification_email(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Send email
-    let email_service = EmailService::new();
+    let email_service = EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     email_service
         .send_verification_email(&user.email, &user.username, &token)
         .await
@@ -1224,7 +1225,7 @@ pub async fn forgot_password(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Send email
-    let email_service = EmailService::new();
+    let email_service = EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     email_service
         .send_password_reset_email(&user.email, &user.username, &token)
         .await

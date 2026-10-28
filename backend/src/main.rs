@@ -17,6 +17,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     auth::validate_configuration().expect("Invalid JWT configuration");
+    email::validate_configuration().expect("Invalid email configuration");
 
     let server_host: IpAddr = std::env::var("SERVER_HOST")
         .unwrap_or_else(|_| "127.0.0.1".to_string())
