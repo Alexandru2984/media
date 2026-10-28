@@ -27,7 +27,7 @@ Browser
 - Frontend: Solid.js single-page application built with Vite
 - API: Rust with Axum
 - Data: MySQL
-- Authentication: JWT-based authentication and bcrypt password hashes
+- Authentication: JWT-backed `__Host-` HttpOnly cookie sessions and bcrypt password hashes
 - Email: SMTP for verification and password-reset messages
 - Edge and origin: Cloudflare Tunnel, Nginx, and a systemd-managed API process
 
@@ -61,10 +61,13 @@ Generated artifacts and runtime data must stay out of Git.
 
 The next project goals are:
 
-1. Replace browser-readable JWT storage with revocable, cookie-based sessions.
+1. Replace stateless JWT cookies with opaque, revocable server-side sessions and
+   add session/device management.
 2. Replace startup DDL with versioned migrations and add integration/browser CI.
-3. Complete upload decode/re-encode, metadata stripping, quotas, and cleanup.
-4. Add health/readiness endpoints, structured logs, metrics, alerts, and restore drills.
+3. Complete upload decode/re-encode, metadata stripping, quotas, and scheduled
+   cleanup for abandoned uploads.
+4. Add structured logs, metrics, alerts, and restore drills around the deployed
+   liveness/readiness endpoints.
 5. Expand the responsive product with relationships, discovery, notifications,
    moderation, privacy controls, and pagination.
 6. Add server-rendered or pre-rendered public content, legal/help pages, real

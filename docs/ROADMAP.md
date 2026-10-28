@@ -17,7 +17,7 @@ unpatchable or weakly isolated service only increases the blast radius.
 ## Phase 0 — Contain production risk
 
 **Progress (2026-10-28):** the tracked Nginx/systemd configuration, direct-origin
-enforcement, layered rate limits, strict CORS, upload ownership, systemd sandbox,
+enforcement, layered rate limits, strict CORS and mutation-origin checks, upload ownership, systemd sandbox,
 secret-route logging policy, immutable static releases, security headers, and
 rollback artifacts are deployed. Application-aware throttling, automated restore
 drills, owned alert routing, and scripted release/rollback remain open.
@@ -43,7 +43,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-28: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 14 unit
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 23 unit
 tests, a validated canary flow, and deployed rollback artifacts. The frontend has
 a locked dependency graph with zero npm audit findings and builds from a source
 directory into an ignored release output served outside the repository. Broader
@@ -66,6 +66,13 @@ and release automation remain open.
 
 ### Identity and sessions
 
+**Progress (2026-10-28):** new browser sessions use a hardened `__Host-`
+HttpOnly cookie, legacy browser-readable tokens are migrated and cleared, auth
+responses no longer expose credentials, unsafe methods enforce the exact
+configured origin, password inputs are bounded, and new one-time tokens are
+hashed and consumed atomically. Opaque server-side storage, revocation, device
+management, and MFA remain open.
+
 - Opaque server-side sessions in `__Host-` HttpOnly cookies.
 - CSRF tokens, origin checks, session rotation, idle/absolute timeouts, and
   revocation on password or email change.
@@ -78,6 +85,12 @@ and release automation remain open.
 
 ### Authorization and data protection
 
+**Progress (2026-10-28):** user response DTOs exclude password hashes, content
+and identity inputs have server-side limits, image paths are owner-bound,
+like/comment counters are transactional and nonnegative, pagination is bounded,
+and major N+1 query paths were replaced with indexed joins. Central policy and
+end-to-end IDOR/concurrency tests remain open.
+
 - Central authorization policy for every object and action.
 - IDOR/BOLA tests for profiles, posts, comments, messages, uploads, and admin APIs.
 - Roles and scopes for user, moderator, support, and administrator.
@@ -88,6 +101,11 @@ and release automation remain open.
 - Data export, account deletion, retention, legal hold, and privacy audit trails.
 
 ### Uploads and content
+
+**Progress (2026-10-28):** JPEG/PNG/WebP signatures, MIME, extension, structure,
+dimensions, byte limits, generated names, owner-bound paths, async writes, and
+replacement/deletion cleanup are deployed. Re-encoding, metadata removal,
+quotas, thumbnails, and scheduled cleanup for abandoned uploads remain open.
 
 - JPEG/PNG/WebP allowlist; magic-byte and decoder validation; re-encoding.
 - Byte, pixel, frame, compression-ratio, CPU, memory, and quota limits.
@@ -206,6 +224,10 @@ SPA behind authenticated routes, so crawlers have only the public landing page
 to index and unknown paths can still become soft 404s.
 
 ## Phase 6 — Reliability, observability, and operations
+
+**Progress (2026-10-28):** public liveness and dependency-aware readiness routes
+are deployed and used after each release. Structured logs, metrics, alerts,
+restore drills, and release automation remain open.
 
 - `/health/live`, `/health/ready`, and dependency-specific readiness checks.
 - Structured JSON logs with request IDs, privacy redaction, and retention limits.

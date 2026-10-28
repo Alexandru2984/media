@@ -6,7 +6,7 @@
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
-**Verdict:** 🟠 Core containment is deployed; session, migration, upload-processing, and observability work remains
+**Verdict:** 🟠 Core containment is deployed; revocable sessions, migrations, image re-encoding, and observability work remains
 
 ## Scope and limitations
 
@@ -32,16 +32,21 @@ bind locally, the database account is not root, dotfiles are denied, SQLx bound
 queries are visible in the binary, passwords use bcrypt, secrets are not short
 placeholders, and core tables have foreign keys and uniqueness constraints.
 
-Browser sessions are still exposed to XSS through `localStorage`, and recovery
-tokens still enter URLs and browser history. Follow-up containment on 2026-10-28
+Recovery tokens still enter URLs and browser history, while browser sessions now
+use hardened cookies but remain stateless JWTs without server-side revocation.
+Follow-up containment on 2026-10-28
 recovered and sanitized the source history, replaced a publicly known hard-coded
 JWT key, eliminated all known RustSec and npm audit findings, blocked direct-origin
 access, added layered edge limits, restricted CORS, stopped access logging on
 secret-bearing routes, sandboxed the API service, separated source from immutable
 frontend releases, and deployed content-aware upload validation. Password bounds,
 generic recovery responses, email configuration, and email-change verification
-were also repaired. Server-side sessions, centralized authorization tests,
-versioned migrations, image re-encoding, and observability remain open.
+were also repaired. Browser-readable session storage was removed, unsafe API
+methods now require the exact configured origin, one-time tokens are hashed at
+rest, input boundaries are enforced server-side, engagement writes are
+transactional, and feed N+1 queries were collapsed. Revocable server-side
+sessions, centralized authorization tests, versioned migrations, image
+re-encoding, and observability remain open.
 
 ## Findings
 
@@ -116,18 +121,24 @@ ever moves off loopback or changes authentication method.
 
 #### SEC-003 — XSS can become immediate account takeover
 
-**Status (2026-10-28): defense in depth improved; core risk remains.** The
+**Status (2026-10-28): browser token exposure mitigated; CSP and revocation work remains.** The
 site-specific CSP now denies objects, base URL changes, foreign form actions,
 inline event-handler attributes, and inline style elements. Cloudflare injects a
 dynamic inline challenge script at the edge, so `script-src 'unsafe-inline'`
 cannot yet be removed without changing that Cloudflare feature. The compiled app
-also relies heavily on inline style attributes. JWT storage remains unchanged.
+also relies heavily on inline style attributes.
 
-- The frontend stores the bearer JWT in `localStorage`.
+- New sessions use a `__Host-media_session` cookie with `Secure`, `HttpOnly`,
+  `SameSite=Strict`, and host-only scope. Login/register responses no longer copy
+  the credential into JSON.
+- The frontend performs a one-time migration for legacy `localStorage` bearer
+  tokens and immediately removes them after exchanging for the cookie.
+- Unsafe API methods require the exact configured `Origin`, mitigating cookie-
+  based CSRF including untrusted sibling sites.
 - The CSP still permits inline scripts and style attributes for the compatibility
   constraints above.
-- The token persists across browser sessions and is available to any JavaScript
-  executing on the origin.
+- The cookie still carries a stateless JWT, so individual session revocation,
+  device inventory, idle timeout, and remote logout are not available.
 
 **Remediation:** replace browser-readable bearer tokens with an opaque server-side
 session in a `__Host-` prefixed `Secure; HttpOnly; SameSite` cookie. Add CSRF
@@ -171,14 +182,14 @@ resource limits. Validate email, MySQL, DNS, and uploads on staging before rollo
 
 #### SEC-006 — Recovery and verification secrets travel in query strings
 
-**Status (2026-10-28): partially mitigated.** Access logging is disabled
+**Status (2026-10-28): token-at-rest and logging risks mitigated; URL transport remains.** Access logging is disabled
 for the known recovery and verification routes, and those responses receive
-`Cache-Control: no-store` and `Referrer-Policy: no-referrer`. URL tokens,
-plaintext token storage, browser history, and the POST exchange still require
-source changes. Umami query-string collection is disabled globally, sensitive
-routes are marked `noindex`, token wildcard injection is rejected, email-change
-tokens are consumed transactionally, and the email-change link now targets the
-correct route.
+`Cache-Control: no-store` and `Referrer-Policy: no-referrer`. New one-time tokens
+are stored as SHA-256 digests and consumed transactionally; legacy plaintext
+records are accepted only for the migration window. Umami query-string
+collection is disabled globally, sensitive routes are marked `noindex`, token
+wildcard injection is rejected, and the email-change link targets the correct
+route. URL tokens, browser history, and the POST exchange still require changes.
 
 The frontend routes use `?token=` for password reset, email verification, and
 email change. Query strings can enter Nginx logs, browser history, screenshots,
@@ -191,15 +202,19 @@ and return `Referrer-Policy: no-referrer` plus `Cache-Control: no-store`.
 
 #### SEC-007 — Upload validation is insufficient
 
-**Status (2026-10-28): content and filesystem controls improved; re-encoding remains open.** The upload tree is
+**Status (2026-10-28): content, ownership, and lifecycle controls improved; re-encoding remains open.** The upload tree is
 now owned by `www-data:www-data` with `0750` directories and `0640` files, is the
 service's only writable application path, and remains readable through Nginx.
 Nginx enforces route-specific body limits and serves only selected image media
 types. The backend now checks filename extension, declared MIME, magic bytes,
 basic JPEG/PNG/WebP structure, and decoded dimensions before creating a
 server-controlled filename. GIF, SVG, mismatches, excessive dimensions, and
-malformed headers are rejected. Full decoder validation, metadata stripping,
-re-encoding, quotas, and orphan cleanup remain absent.
+malformed headers are rejected. Axum and Nginx multipart limits are aligned,
+filesystem writes no longer block async workers, image paths are bound to the
+authenticated owner's UUID, failed avatar writes are rolled back, and replaced
+or deleted referenced images are removed safely. Abandoned pre-attachment
+uploads, full decoder validation, metadata stripping, re-encoding, and quotas
+remain open.
 
 - The UI permits files up to 10 MB; the initial vhost had no explicit body limit.
 - Upload handling still does not fully decode/re-encode images or cap processing
@@ -216,12 +231,15 @@ cookieless media origin with strict content headers.
 
 #### SEC-008 — Authentication controls are below a safe baseline
 
-**Status (2026-10-28): password and recovery baseline improved; session model remains high risk.**
+**Status (2026-10-28): password, recovery, cookie, and CSRF baseline improved; revocation remains open.**
 
 - Registration, password change, and reset now enforce 12 characters minimum and
   72 bytes maximum in both backend and frontend, avoiding bcrypt truncation.
 - Password recovery returns one generic response for existing and nonexistent
   accounts, and email-change verification rejects wildcard tokens.
+- Login and reauthentication inputs are bounded before bcrypt verification.
+- New browser sessions are script-inaccessible, and unsafe requests require the
+  exact production origin.
 - No MFA/passkeys, server-side session revocation, recovery codes, breached-
   password check, security event history, or login alert was observed.
 - JWT claims remain minimal and lack issuer, audience, token ID, rotation, and
@@ -234,7 +252,10 @@ generic auth/recovery responses.
 
 #### SEC-009 — Detection, response, and recovery are not demonstrated
 
-- There is no health/readiness endpoint.
+**Status (2026-10-28): health endpoints deployed; broader observability and recovery remain open.**
+
+- `/api/health/live` and dependency-aware `/api/health/ready` are deployed and
+  exercised after releases through Cloudflare.
 - No Media-specific structured security log, alert, dashboard, on-call path,
   incident runbook, tested restore, or documented rollback was found.
 - Application errors are mostly empty responses or console messages.
@@ -295,24 +316,30 @@ redacted configuration diagnostics.
 
 #### SEC-014 — Sensitive responses lack explicit cache policy
 
-API and auth responses do not consistently return `Cache-Control: no-store`.
-The SPA document also has no explicit revalidation policy, while hashed assets
-receive only a short edge cache lifetime.
+**Status (2026-10-28): mitigated at Nginx.** API responses use `no-store`, SPA
+documents revalidate, recovery routes add stricter no-store/no-referrer policy,
+and content-hashed assets receive one-year immutable caching.
 
 **Remediation:** use `no-store` on auth/private responses, `no-cache` or short
 revalidation for HTML, and one-year immutable caching for content-hashed assets.
 
 #### SEC-015 — Data consistency and indexing need source-level review
 
-**Status (2026-10-28): response exposure reduced; consistency review remains open.**
+**Status (2026-10-28): core response, consistency, and query issues mitigated; integration coverage remains open.**
 The database-only `User` type is no longer serializable, and profile-update
 responses explicitly select safe fields, preventing accidental password-hash
-serialization. Like/comment counter transactions, length constraints, and query
-plans remain unresolved.
+serialization. Like/comment row and counter changes now share transactions,
+counter decrements cannot become negative, and a production read-only integrity
+check found no drift. Central server-side limits cover identity, posts, comments,
+messages, pagination, passwords, email, and image paths. Feed, profile-post,
+comment, and message N+1 queries were replaced with joins, and composite comment
+and conversation indexes were deployed. Authenticated concurrency and query-plan
+regression tests remain open.
 
-Post like/comment counters are denormalized and likely updated separately from
-their rows. The schema lacks visible length constraints and some useful composite
-indexes. Correct ownership checks and transaction boundaries cannot be proven.
+Post like/comment counters remain denormalized, and database-level text length
+constraints are not yet encoded in versioned migrations. Ownership checks exist
+in handlers but still need a centralized authorization matrix and end-to-end IDOR
+tests.
 
 **Remediation:** add authorization matrix tests, transactions, nonnegative counter
 guards or derived counts, content length constraints, normalized email/username
@@ -340,8 +367,8 @@ messages; keep detailed causes only in redacted server logs.
 
 ### Threat model (STRIDE)
 
-1. **Spoofing / elevation of privilege — high likelihood, high impact:** stolen
-   browser JWT through XSS, session replay, or credential stuffing.
+1. **Spoofing / elevation of privilege — medium likelihood, high impact:**
+   stateless session replay, credential stuffing, or an untested authorization bypass.
 2. **Information disclosure / tampering — medium likelihood, high impact:**
    unsafe upload handling, token leakage, IDOR, or a compromised unsandboxed API.
 3. **Denial of service — high likelihood, medium impact:** expensive bcrypt,
@@ -394,7 +421,8 @@ service; ownership, DPAs, retention, regions, and last security review are unkno
   frontend release reproduction remains open.
 - Critical dependencies are upgraded and `cargo audit` has no unaccepted finding.
 - Origin bypass, wildcard CORS, auth abuse, and upload permissions are fixed.
-- Session migration and token-log containment are designed and tested.
+- Cookie-session migration, CSRF origin enforcement, and token-log containment
+  are deployed; server-side revocation remains open.
 - systemd sandbox score is materially reduced without breaking required I/O.
 - Health checks, alerts, backup restore, rollback, and incident ownership work.
 - Authz/IDOR, recovery, upload, and data lifecycle tests pass on staging.
