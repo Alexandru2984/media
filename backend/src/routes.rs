@@ -24,6 +24,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
             get(handlers::list_sessions).delete(handlers::revoke_other_sessions),
         )
         .route("/auth/sessions/:id", delete(handlers::revoke_session))
+        .route("/auth/security-events", get(handlers::list_security_events))
         .route(
             "/auth/send-verification",
             post(handlers::send_verification_email),

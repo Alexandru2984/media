@@ -18,6 +18,10 @@ use crate::{
     email::EmailService,
     models::*,
     passwords::{hash_password, spend_password_work, verify_password},
+    security_events::{
+        recent_security_events, record_security_event, SecurityEventKind,
+        SECURITY_EVENT_RETENTION_DAYS,
+    },
     tokens::{generate_one_time_token, hash_one_time_token},
     uploads::validated_image_extension,
     validation::{
@@ -270,6 +274,7 @@ pub async fn register(
             let token = issue_session(&pool, &user_id)
                 .await
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            record_security_event(&pool, &user_id, SecurityEventKind::AccountCreated).await;
 
             authenticated_response(
                 &token,
@@ -318,6 +323,7 @@ pub async fn login(
     let token = issue_session(&pool, &user.id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    record_security_event(&pool, &user.id, SecurityEventKind::LoginSucceeded).await;
 
     authenticated_response(
         &token,
@@ -360,9 +366,17 @@ pub async fn logout(
     State(pool): State<MySqlPool>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Json<Value>), StatusCode> {
+    let authenticated_session = match get_authenticated_session(&pool, &headers).await {
+        Ok(session) => Some(session),
+        Err(StatusCode::UNAUTHORIZED) => None,
+        Err(status) => return Err(status),
+    };
     revoke_current_session(&pool, &headers)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if let Some(session) = authenticated_session {
+        record_security_event(&pool, &session.user_id, SecurityEventKind::LoggedOut).await;
+    }
     let mut headers = HeaderMap::new();
     headers.insert(
         header::SET_COOKIE,
@@ -405,6 +419,24 @@ pub async fn list_sessions(
     Ok(Json(json!({ "sessions": sessions })))
 }
 
+pub async fn list_security_events(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let user_id = get_current_user(&pool, &headers).await?;
+    let events = recent_security_events(&pool, &user_id)
+        .await
+        .map_err(|error| {
+            tracing::error!(error = %error, "failed to load user security events");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(json!({
+        "events": events,
+        "retention_days": SECURITY_EVENT_RETENTION_DAYS
+    })))
+}
+
 pub async fn revoke_session(
     State(pool): State<MySqlPool>,
     Path(session_id): Path<String>,
@@ -436,6 +468,12 @@ pub async fn revoke_session(
     if result.rows_affected() != 1 {
         return Err(StatusCode::NOT_FOUND);
     }
+    record_security_event(
+        &pool,
+        &current_session.user_id,
+        SecurityEventKind::SessionRevoked,
+    )
+    .await;
 
     Ok(Json(json!({ "message": "Sesiunea a fost revocată" })))
 }
@@ -459,6 +497,14 @@ pub async fn revoke_other_sessions(
     .execute(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if result.rows_affected() > 0 {
+        record_security_event(
+            &pool,
+            &current_session.user_id,
+            SecurityEventKind::OtherSessionsRevoked,
+        )
+        .await;
+    }
 
     Ok(Json(json!({
         "message": "Celelalte sesiuni au fost revocate",
@@ -923,6 +969,7 @@ pub async fn change_password(
     let token = issue_session(&pool, &user_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    record_security_event(&pool, &user_id, SecurityEventKind::PasswordChanged).await;
 
     authenticated_response(
         &token,
@@ -1000,6 +1047,7 @@ pub async fn change_email(
         .send_email_change_verification(new_email, &user.username, &token)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    record_security_event(&pool, &user_id, SecurityEventKind::EmailChangeRequested).await;
 
     Ok(Json(json!({
         "message": "Email de verificare trimis la noua adresă"
@@ -1091,6 +1139,7 @@ pub async fn verify_email_change(
         .commit()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    record_security_event(&pool, &user_id, SecurityEventKind::EmailChanged).await;
 
     Ok(Json(json!({
         "message": "Email schimbat cu succes"
@@ -1741,6 +1790,7 @@ pub async fn verify_email(
         .commit()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    record_security_event(&pool, &token_record.1, SecurityEventKind::EmailVerified).await;
 
     Ok(Json(json!({
         "message": "Email verificat cu succes"
@@ -1871,6 +1921,7 @@ pub async fn reset_password(
         .commit()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    record_security_event(&pool, &token_record.1, SecurityEventKind::PasswordReset).await;
 
     Ok(Json(json!({
         "message": "Parola a fost resetată cu succes"
