@@ -43,7 +43,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-28: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 26 unit
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 31 unit
 tests, embedded versioned MySQL migrations, a validated canary flow, and deployed
 rollback artifacts. The frontend has
 a locked dependency graph with zero npm audit findings and builds from a source
@@ -79,14 +79,19 @@ sessions have a 24-hour idle timeout, a seven-day absolute timeout, and a limit 
 20 per account. Security event history, MFA, login alerts, and explicit
 synchronizer CSRF tokens remain open.
 
+New and changed passwords use an explicit Argon2id v19 profile. Legacy bcrypt
+and outdated Argon2id credentials upgrade atomically after successful
+authentication; password jobs are blocking-pool isolated, concurrency-bounded,
+and protected against attacker-sized stored parameters.
+
 - Opaque server-side sessions in `__Host-` HttpOnly cookies. ✅
 - Origin checks, absolute timeout, password-change rotation, and revocation on
   password reset or verified email change. ✅
 - Idle expiry and a session dashboard with scoped remote logout. ✅
 - Synchronizer CSRF tokens and security event history.
 - Passkeys/WebAuthn, optional TOTP, hashed recovery codes, and login alerts.
-- Strong password policy, breached-password screening, Argon2id migration, and
-  reauthentication for high-risk changes.
+- Strong password policy and Argon2id migration. ✅ Add breached-password
+  screening and stronger reauthentication for high-risk changes.
 - Generic login/recovery responses and layered IP/account/device throttling.
 - Hashed one-time tokens with single use, short expiry, and audit events.
 

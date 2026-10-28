@@ -31,7 +31,7 @@ evidence of absence.
 
 The service has a useful baseline: TLS 1.0/1.1 are rejected, the API and database
 bind locally, the database account is not root, dotfiles are denied, SQLx bound
-queries are visible in the binary, passwords use bcrypt, secrets are not short
+queries are visible in the binary, passwords use Argon2id, secrets are not short
 placeholders, and core tables have foreign keys and uniqueness constraints.
 
 Browser sessions now use hashed opaque server-side credentials with expiry,
@@ -247,10 +247,17 @@ cookieless media origin with strict content headers.
 baseline improved.**
 
 - Registration, password change, and reset now enforce 12 characters minimum and
-  72 bytes maximum in both backend and frontend, avoiding bcrypt truncation.
+  72 bytes maximum in both backend and frontend, retaining unambiguous
+  compatibility while legacy bcrypt hashes remain.
+- New credentials use Argon2id v19 with 19 MiB of memory, two iterations, one
+  lane, random salts, and 32-byte outputs. Valid bcrypt and outdated Argon2id
+  credentials are upgraded atomically at login or reauthentication.
+- Password work runs outside the async executor and is capped at four concurrent
+  jobs. Oversized stored Argon2 profiles are rejected before allocation, and
+  unknown accounts with valid inputs take a comparable memory-hard path.
 - Password recovery returns one generic response for existing and nonexistent
   accounts, and email-change verification rejects wildcard tokens.
-- Login and reauthentication inputs are bounded before bcrypt verification.
+- Login and reauthentication inputs are bounded before password verification.
 - New browser sessions are script-inaccessible, and unsafe requests require the
   exact production origin.
 - Server-side logout revocation is deployed; password and verified-email changes
@@ -260,8 +267,7 @@ baseline improved.**
 - No MFA/passkeys, recovery codes, breached-password check, security-event
   history, or login alert was observed.
 
-**Remediation:** adopt modern password guidance, Argon2id for new hashes with
-transparent migration, email verification gates, optional passkeys/TOTP, hashed
+**Remediation:** add email verification gates, optional passkeys/TOTP, hashed
 recovery codes, reauthentication for risk events, security-event history, and
 generic auth/recovery responses.
 
@@ -392,8 +398,9 @@ messages; keep detailed causes only in redacted server logs.
    credential stuffing, stolen opaque-session replay, or an untested authorization bypass.
 2. **Information disclosure / tampering — medium likelihood, high impact:**
    unsafe upload handling, token leakage, IDOR, or a compromised unsandboxed API.
-3. **Denial of service — high likelihood, medium impact:** expensive bcrypt,
-   recovery email, upload, and database endpoints without layered limits.
+3. **Denial of service — medium likelihood, medium impact:** memory-hard password
+   work is concurrency-bounded and edge-limited, while recovery email, upload,
+   and database endpoints still need broader application-aware budgets.
 
 ### Blast radius
 

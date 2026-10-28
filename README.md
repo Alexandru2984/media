@@ -28,7 +28,9 @@ Browser
 - Frontend: Solid.js single-page application built with Vite
 - API: Rust with Axum
 - Data: MySQL
-- Authentication: hashed, revocable server-side sessions in a `__Host-` HttpOnly cookie and bcrypt password hashes
+- Authentication: hashed, revocable server-side sessions in a `__Host-`
+  HttpOnly cookie; new passwords use Argon2id and legacy bcrypt hashes upgrade
+  after a valid login
 - Email: SMTP for verification and password-reset messages
 - Edge and origin: Cloudflare Tunnel, Nginx, and a systemd-managed API process
 
