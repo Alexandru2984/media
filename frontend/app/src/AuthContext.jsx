@@ -7,20 +7,21 @@ export function AuthProvider(props) {
   const [user, setUser] = createSignal(null);
   const [loading, setLoading] = createSignal(true);
 
-  // Check if user is already logged in on mount
+  // Migrate old browser-readable bearer tokens once, then rely on HttpOnly cookies.
   onMount(async () => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        // Set token in api service before making request
-        api.setToken(token);
-        // Verify token by fetching current user
+    const legacyToken = localStorage.getItem('token');
+    try {
+      if (legacyToken) {
+        api.setToken(legacyToken);
+        const data = await api.migrateSession();
+        setUser(data.user);
+        api.clearToken();
+      } else {
         const userData = await api.getCurrentUser();
         setUser(userData);
-      } catch (error) {
-        console.error('Token validation failed:', error);
-        api.clearToken();
       }
+    } catch (error) {
+      api.clearToken();
     }
     setLoading(false);
   });
@@ -53,9 +54,12 @@ export function AuthProvider(props) {
     }
   };
 
-  const logout = () => {
-    api.clearToken();
-    setUser(null);
+  const logout = async () => {
+    try {
+      await api.logout();
+    } finally {
+      setUser(null);
+    }
   };
 
   const value = {

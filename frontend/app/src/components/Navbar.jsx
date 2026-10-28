@@ -31,8 +31,8 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = () => {
-    auth.logout();
+  const handleLogout = async () => {
+    await auth.logout();
     navigate('/');
   };
 

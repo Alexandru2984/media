@@ -28,6 +28,7 @@ class ApiService {
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'same-origin',
     });
 
     if (!response.ok) {
@@ -39,21 +40,29 @@ class ApiService {
 
   // Auth
   async register(username, email, password, bio = '') {
-    const data = await this.request('/auth/register', {
+    return this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ username, email, password, bio }),
     });
-    this.setToken(data.token);
-    return data;
   }
 
   async login(email, password) {
-    const data = await this.request('/auth/login', {
+    return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
-    this.setToken(data.token);
-    return data;
+  }
+
+  async migrateSession() {
+    return this.request('/auth/session', { method: 'POST' });
+  }
+
+  async logout() {
+    try {
+      return await this.request('/auth/logout', { method: 'POST' });
+    } finally {
+      this.clearToken();
+    }
   }
 
   async getCurrentUser() {
