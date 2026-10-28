@@ -5,7 +5,8 @@ The application currently provides account management, email verification and
 password recovery, user profiles, avatars, posts, image uploads, likes, and
 comments. It also includes a paginated feed, community search, responsive mobile
 navigation, active-session controls, a private security-activity timeline,
-public project/community pages, and real HTTP 404 handling.
+public project/community pages, real HTTP 404 handling, and account-bound upload
+quotas with automatic cleanup of abandoned images.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -69,8 +70,9 @@ The next project goals are:
    reauthentication for high-risk account changes.
 2. Add database integration tests, browser CI, migration checks, and automated
    release/rollback workflows around the deployed versioned migrations.
-3. Add upload quotas, responsive derivatives, and scheduled cleanup for
-   abandoned uploads on top of the deployed decode/re-encode pipeline.
+3. Add responsive image derivatives, deduplication, decoder telemetry, and a
+   separate cookieless media origin on top of the deployed decode/re-encode,
+   quota, ownership, and abandoned-upload lifecycle.
 4. Add metrics, alerts, retention policy, and restore drills around the deployed
    health endpoints and privacy-redacted JSON request logs.
 5. Expand the responsive product with relationships, notifications, moderation,

@@ -56,7 +56,9 @@ curl --fail --silent --show-error http://127.0.0.1:8083/api/health/ready
 The decoder accepts only JPEG, PNG, and WebP. New uploads are decoded and
 re-encoded; the process is bounded by input/output size, dimensions, pixel count,
 decoder memory, systemd memory ceilings, Nginx rate limits, and a two-job
-application semaphore.
+application semaphore. New files are registered by owner and encoded byte size;
+active storage is capped at 100 MiB per account and pending post images at five.
+Pending images expire after 24 hours and interrupted writes after one hour.
 
 If the new pipeline is suspected:
 
@@ -69,7 +71,9 @@ If the new pipeline is suspected:
    references and files must remain consistent until scope is known.
 
 Rollback changes code behavior only; it does not require a schema rollback and
-does not mutate previously stored images.
+does not mutate previously stored images. The additive `managed_uploads` table is
+compatible with the prior binary. Do not drop it during an emergency rollback;
+pending rows can be reconciled after service recovery.
 
 ## Scope, recovery, and closure
 
@@ -126,3 +130,27 @@ locked dependency and RustSec review.
 memory ceiling, strict output cap, metadata-removal tests, rollback binary, and
 health checks are release gates. Automated alerts and a live restore exercise
 remain mandatory follow-up work.
+
+## CISO review record — upload quota and lifecycle rollout
+
+**Date:** 2026-10-29
+
+- Top threats: storage exhaustion through abandoned uploads, unauthorized reuse
+  of another account's filename, and DB/filesystem divergence during failures.
+- Controls: a 100 MiB account budget, five-pending-image limit, owner-bound
+  registry, single-use transactional post claim, explicit `writing`, `pending`,
+  `attached`, and retryable `deleting` states, plus bounded 15-minute cleanup.
+- Rollback: root-only pre-rollout binary and database dumps are stored as
+  `media-binary-pre-upload-quota-20261028T232650Z-545361c` and
+  `media-db-pre-upload-quota-20261028T232650Z-545361c.sql` under `/var/backups`.
+  The migration is additive and the previous binary remains runnable.
+- Validation: production canaries verified cross-account rejection, single-use
+  claim, transactional create/replace/delete, physical cleanup, avatar
+  replacement, five-image pending enforcement, and cleanup of a 25-hour stale
+  pending file. Canary accounts, rows, and files were removed afterward.
+- Residual risk: historical files are outside the registry, alerts remain
+  manual, and any future account-deletion feature must mark its registered files
+  for deletion before cascading the account row.
+
+**Verdict:** ship with monitoring. Responsive derivatives, deduplication,
+telemetry/alerts, and account-deletion integration remain tracked follow-ups.

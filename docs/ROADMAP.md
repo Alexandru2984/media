@@ -16,10 +16,11 @@ unpatchable or weakly isolated service only increases the blast radius.
 
 ## Phase 0 — Contain production risk
 
-**Progress (2026-10-28):** the tracked Nginx/systemd configuration, direct-origin
+**Progress (2026-10-29):** the tracked Nginx/systemd configuration, direct-origin
 enforcement, layered rate limits, strict CORS and mutation-origin checks, upload ownership, systemd sandbox,
 secret-route logging policy, immutable static releases, security headers, and
-rollback artifacts are deployed. Application-aware throttling, automated restore
+rollback artifacts are deployed. Uploads also have account-aware storage and
+pending-count limits. Broader application-aware throttling, automated restore
 drills, owned alert routing, and scripted release/rollback remain open.
 
 1. Version the active Nginx vhost, rate-limit zones, and systemd unit.
@@ -41,10 +42,11 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 ## Phase 1 — Recover a maintainable application
 
-Progress on 2026-10-28: the sanitized legacy history, backend and frontend
+Progress on 2026-10-29: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 33 unit
-tests, embedded versioned MySQL migrations, a validated canary flow, and deployed
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 34 API
+binary unit tests plus 5 seed-binary tests, embedded versioned MySQL migrations,
+a validated canary flow, and deployed
 rollback artifacts. The frontend has
 a locked dependency graph with zero npm audit findings and builds from a source
 directory into an ignored release output served outside the repository. Broader
@@ -117,20 +119,26 @@ end-to-end IDOR/concurrency tests remain open.
 
 ### Uploads and content
 
-**Progress (2026-10-28):** JPEG/PNG/WebP signatures, MIME, extension, structure,
+**Progress (2026-10-29):** JPEG/PNG/WebP signatures, MIME, extension, structure,
 dimensions, byte limits, generated names, owner-bound paths, async writes, and
 replacement/deletion cleanup are deployed. New files are fully decoded and
 re-encoded from pixels, which removes EXIF/comments/XMP/ICC data; EXIF orientation
 is applied first. Decoder work runs outside the async executor with a two-job
 limit, 16 MP/8192 px input ceilings, a 96 MiB per-job decode budget, strict
 encoded-output caps, and the existing 512 MiB systemd ceiling. Avatars are reduced
-to at most 1024 px. Quotas, responsive post derivatives, and scheduled cleanup
-for abandoned uploads remain open.
+to at most 1024 px. A database registry now gives every new file an owner, byte
+size, purpose, and lifecycle state. Each account has a 100 MiB active-upload
+budget and at most five unattached post images. Post-image claim/replacement and
+post writes are transactional; stale pending files expire after 24 hours,
+interrupted writes after one hour, and a bounded worker plus upload-time cleanup
+retries deletions every 15 minutes. Historical files are deliberately not
+bulk-deleted. Responsive post derivatives, deduplication, and a cookieless media
+origin remain open.
 
 - JPEG/PNG/WebP allowlist; magic-byte and decoder validation; re-encoding. ✅
-- Byte, pixel, frame, compression-ratio, CPU, memory, and quota limits.
-- EXIF/metadata removal and generated filenames. ✅ Add deduplication, quotas,
-  and scheduled orphan cleanup.
+- Byte, pixel, frame, compression-ratio, CPU, memory, and account quota limits. ✅
+- EXIF/metadata removal, generated filenames, and bounded abandoned-upload
+  cleanup. ✅ Add deduplication and lifecycle handling to future account deletion.
 - Thumbnail/responsive-image pipeline and separate cookieless media origin.
 - Malware scanning where useful; quarantine and moderation workflow.
 - Strict CSP without `unsafe-inline`, Trusted Types where supported, and no

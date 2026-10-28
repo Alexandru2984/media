@@ -217,8 +217,8 @@ tests.
 
 #### SEC-007 — Upload validation is insufficient
 
-**Status (2026-10-28): content decoding, metadata removal, ownership, and
-lifecycle controls deployed; quotas and abandoned-file cleanup remain open.** The upload tree is
+**Status (2026-10-29): content decoding, metadata removal, ownership, quotas, and
+bounded abandoned-file cleanup deployed.** The upload tree is
 now owned by `www-data:www-data` with `0750` directories and `0640` files, is the
 service's only writable application path, and remains readable through Nginx.
 Nginx enforces route-specific body limits and serves only selected image media
@@ -232,8 +232,13 @@ blocking-pool isolation, and a systemd memory ceiling. Avatars are capped at 102
 px. Axum and Nginx multipart limits are aligned, filesystem writes no longer
 block async workers, image paths are bound to the authenticated owner's UUID,
 failed avatar writes are rolled back, and replaced or deleted referenced images
-are removed safely. Abandoned pre-attachment uploads, per-account quotas,
-responsive post derivatives, and scheduled orphan cleanup remain open.
+are removed safely. A `managed_uploads` registry now records owner, type, encoded
+bytes, attachment, and lifecycle state for every new upload. Each account is
+limited to 100 MiB and five pending post images. A post image can be claimed only
+once, only by its owner, and in the same transaction as post creation or update.
+Pending images expire after 24 hours, incomplete writes after one hour, and
+deletions remain retryable until a bounded 15-minute maintenance pass removes
+both file and row. Historical unregistered files are not deleted automatically.
 
 - The UI permits files up to 10 MB; the initial vhost had no explicit body limit.
 - Processing is now bounded by encoded bytes, decoded bytes, dimensions, pixels,
@@ -244,9 +249,10 @@ responsive post derivatives, and scheduled orphan cleanup remain open.
 - At initial review, upload directories were `755 micu:micu` while the service
   ran as `www-data`, preventing backend writes.
 
-**Follow-up:** add account/storage quotas, scheduled orphan cleanup, responsive
-derivatives, decoder performance telemetry, and a separate cookieless media
-origin. Reassess the locked image stack promptly when decoder advisories appear.
+**Follow-up:** add responsive derivatives, deduplication, decoder performance
+telemetry, lifecycle handling for future account deletion, and a separate
+cookieless media origin. Reassess the locked image stack promptly when decoder
+advisories appear.
 
 #### SEC-008 — Authentication controls are below a safe baseline
 
