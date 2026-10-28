@@ -1,5 +1,8 @@
-use bcrypt::{hash, DEFAULT_COST};
 use sqlx::{MySqlPool, Row};
+
+#[allow(dead_code)]
+#[path = "../passwords.rs"]
+mod passwords;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -68,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     // Create users
-    let password_hash = hash("password123", DEFAULT_COST)?;
+    let password_hash = passwords::hash_password("password123").await?;
     let mut user_ids: Vec<String> = Vec::new();
 
     for username in &usernames {

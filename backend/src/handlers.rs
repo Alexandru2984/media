@@ -3,7 +3,6 @@ use axum::{
     http::{header, HeaderMap, StatusCode},
     response::Json,
 };
-use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -18,6 +17,7 @@ use crate::{
     },
     email::EmailService,
     models::*,
+    passwords::{hash_password, spend_password_work, verify_password},
     tokens::{generate_one_time_token, hash_one_time_token},
     uploads::validated_image_extension,
     validation::{
@@ -149,6 +149,44 @@ fn authenticated_response(
     Ok((headers, Json(payload)))
 }
 
+async fn verify_and_upgrade_password(
+    pool: &MySqlPool,
+    user: &User,
+    password: &str,
+) -> Result<bool, StatusCode> {
+    let verification = verify_password(password, &user.password_hash)
+        .await
+        .map_err(|error| {
+            tracing::error!(error = %error, user_id = %user.id, "password verification failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    if !verification.valid {
+        return Ok(false);
+    }
+    if !verification.needs_rehash {
+        return Ok(true);
+    }
+
+    let upgraded_hash = hash_password(password).await.map_err(|error| {
+        tracing::error!(error = %error, user_id = %user.id, "password hash upgrade failed");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let upgraded = query(
+        "UPDATE users SET password_hash = ?, updated_at = ?
+         WHERE id = ? AND password_hash = ?",
+    )
+    .bind(&upgraded_hash)
+    .bind(Utc::now())
+    .bind(&user.id)
+    .bind(&user.password_hash)
+    .execute(pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // A concurrent password change must win over a login using the old secret.
+    Ok(upgraded.rows_affected() == 1)
+}
+
 // Auth handlers
 pub async fn register(
     State(pool): State<MySqlPool>,
@@ -169,8 +207,9 @@ pub async fn register(
     }
 
     let user_id = Uuid::new_v4().to_string();
-    let password_hash =
-        hash(&payload.password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let password_hash = hash_password(&payload.password)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let now = Utc::now();
 
@@ -263,34 +302,35 @@ pub async fn login(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    match user {
-        Some(user) => {
-            let is_valid = verify(&payload.password, &user.password_hash)
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let Some(user) = user else {
+        // Keep valid-but-unknown accounts on the same memory-hard path as a
+        // wrong password, so account discovery does not gain a cheap oracle.
+        spend_password_work(&payload.password)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        return Err(StatusCode::UNAUTHORIZED);
+    };
 
-            if is_valid {
-                let token = issue_session(&pool, &user.id)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-                authenticated_response(
-                    &token,
-                    json!({
-                        "user": {
-                            "id": user.id,
-                            "username": user.username,
-                            "email": user.email,
-                            "bio": user.bio,
-                            "avatar_url": user.avatar_url
-                        }
-                    }),
-                )
-            } else {
-                Err(StatusCode::UNAUTHORIZED)
-            }
-        }
-        None => Err(StatusCode::UNAUTHORIZED),
+    if !verify_and_upgrade_password(&pool, &user, &payload.password).await? {
+        return Err(StatusCode::UNAUTHORIZED);
     }
+
+    let token = issue_session(&pool, &user.id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    authenticated_response(
+        &token,
+        json!({
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "bio": user.bio,
+                "avatar_url": user.avatar_url
+            }
+        }),
+    )
 }
 
 // Get current authenticated user
@@ -833,16 +873,19 @@ pub async fn change_password(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Verify old password
-    let is_valid = verify(&payload.old_password, &user.password_hash)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let is_valid = verify_password(&payload.old_password, &user.password_hash)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .valid;
 
     if !is_valid {
         return Err(StatusCode::UNAUTHORIZED);
     }
 
     // Hash new password
-    let new_password_hash =
-        hash(&payload.new_password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let new_password_hash = hash_password(&payload.new_password)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut transaction = pool
         .begin()
@@ -850,13 +893,20 @@ pub async fn change_password(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Change the credential and revoke every existing session atomically.
-    query("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
-        .bind(&new_password_hash)
-        .bind(Utc::now())
-        .bind(&user_id)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let password_changed = query(
+        "UPDATE users SET password_hash = ?, updated_at = ?
+         WHERE id = ? AND password_hash = ?",
+    )
+    .bind(&new_password_hash)
+    .bind(Utc::now())
+    .bind(&user_id)
+    .bind(&user.password_hash)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if password_changed.rows_affected() != 1 {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
 
     query("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
         .bind(Utc::now())
@@ -903,8 +953,7 @@ pub async fn change_email(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Verify password
-    let is_valid = verify(&payload.password, &user.password_hash)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let is_valid = verify_and_upgrade_password(&pool, &user, &payload.password).await?;
 
     if !is_valid {
         return Err(StatusCode::UNAUTHORIZED);
@@ -1785,8 +1834,9 @@ pub async fn reset_password(
     }
 
     // Hash new password
-    let password_hash =
-        hash(new_password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let password_hash = hash_password(new_password)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut transaction = pool
         .begin()

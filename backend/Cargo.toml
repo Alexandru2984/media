@@ -12,6 +12,7 @@ serde_json = "1.0"
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "mysql", "chrono", "uuid", "derive", "macros", "migrate"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
+argon2 = "0.6"
 bcrypt = "0.15"
 anyhow = "1.0"
 tracing = "0.1"

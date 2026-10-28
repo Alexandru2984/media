@@ -4,6 +4,7 @@ mod email;
 mod handlers;
 mod health;
 mod models;
+mod passwords;
 mod routes;
 mod security;
 mod tokens;
