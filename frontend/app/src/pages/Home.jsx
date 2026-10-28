@@ -1,180 +1,230 @@
-import { createSignal, onMount, Show, For, createEffect } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { A } from '@solidjs/router';
+import { createEffect, createSignal, For, Show } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import { api } from '../api';
-import Navbar from '../components/Navbar';
 import CreatePost from '../components/CreatePost';
+import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
+import { getImageUrl } from '../utils/urls';
+
+function LoadingFeed() {
+  return (
+    <div class="loading-stack" aria-label="Se încarcă postările" aria-busy="true">
+      <For each={[1, 2]}>
+        {() => (
+          <div class="surface skeleton">
+            <div class="skeleton-lines">
+              <div class="skeleton-line" />
+              <div class="skeleton-line" />
+              <div class="skeleton-line" />
+            </div>
+          </div>
+        )}
+      </For>
+    </div>
+  );
+}
+
+function Landing() {
+  return (
+    <main class="landing">
+      <section class="landing-hero app-container" aria-labelledby="landing-title">
+        <div class="hero-copy">
+          <div class="eyebrow">
+            <span aria-hidden="true">●</span>
+            Comunitatea ta, fără zgomot inutil
+          </div>
+          <h1 id="landing-title" class="hero-title">
+            Oameni reali.<br /><span>Conversații care contează.</span>
+          </h1>
+          <p class="hero-lead">
+            Media este locul în care distribui idei, imagini și momente cu o comunitate construită în jurul conexiunilor autentice.
+          </p>
+          <div class="hero-actions">
+            <A href="/register" class="btn btn-primary">
+              Creează un cont
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </A>
+            <A href="/login" class="btn btn-secondary">Am deja cont</A>
+          </div>
+          <div class="hero-proof" aria-label="Avantajele platformei">
+            <span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              Gratuit
+            </span>
+            <span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 5 6v5c0 4.7 3 8.3 7 10 4-1.7 7-5.3 7-10V6l-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+              Cont protejat
+            </span>
+            <span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+              Simplu de folosit
+            </span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hero-orb" />
+          <div class="preview-card preview-card-main">
+            <div class="preview-user">
+              <span class="avatar-fallback">M</span>
+              <div>
+                <div class="preview-name">Mara</div>
+                <div class="preview-meta">acum 4 minute</div>
+              </div>
+            </div>
+            <p class="preview-copy">Uneori, cele mai bune idei încep cu o conversație simplă.</p>
+            <div class="preview-media" />
+            <div class="preview-actions"><span>♡ 24 aprecieri</span><span>◯ 8 răspunsuri</span></div>
+          </div>
+          <div class="preview-card preview-card-small">
+            <div class="preview-user">
+              <span class="avatar-fallback">A</span>
+              <div>
+                <div class="preview-name">Andrei</div>
+                <div class="preview-meta">Tocmai a publicat</div>
+              </div>
+            </div>
+            <p class="preview-copy">Bun venit într-un feed mai calm.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
 
 export default function Home() {
   const [posts, setPosts] = createSignal([]);
-  const [loading, setLoading] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
+  const [error, setError] = createSignal('');
+  const [loadedForUser, setLoadedForUser] = createSignal(null);
   const auth = useAuth();
-  const navigate = useNavigate();
 
   const loadPosts = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await api.getPosts(20, 0);
       setPosts(data);
-    } catch (error) {
-      console.error('Failed to load posts:', error);
+    } catch (requestError) {
+      console.error('Failed to load posts:', requestError);
+      setError('Nu am putut încărca feedul. Verifică conexiunea și încearcă din nou.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Wait for auth to load, then check authentication
   createEffect(() => {
-    if (!auth.loading() && !auth.isAuthenticated()) {
-      navigate('/login');
-    } else if (!auth.loading() && auth.isAuthenticated()) {
+    const userId = auth.user()?.id;
+    if (!auth.loading() && userId && loadedForUser() !== userId) {
+      setLoadedForUser(userId);
       loadPosts();
     }
   });
 
-  const styles = {
-    container: {
-      minHeight: '100vh',
-      paddingBottom: '40px',
-    },
-    content: {
-      maxWidth: '680px',
-      margin: '0 auto',
-      padding: '24px 16px',
-    },
-    loading: {
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: '60px 0',
-    },
-    loadingContent: {
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '16px',
-    },
-    spinner: {
-      width: '48px',
-      height: '48px',
-      animation: 'spin 1s linear infinite',
-    },
-    loadingText: {
-      fontSize: '16px',
-      fontWeight: '500',
-      color: '#718096',
-    },
-    emptyState: {
-      background: '#ffffff',
-      borderRadius: '20px',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-      padding: '80px 40px',
-      textAlign: 'center',
-      border: '2px dashed #e2e8f0',
-    },
-    emptyIcon: {
-      fontSize: '80px',
-      marginBottom: '24px',
-      opacity: 0.8,
-    },
-    emptyTitle: {
-      fontSize: '24px',
-      fontWeight: '700',
-      color: '#2d3748',
-      marginBottom: '12px',
-    },
-    emptyText: {
-      fontSize: '16px',
-      color: '#718096',
-      lineHeight: '1.6',
-    },
-    postsContainer: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '20px',
-    },
-  };
-
   return (
-    <div style={styles.container} class="home-page">
+    <>
       <Navbar />
-      <div style={styles.content}>
-        <CreatePost onPostCreated={loadPosts} />
-
-        <Show when={loading()}>
-          <div style={styles.loading}>
-            <div style={styles.loadingContent}>
-              <svg style={styles.spinner} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle style={{opacity: 0.15}} cx="12" cy="12" r="10" stroke="#667eea" stroke-width="4"></circle>
-                <path style={{opacity: 0.75}} fill="#667eea" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <p style={styles.loadingText} class="loading-text">✨ Se încarcă postările...</p>
+      <Show
+        when={!auth.loading()}
+        fallback={
+          <main class="page-shell app-container">
+            <div class="home-grid">
+              <div class="feed-column"><LoadingFeed /></div>
             </div>
-          </div>
+          </main>
+        }
+      >
+        <Show when={auth.isAuthenticated()} fallback={<Landing />}>
+          <main class="page-shell app-container">
+            <div class="home-grid">
+              <aside class="sidebar sidebar-left" aria-label="Profil rapid">
+                <div class="surface sidebar-card">
+                  <div class="sidebar-profile">
+                    <Show
+                      when={auth.user()?.avatar_url}
+                      fallback={<span class="avatar-fallback">{auth.user()?.username?.charAt(0).toUpperCase()}</span>}
+                    >
+                      <img class="avatar" src={getImageUrl(auth.user()?.avatar_url)} alt="" />
+                    </Show>
+                    <div>
+                      <p class="sidebar-eyebrow">Profilul tău</p>
+                      <h2 class="sidebar-title">{auth.user()?.username}</h2>
+                    </div>
+                  </div>
+                  <A href={`/profile/${auth.user()?.id}`} class="btn btn-secondary" style={{ width: '100%', 'margin-top': '16px' }}>
+                    Vezi profilul
+                  </A>
+                </div>
+              </aside>
+
+              <section class="feed-column" aria-labelledby="feed-title">
+                <div class="feed-heading">
+                  <div>
+                    <h1 id="feed-title">Pentru tine</h1>
+                    <p>Idei și momente din comunitate</p>
+                  </div>
+                  <button type="button" class="icon-button" onClick={loadPosts} aria-label="Reîncarcă feedul" title="Reîncarcă">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </button>
+                </div>
+
+                <CreatePost onPostCreated={loadPosts} />
+
+                <Show when={loading()}><LoadingFeed /></Show>
+
+                <Show when={!loading() && error()}>
+                  <div class="surface state-card" role="alert">
+                    <div>
+                      <span class="state-icon">
+                        <svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5m0 3h.01M10.3 4.2 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                      </span>
+                      <h2>Feed indisponibil</h2>
+                      <p>{error()}</p>
+                      <button type="button" class="btn btn-primary" onClick={loadPosts} style={{ 'margin-top': '20px' }}>Încearcă din nou</button>
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={!loading() && !error() && posts().length === 0}>
+                  <div class="surface state-card">
+                    <div>
+                      <span class="state-icon">
+                        <svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+                      </span>
+                      <h2>Începe conversația</h2>
+                      <p>Feedul este liber. Publică primul gând și dă tonul comunității.</p>
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={!loading() && !error()}>
+                  <div class="feed-list">
+                    <For each={posts()}>{(post) => <PostCard post={post} onDelete={loadPosts} onUpdate={loadPosts} />}</For>
+                  </div>
+                </Show>
+              </section>
+
+              <aside class="sidebar sidebar-right" aria-label="Despre comunitate">
+                <div class="surface sidebar-card">
+                  <p class="sidebar-eyebrow">Media</p>
+                  <h2 class="sidebar-title">Un spațiu mai bun</h2>
+                  <p class="sidebar-copy">Publică responsabil, respectă comunitatea și păstrează conversațiile constructive.</p>
+                </div>
+                <div class="surface sidebar-card">
+                  <p class="sidebar-eyebrow">Sfat</p>
+                  <h2 class="sidebar-title">Fă-ți profilul memorabil</h2>
+                  <p class="sidebar-copy">Adaugă un avatar și o descriere scurtă ca oamenii să te recunoască ușor.</p>
+                </div>
+              </aside>
+            </div>
+          </main>
         </Show>
-
-        <Show when={!loading() && posts().length === 0}>
-          <div style={styles.emptyState} class="empty-state">
-            <div style={styles.emptyIcon}>📝</div>
-            <h3 style={styles.emptyTitle} class="empty-title">
-              Nu există încă postări
-            </h3>
-            <p style={styles.emptyText} class="empty-text">
-              Fii primul care postează ceva interesant!<br/>
-              Distribuie gândurile tale cu comunitatea.
-            </p>
-          </div>
-        </Show>
-
-        <div style={{
-          display: 'block',
-          width: '100%',
-        }}>
-          <For each={posts()}>
-            {(post) => <PostCard post={post} />}
-          </For>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        body.dark .home-page {
-          background: linear-gradient(180deg, #1a202c 0%, #2d3748 100%);
-        }
-
-        body.dark .loading-text {
-          color: #a0aec0;
-        }
-
-        body.dark .empty-state {
-          background: #2d3748 !important;
-          border-color: #4a5568 !important;
-        }
-
-        body.dark .empty-title {
-          color: #e2e8f0 !important;
-        }
-
-        body.dark .empty-text {
-          color: #a0aec0 !important;
-        }
-      `}</style>
-    </div>
+      </Show>
+    </>
   );
 }

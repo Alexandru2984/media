@@ -1,122 +1,109 @@
-import { createSignal } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { A, useNavigate } from '@solidjs/router';
+import { createSignal, Show } from 'solid-js';
 import { useAuth } from '../AuthContext';
+import Navbar from '../components/Navbar';
+
+function SubmitSpinner() {
+  return (
+    <svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+    </svg>
+  );
+}
 
 export default function Login() {
   const [email, setEmail] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [error, setError] = createSignal('');
+  const [submitting, setSubmitting] = createSignal(false);
   const navigate = useNavigate();
   const auth = useAuth();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
+    setSubmitting(true);
 
     try {
-      await auth.login(email(), password());
+      await auth.login(email().trim(), password());
       navigate('/');
-    } catch (err) {
-      setError('Email sau parolă incorectă');
+    } catch (requestError) {
+      console.error('Login failed:', requestError);
+      setError('Datele de conectare nu sunt corecte. Verifică emailul și parola.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-md w-full space-y-8">
-        {/* Header */}
-        <div class="text-center">
-          <div class="flex justify-center mb-4">
-            <span class="text-6xl">🌐</span>
-          </div>
-          <h2 class="text-4xl font-bold bg-gradient-to-r from-primary-500 to-blue-600 bg-clip-text text-transparent mb-2">
-            Bun venit înapoi!
-          </h2>
-          <p class="text-gray-600 dark:text-gray-400">
-            Conectează-te pentru a continua
-          </p>
-        </div>
+    <>
+      <Navbar />
+      <main class="auth-page">
+        <div class="auth-layout app-container">
+          <section class="auth-intro" aria-labelledby="login-intro-title">
+            <div class="eyebrow">Bine ai revenit</div>
+            <h1 id="login-intro-title">Conversațiile tale continuă aici.</h1>
+            <p>Intră în cont pentru a vedea cele mai noi postări, a răspunde comunității și a publica următoarea ta idee.</p>
+          </section>
 
-        {/* Card */}
-        <div class="card p-8">
-          {error() && (
-            <div class="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p class="text-red-600 dark:text-red-400 text-sm text-center font-medium">
-                {error()}
-              </p>
-            </div>
-          )}
+          <section class="surface auth-card" aria-labelledby="login-title">
+            <header class="auth-card-header">
+              <h1 id="login-title">Conectare</h1>
+              <p>Folosește adresa de email asociată contului tău.</p>
+            </header>
 
-          <form onSubmit={handleSubmit} class="space-y-6">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email()}
-                onInput={(e) => setEmail(e.target.value)}
-                required
-                class="input"
-                placeholder="nume@exemplu.com"
-              />
-            </div>
+            <Show when={error()}>
+              <div class="alert alert-error" role="alert" style={{ 'margin-bottom': '18px' }}>{error()}</div>
+            </Show>
 
-            <div>
-              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Parolă
-              </label>
-              <input
-                type="password"
-                value={password()}
-                onInput={(e) => setPassword(e.target.value)}
-                required
-                class="input"
-                placeholder="••••••••"
-              />
-            </div>
+            <form class="auth-form" onSubmit={handleSubmit}>
+              <div>
+                <label class="field-label" for="login-email">Adresă de email</label>
+                <input
+                  id="login-email"
+                  class="input"
+                  type="email"
+                  value={email()}
+                  onInput={(event) => setEmail(event.currentTarget.value)}
+                  autocomplete="email"
+                  inputmode="email"
+                  placeholder="nume@exemplu.ro"
+                  required
+                />
+              </div>
 
-            <button
-              type="submit"
-              disabled={auth.loading()}
-              class="btn btn-primary w-full text-base py-3 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {auth.loading() ? (
-                <span class="flex items-center justify-center">
-                  <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Se încarcă...
-                </span>
-              ) : (
-                'Conectare'
-              )}
-            </button>
-          </form>
+              <div>
+                <label class="field-label" for="login-password">Parolă</label>
+                <input
+                  id="login-password"
+                  class="input"
+                  type="password"
+                  value={password()}
+                  onInput={(event) => setPassword(event.currentTarget.value)}
+                  autocomplete="current-password"
+                  placeholder="Parola ta"
+                  required
+                />
+              </div>
 
-          <div class="mt-4 text-center">
-            <a
-              href="/forgot-password"
-              class="text-sm text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
-            >
-              Ai uitat parola?
-            </a>
-          </div>
+              <div class="auth-row">
+                <A href="/forgot-password" class="text-link">Ai uitat parola?</A>
+              </div>
 
-          <div class="mt-6 text-center">
-            <p class="text-sm text-gray-600 dark:text-gray-400">
-              Nu ai cont?{' '}
-              <a
-                href="/register"
-                class="font-semibold text-primary-600 hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
-              >
-                Înregistrează-te aici
-              </a>
+              <button type="submit" class="btn btn-primary" disabled={submitting()}>
+                <Show when={submitting()} fallback="Intră în cont">
+                  <SubmitSpinner /> Se conectează…
+                </Show>
+              </button>
+            </form>
+
+            <p class="auth-footer">
+              Nu ai cont? <A href="/register" class="text-link">Creează unul gratuit</A>
             </p>
-          </div>
+          </section>
         </div>
-      </div>
-    </div>
+      </main>
+    </>
   );
 }

@@ -1,85 +1,107 @@
+import { A, useLocation, useNavigate } from '@solidjs/router';
+import { Show } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
-import { useNavigate } from '@solidjs/router';
-import { Show } from 'solid-js';
 import { getImageUrl } from '../utils/urls';
+
+function BrandIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M7 8.5h10M7 12h6M9 19l-4 2v-5.2A7 7 0 0 1 3 11C3 6.6 7 3 12 3s9 3.6 9 8-4 8-9 8H9Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  );
+}
+
+function ThemeIcon(props) {
+  return props.dark ? (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+      <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8" />
+    </svg>
+  ) : (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+    </svg>
+  );
+}
 
 export default function Navbar() {
   const auth = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     auth.logout();
-    navigate('/login');
+    navigate('/');
   };
 
   return (
-    <nav class="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div
-            class="flex items-center space-x-2 cursor-pointer group"
-            onClick={() => navigate('/')}
+    <header class="site-header">
+      <nav class="site-nav app-container" aria-label="Navigație principală">
+        <A href="/" class="brand" aria-label="Media — pagina principală">
+          <span class="brand-mark"><BrandIcon /></span>
+          <span class="brand-name">Media</span>
+        </A>
+
+        <Show when={auth.isAuthenticated()}>
+          <div class="nav-links">
+            <A href="/" class={`nav-link ${location.pathname === '/' ? 'is-active' : ''}`}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              </svg>
+              Acasă
+            </A>
+            <A href={`/profile/${auth.user()?.id}`} class={`nav-link ${location.pathname.startsWith('/profile/') ? 'is-active' : ''}`}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" />
+                <path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+              Profil
+            </A>
+          </div>
+        </Show>
+
+        <div class="nav-actions">
+          <button
+            type="button"
+            class="icon-button"
+            onClick={toggleTheme}
+            aria-label={theme() === 'light' ? 'Activează tema întunecată' : 'Activează tema luminoasă'}
+            title={theme() === 'light' ? 'Temă întunecată' : 'Temă luminoasă'}
           >
-            <span class="text-3xl">🌐</span>
-            <h1 class="text-2xl font-bold bg-gradient-to-r from-primary-500 to-blue-600 bg-clip-text text-transparent group-hover:from-primary-600 group-hover:to-blue-700 transition-all">
-              Social Media
-            </h1>
-          </div>
+            <ThemeIcon dark={theme() === 'dark'} />
+          </button>
 
-          {/* Right side - Auth actions */}
-          <div class="flex items-center space-x-4">
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={toggleTheme}
-              class="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500"
-              aria-label="Toggle dark mode"
-            >
-              {theme() === 'light' ? (
-                <span class="text-xl">🌙</span>
-              ) : (
-                <span class="text-xl">☀️</span>
-              )}
+          <Show
+            when={auth.isAuthenticated()}
+            fallback={
+              <Show when={!auth.loading()}>
+                <A href="/login" class="btn btn-ghost desktop-only">Conectare</A>
+                <A href="/register" class="btn btn-primary">Cont nou</A>
+              </Show>
+            }
+          >
+            <A href={`/profile/${auth.user()?.id}`} class="nav-user" aria-label="Deschide profilul">
+              <Show
+                when={auth.user()?.avatar_url}
+                fallback={<span class="avatar-fallback">{auth.user()?.username?.charAt(0).toUpperCase()}</span>}
+              >
+                <img class="avatar" src={getImageUrl(auth.user()?.avatar_url)} alt="" />
+              </Show>
+              <span>{auth.user()?.username}</span>
+            </A>
+            <button type="button" class="btn btn-secondary desktop-only" onClick={handleLogout}>
+              Ieșire
             </button>
-
-            {auth.isAuthenticated() && (
-              <>
-                {/* User Profile Link */}
-                <button
-                  onClick={() => navigate(`/profile/${auth.user()?.id}`)}
-                  class="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
-                >
-                  <Show
-                    when={auth.user()?.avatar_url}
-                    fallback={
-                      <span class="text-xl">👤</span>
-                    }
-                  >
-                    <img
-                      src={getImageUrl(auth.user()?.avatar_url)}
-                      alt={auth.user()?.username}
-                      class="w-8 h-8 rounded-full object-cover border-2 border-primary-500"
-                    />
-                  </Show>
-                  <span class="font-medium text-gray-700 dark:text-gray-200 hidden sm:inline">
-                    {auth.user()?.username}
-                  </span>
-                </button>
-
-                {/* Logout Button */}
-                <button
-                  onClick={handleLogout}
-                  class="btn btn-primary text-sm"
-                >
-                  Logout
-                </button>
-              </>
-            )}
-          </div>
+            <button type="button" class="icon-button" onClick={handleLogout} aria-label="Deconectare" title="Deconectare">
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M10 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h5m5-3 4-4-4-4m4 4H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </Show>
         </div>
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
 }
