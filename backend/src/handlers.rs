@@ -4,7 +4,7 @@ use axum::{
     response::Json,
 };
 use bcrypt::{hash, verify, DEFAULT_COST};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use sqlx::{query, query_as, query_scalar, MySql, MySqlPool, QueryBuilder};
 use std::collections::HashMap;
@@ -23,6 +23,53 @@ use crate::{
         MAXIMUM_COMMENT_CHARACTERS, MAXIMUM_MESSAGE_CHARACTERS, MAXIMUM_POST_CHARACTERS,
     },
 };
+
+#[derive(sqlx::FromRow)]
+struct PostFeedRow {
+    id: String,
+    content: String,
+    image_url: Option<String>,
+    likes_count: i64,
+    comments_count: i64,
+    created_at: DateTime<Utc>,
+    user_id: String,
+    username: String,
+    bio: Option<String>,
+    avatar_url: Option<String>,
+    user_posts_count: i64,
+    user_created_at: DateTime<Utc>,
+    is_liked: bool,
+}
+
+#[derive(sqlx::FromRow)]
+struct CommentFeedRow {
+    id: String,
+    content: String,
+    created_at: DateTime<Utc>,
+    user_id: String,
+    username: String,
+    avatar_url: Option<String>,
+}
+
+fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
+    PostWithUser {
+        id: row.id,
+        content: row.content,
+        image_url: row.image_url,
+        likes_count: row.likes_count,
+        comments_count: row.comments_count,
+        created_at: row.created_at,
+        user: UserProfile {
+            id: row.user_id,
+            username: row.username,
+            bio: row.bio,
+            avatar_url: row.avatar_url,
+            posts_count: row.user_posts_count,
+            created_at: row.user_created_at,
+        },
+        is_liked: row.is_liked,
+    }
+}
 
 fn authenticated_response(
     token: &str,
@@ -338,66 +385,34 @@ pub async fn get_posts(
         .unwrap_or(0)
         .clamp(0, 1_000_000);
 
-    // First get all posts
-    let posts =
-        query_as::<_, Post>("SELECT * FROM posts ORDER BY created_at DESC LIMIT ? OFFSET ?")
-            .bind(limit)
-            .bind(offset)
-            .fetch_all(&pool)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let rows = query_as::<_, PostFeedRow>(
+        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+                u.id AS user_id, u.username, u.bio, u.avatar_url,
+                post_counts.posts_count AS user_posts_count,
+                u.created_at AS user_created_at,
+                (current_like.id IS NOT NULL) AS is_liked
+         FROM posts p
+         INNER JOIN users u ON u.id = p.user_id
+         INNER JOIN (
+             SELECT user_id, COUNT(*) AS posts_count
+             FROM posts
+             GROUP BY user_id
+         ) post_counts ON post_counts.user_id = p.user_id
+         LEFT JOIN likes current_like
+           ON current_like.post_id = p.id AND current_like.user_id = ?
+         ORDER BY p.created_at DESC
+         LIMIT ? OFFSET ?",
+    )
+    .bind(current_user_id.as_deref())
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let mut result = Vec::new();
-
-    for post in posts {
-        // Get user info
-        let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
-            .bind(&post.user_id)
-            .fetch_one(&pool)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        // Get user posts count
-        let user_posts_count: i64 = query_scalar("SELECT COUNT(*) FROM posts WHERE user_id = ?")
-            .bind(&post.user_id)
-            .fetch_one(&pool)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        // Check if liked by current user
-        let is_liked = if let Some(ref uid) = current_user_id {
-            let count: i64 =
-                query_scalar("SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?")
-                    .bind(&post.id)
-                    .bind(uid)
-                    .fetch_one(&pool)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            count > 0
-        } else {
-            false
-        };
-
-        result.push(PostWithUser {
-            id: post.id,
-            content: post.content,
-            image_url: post.image_url,
-            likes_count: post.likes_count,
-            comments_count: post.comments_count,
-            created_at: post.created_at,
-            user: UserProfile {
-                id: user.id,
-                username: user.username,
-                bio: user.bio,
-                avatar_url: user.avatar_url,
-                posts_count: user_posts_count,
-                created_at: user.created_at,
-            },
-            is_liked,
-        });
-    }
-
-    Ok(Json(result))
+    Ok(Json(
+        rows.into_iter().map(post_feed_row_to_response).collect(),
+    ))
 }
 
 pub async fn like_post(
@@ -550,35 +565,36 @@ pub async fn get_comments(
     State(pool): State<MySqlPool>,
     Path(post_id): Path<String>,
 ) -> Result<Json<Vec<Value>>, StatusCode> {
-    let comments =
-        query_as::<_, Comment>("SELECT * FROM comments WHERE post_id = ? ORDER BY created_at ASC")
-            .bind(&post_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let comments = query_as::<_, CommentFeedRow>(
+        "SELECT c.id, c.content, c.created_at,
+                u.id AS user_id, u.username, u.avatar_url
+         FROM comments c
+         INNER JOIN users u ON u.id = c.user_id
+         WHERE c.post_id = ?
+         ORDER BY c.created_at ASC",
+    )
+    .bind(&post_id)
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let mut result = Vec::new();
-
-    for comment in comments {
-        let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
-            .bind(&comment.user_id)
-            .fetch_one(&pool)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        result.push(json!({
-            "id": comment.id,
-            "content": comment.content,
-            "created_at": comment.created_at,
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "avatar_url": user.avatar_url
-            }
-        }));
-    }
-
-    Ok(Json(result))
+    Ok(Json(
+        comments
+            .into_iter()
+            .map(|comment| {
+                json!({
+                    "id": comment.id,
+                    "content": comment.content,
+                    "created_at": comment.created_at,
+                    "user": {
+                        "id": comment.user_id,
+                        "username": comment.username,
+                        "avatar_url": comment.avatar_url
+                    }
+                })
+            })
+            .collect(),
+    ))
 }
 
 // Update User Profile
@@ -1211,10 +1227,18 @@ pub async fn get_messages(
     let user_id = get_current_user(&headers).await?;
     let other_user_id = params.get("user_id").ok_or(StatusCode::BAD_REQUEST)?;
 
-    let messages = query_as::<_, Message>(
-        "SELECT * FROM messages
-         WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
-         ORDER BY created_at ASC",
+    if Uuid::parse_str(other_user_id).is_err() || other_user_id == &user_id {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let messages = query_as::<_, MessageWithUser>(
+        "SELECT m.id, m.sender_id, m.receiver_id, m.content, m.`read`, m.created_at,
+                sender.username AS sender_username, sender.avatar_url AS sender_avatar
+         FROM messages m
+         INNER JOIN users sender ON sender.id = m.sender_id
+         WHERE (m.sender_id = ? AND m.receiver_id = ?)
+            OR (m.sender_id = ? AND m.receiver_id = ?)
+         ORDER BY m.created_at ASC",
     )
     .bind(&user_id)
     .bind(other_user_id)
@@ -1224,101 +1248,66 @@ pub async fn get_messages(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let mut result = Vec::new();
-
-    for message in messages {
-        let sender = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
-            .bind(&message.sender_id)
-            .fetch_one(&pool)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-        result.push(MessageWithUser {
-            id: message.id,
-            sender_id: message.sender_id,
-            receiver_id: message.receiver_id,
-            content: message.content,
-            read: message.read,
-            created_at: message.created_at,
-            sender_username: sender.username,
-            sender_avatar: sender.avatar_url,
-        });
-    }
-
     // Mark messages as read
     query("UPDATE messages SET read = 1 WHERE receiver_id = ? AND sender_id = ?")
         .bind(&user_id)
         .bind(other_user_id)
         .execute(&pool)
         .await
-        .ok();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(Json(result))
+    Ok(Json(messages))
 }
 
 // Get User Posts
 pub async fn get_user_posts(
     State(pool): State<MySqlPool>,
     Path(user_id): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
     let current_user_id = get_current_user(&headers).await.ok();
+    let limit = params
+        .get("limit")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(50)
+        .clamp(1, 50);
+    let offset = params
+        .get("offset")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(0)
+        .clamp(0, 1_000_000);
 
-    let posts =
-        query_as::<_, Post>("SELECT * FROM posts WHERE user_id = ? ORDER BY created_at DESC")
-            .bind(&user_id)
-            .fetch_all(&pool)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let rows = query_as::<_, PostFeedRow>(
+        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+                u.id AS user_id, u.username, u.bio, u.avatar_url,
+                post_counts.posts_count AS user_posts_count,
+                u.created_at AS user_created_at,
+                (current_like.id IS NOT NULL) AS is_liked
+         FROM posts p
+         INNER JOIN users u ON u.id = p.user_id
+         INNER JOIN (
+             SELECT user_id, COUNT(*) AS posts_count
+             FROM posts
+             GROUP BY user_id
+         ) post_counts ON post_counts.user_id = p.user_id
+         LEFT JOIN likes current_like
+           ON current_like.post_id = p.id AND current_like.user_id = ?
+         WHERE p.user_id = ?
+         ORDER BY p.created_at DESC
+         LIMIT ? OFFSET ?",
+    )
+    .bind(current_user_id.as_deref())
+    .bind(&user_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let mut result = Vec::new();
-
-    let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
-        .bind(&user_id)
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let user_posts_count: i64 = query_scalar("SELECT COUNT(*) FROM posts WHERE user_id = ?")
-        .bind(&user_id)
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    for post in posts {
-        let is_liked = if let Some(ref uid) = current_user_id {
-            let count: i64 =
-                query_scalar("SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?")
-                    .bind(&post.id)
-                    .bind(uid)
-                    .fetch_one(&pool)
-                    .await
-                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            count > 0
-        } else {
-            false
-        };
-
-        result.push(PostWithUser {
-            id: post.id,
-            content: post.content,
-            image_url: post.image_url,
-            likes_count: post.likes_count,
-            comments_count: post.comments_count,
-            created_at: post.created_at,
-            user: UserProfile {
-                id: user.id.clone(),
-                username: user.username.clone(),
-                bio: user.bio.clone(),
-                avatar_url: user.avatar_url.clone(),
-                posts_count: user_posts_count,
-                created_at: user.created_at,
-            },
-            is_liked,
-        });
-    }
-
-    Ok(Json(result))
+    Ok(Json(
+        rows.into_iter().map(post_feed_row_to_response).collect(),
+    ))
 }
 
 // Email verification handlers

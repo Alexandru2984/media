@@ -108,7 +108,7 @@ pub struct CreateMessage {
     pub content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct MessageWithUser {
     pub id: String,
     pub sender_id: String,

@@ -113,6 +113,12 @@ pub async fn init_db() -> Result<DbPool> {
     let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id)")
         .execute(&pool)
         .await;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_comments_post_created
+         ON comments(post_id, created_at)",
+    )
+    .execute(&pool)
+    .await?;
     let _ = sqlx::query("CREATE INDEX IF NOT EXISTS idx_likes_post_id ON likes(post_id)")
         .execute(&pool)
         .await;
@@ -120,6 +126,12 @@ pub async fn init_db() -> Result<DbPool> {
         sqlx::query("CREATE INDEX IF NOT EXISTS idx_messages_receiver ON messages(receiver_id)")
             .execute(&pool)
             .await;
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_messages_conversation
+         ON messages(sender_id, receiver_id, created_at)",
+    )
+    .execute(&pool)
+    .await?;
 
     println!("✅ Database initialized successfully");
 
