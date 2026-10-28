@@ -104,20 +104,101 @@ function Landing() {
           </div>
           <div class="principles-grid">
             <article class="surface feature-card">
-              <span class="feature-icon" aria-hidden="true">✦</span>
+              <span class="feature-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </span>
               <h3>Publică fără fricțiune</h3>
               <p>Împărtășește texte și imagini într-un composer rapid, cu validări clare și stări utile.</p>
             </article>
             <article class="surface feature-card">
-              <span class="feature-icon" aria-hidden="true">⌕</span>
+              <span class="feature-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8" />
+                  <path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+              </span>
               <h3>Descoperă comunitatea</h3>
-              <p>Caută oameni și conversații, urmărește profiluri și continuă discuția prin comentarii.</p>
+              <p>Caută oameni și conversații, explorează profiluri și continuă discuția prin comentarii.</p>
             </article>
             <article class="surface feature-card">
-              <span class="feature-icon" aria-hidden="true">◎</span>
+              <span class="feature-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <rect x="5" y="2.5" width="14" height="19" rx="3" stroke="currentColor" stroke-width="1.8" />
+                  <path d="M10 18h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+              </span>
               <h3>Conceput pentru mobil</h3>
               <p>Navigația, feedul și setările rămân clare de la 320 px până la ecrane desktop.</p>
             </article>
+          </div>
+        </section>
+
+        <section class="landing-journey app-container" aria-labelledby="landing-journey-title">
+          <div class="journey-intro">
+            <p class="sidebar-eyebrow">De la idee la conversație</p>
+            <h2 id="landing-journey-title">Trei pași. Fără manual de utilizare.</h2>
+            <p>Media păstrează lucrurile importante la îndemână, ca tu să poți intra direct în conversație.</p>
+          </div>
+          <ol class="journey-steps">
+            <li class="journey-step">
+              <span class="journey-number">01</span>
+              <div>
+                <h3>Creează-ți profilul</h3>
+                <p>Alege un nume, confirmă adresa de email și personalizează-ți spațiul.</p>
+              </div>
+            </li>
+            <li class="journey-step">
+              <span class="journey-number">02</span>
+              <div>
+                <h3>Publică ce contează</h3>
+                <p>Scrie un gând sau adaugă o imagine, cu feedback clar înainte de publicare.</p>
+              </div>
+            </li>
+            <li class="journey-step">
+              <span class="journey-number">03</span>
+              <div>
+                <h3>Continuă discuția</h3>
+                <p>Descoperă postări, apreciază idei și răspunde direct prin comentarii.</p>
+              </div>
+            </li>
+          </ol>
+        </section>
+
+        <section class="landing-trust app-container" aria-labelledby="landing-trust-title">
+          <div class="trust-panel">
+            <div class="trust-copy">
+              <p class="trust-eyebrow">Siguranță vizibilă</p>
+              <h2 id="landing-trust-title">Controlul contului tău nu stă ascuns într-un meniu.</h2>
+              <p>Primești instrumente concrete pentru acces, sesiuni și schimbările importante ale contului.</p>
+              <A href="/despre" class="trust-link">
+                Cum este construită Media
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </A>
+            </div>
+            <ul class="trust-list">
+              <li>
+                <span class="trust-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="3" stroke="currentColor" stroke-width="1.8" /><path d="M8 9h8M8 13h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                </span>
+                <div><strong>Sesiuni sub control</strong><span>Vezi sesiunile active și le poți închide de la distanță.</span></div>
+              </li>
+              <li>
+                <span class="trust-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5c0 4.7 3 8.3 7 10 4-1.7 7-5.3 7-10V6l-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /><path d="m9 12 2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <div><strong>Activitate de securitate</strong><span>Autentificările și modificările sensibile rămân ușor de verificat.</span></div>
+              </li>
+              <li>
+                <span class="trust-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 16.5V19h16v-2.5M12 4v10m0-10L8 8m4-4 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </span>
+                <div><strong>Fișiere verificate</strong><span>Imaginile încărcate trec prin limite și validări stricte pe server.</span></div>
+              </li>
+            </ul>
           </div>
         </section>
 
