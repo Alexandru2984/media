@@ -24,7 +24,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
             "/auth/send-verification",
             post(handlers::send_verification_email),
         )
-        .route("/auth/verify-email", get(handlers::verify_email))
+        .route("/auth/verify-email", post(handlers::verify_email))
         .route("/auth/forgot-password", post(handlers::forgot_password))
         .route("/auth/reset-password", post(handlers::reset_password))
         // User routes
@@ -38,7 +38,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/users/me/change-email", post(handlers::change_email))
         .route(
             "/users/verify-email-change",
-            get(handlers::verify_email_change),
+            post(handlers::verify_email_change),
         )
         .route("/users/:id/posts", get(handlers::get_user_posts))
         // Post routes

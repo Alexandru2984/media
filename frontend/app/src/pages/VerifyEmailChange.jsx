@@ -1,19 +1,19 @@
-import { A, useNavigate, useSearchParams } from '@solidjs/router';
+import { A, useNavigate } from '@solidjs/router';
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { api } from '../api';
 import AccountFlow, { StatusMark } from '../components/AccountFlow';
 import PageMeta from '../components/PageMeta';
+import { consumeOneTimeToken } from '../utils/urls';
 
 export default function VerifyEmailChange() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const token = consumeOneTimeToken();
   const [status, setStatus] = createSignal('loading');
   const [message, setMessage] = createSignal('Confirmăm noua adresă…');
   let redirectTimer;
   onCleanup(() => window.clearTimeout(redirectTimer));
 
   onMount(async () => {
-    const token = searchParams.token;
     if (!token) {
       setStatus('error');
       setMessage('Linkul de confirmare este incomplet.');

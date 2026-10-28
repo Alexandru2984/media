@@ -44,9 +44,8 @@ server {
         add_header X-Permitted-Cross-Domain-Policies "none" always;
     }
 
-    # These routes currently carry one-time secrets in the query string. Keep
-    # them out of origin logs and browser caches until the application moves the
-    # token exchange to a POST body.
+    # New links keep secrets in URL fragments and exchange them through POST.
+    # Logging stays disabled so already-issued query-string links remain safe.
     location ~ ^/(reset-password|verify-email|verify-email-change)/?$ {
         access_log off;
         # Serve the SPA entry in this location instead of internally redirecting

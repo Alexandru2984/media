@@ -81,6 +81,11 @@ pub struct ChangeEmail {
     pub password: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct OneTimeTokenRequest {
+    pub token: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdatePost {
     pub content: String,

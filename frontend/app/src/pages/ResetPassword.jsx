@@ -1,13 +1,14 @@
-import { A, useNavigate, useSearchParams } from '@solidjs/router';
+import { A, useNavigate } from '@solidjs/router';
 import { createSignal, onCleanup, Show } from 'solid-js';
 import { api } from '../api';
 import AccountFlow, { StatusMark } from '../components/AccountFlow';
 import { getPasswordPolicyError } from '../utils/passwords';
 import PageMeta from '../components/PageMeta';
+import { consumeOneTimeToken } from '../utils/urls';
 
 export default function ResetPassword() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const token = consumeOneTimeToken();
   const [password, setPassword] = createSignal('');
   const [confirmPassword, setConfirmPassword] = createSignal('');
   const [loading, setLoading] = createSignal(false);
@@ -28,7 +29,6 @@ export default function ResetPassword() {
       setError(policyError);
       return;
     }
-    const token = searchParams.token;
     if (!token) {
       setError('Linkul de resetare este incomplet. Solicită unul nou.');
       return;

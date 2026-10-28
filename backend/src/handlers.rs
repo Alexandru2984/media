@@ -839,9 +839,9 @@ pub async fn change_email(
 // Verify Email Change
 pub async fn verify_email_change(
     State(pool): State<MySqlPool>,
-    Query(params): Query<HashMap<String, String>>,
+    Json(payload): Json<OneTimeTokenRequest>,
 ) -> Result<Json<Value>, StatusCode> {
-    let token = params.get("token").ok_or(StatusCode::BAD_REQUEST)?;
+    let token = payload.token.trim();
 
     if !one_time_token_is_valid(token) {
         return Err(StatusCode::BAD_REQUEST);
@@ -1514,9 +1514,9 @@ pub async fn send_verification_email(
 
 pub async fn verify_email(
     State(pool): State<MySqlPool>,
-    Query(params): Query<HashMap<String, String>>,
+    Json(payload): Json<OneTimeTokenRequest>,
 ) -> Result<Json<Value>, StatusCode> {
-    let token = params.get("token").ok_or(StatusCode::BAD_REQUEST)?;
+    let token = payload.token.trim();
 
     if !one_time_token_is_valid(token) {
         return Err(StatusCode::BAD_REQUEST);

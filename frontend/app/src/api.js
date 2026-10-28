@@ -182,8 +182,9 @@ class ApiService {
   }
 
   async verifyEmail(token) {
-    return this.request(`/auth/verify-email?token=${token}`, {
-      method: 'GET',
+    return this.request('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
     });
   }
 
@@ -218,8 +219,9 @@ class ApiService {
   }
 
   async verifyEmailChange(token) {
-    return this.request(`/users/verify-email-change?token=${token}`, {
-      method: 'GET',
+    return this.request('/users/verify-email-change', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
     });
   }
 

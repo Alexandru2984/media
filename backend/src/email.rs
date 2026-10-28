@@ -108,7 +108,7 @@ impl EmailService {
         button_label: &str,
         subject: &str,
     ) -> Result<()> {
-        let verification_url = format!("{}/{}?token={}", self.app_url, route, token);
+        let verification_url = one_time_link(&self.app_url, route, token);
 
         let html_body = format!(
             r#"
@@ -161,7 +161,7 @@ impl EmailService {
         username: &str,
         token: &str,
     ) -> Result<()> {
-        let reset_url = format!("{}/reset-password?token={}", self.app_url, token);
+        let reset_url = one_time_link(&self.app_url, "reset-password", token);
 
         let html_body = format!(
             r#"
@@ -284,9 +284,13 @@ fn escape_html(value: &str) -> String {
     escaped
 }
 
+fn one_time_link(app_url: &str, route: &str, token: &str) -> String {
+    format!("{}/{}#token={}", app_url, route, token)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{escape_html, validate_app_url};
+    use super::{escape_html, one_time_link, validate_app_url};
 
     #[test]
     fn escapes_user_content_for_html_email() {
@@ -309,5 +313,13 @@ mod tests {
     fn application_url_rejects_embedded_credentials_and_fragments() {
         assert!(validate_app_url("https://user:pass@example.com", true).is_err());
         assert!(validate_app_url("https://example.com/#token", true).is_err());
+    }
+
+    #[test]
+    fn one_time_secrets_are_kept_out_of_http_requests() {
+        assert_eq!(
+            one_time_link("https://media.example.com", "verify-email", "abc123"),
+            "https://media.example.com/verify-email#token=abc123"
+        );
     }
 }
