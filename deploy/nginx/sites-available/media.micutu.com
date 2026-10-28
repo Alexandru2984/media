@@ -103,7 +103,7 @@ server {
         add_header X-Permitted-Cross-Domain-Policies "none" always;
     }
 
-    location ~ ^/api/auth/(login|register|forgot-password|reset-password|send-verification)$ {
+    location ~ ^/api/auth/(login|register|session|logout|forgot-password|reset-password|send-verification)$ {
         limit_req zone=media_auth burst=5 nodelay;
         include snippets/media-api-proxy.conf;
     }

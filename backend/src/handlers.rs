@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::{header, HeaderMap, StatusCode},
     response::Json,
 };
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -11,7 +11,9 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::{
-    auth::{create_jwt, get_user_id_from_headers, verify_jwt},
+    auth::{
+        clear_session_cookie, create_jwt, get_user_id_from_headers, session_cookie, verify_jwt,
+    },
     email::EmailService,
     models::*,
     tokens::{generate_one_time_token, hash_one_time_token},
@@ -19,11 +21,23 @@ use crate::{
     validation::{email_is_valid, one_time_token_is_valid, password_is_valid},
 };
 
+fn authenticated_response(
+    token: &str,
+    payload: Value,
+) -> Result<(HeaderMap, Json<Value>), StatusCode> {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::SET_COOKIE,
+        session_cookie(token).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    );
+    Ok((headers, Json(payload)))
+}
+
 // Auth handlers
 pub async fn register(
     State(pool): State<MySqlPool>,
     Json(payload): Json<CreateUser>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<(HeaderMap, Json<Value>), StatusCode> {
     if !password_is_valid(&payload.password) {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -87,15 +101,18 @@ pub async fn register(
             let token =
                 create_jwt(user_id.clone()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-            Ok(Json(json!({
-                "token": token,
-                "user": {
-                    "id": user_id,
-                    "username": payload.username,
-                    "email": payload.email,
-                    "bio": payload.bio
-                }
-            })))
+            authenticated_response(
+                &token,
+                json!({
+                    "token": token,
+                    "user": {
+                        "id": user_id,
+                        "username": payload.username,
+                        "email": payload.email,
+                        "bio": payload.bio
+                    }
+                }),
+            )
         }
         Err(_) => Err(StatusCode::CONFLICT),
     }
@@ -104,7 +121,7 @@ pub async fn register(
 pub async fn login(
     State(pool): State<MySqlPool>,
     Json(payload): Json<LoginUser>,
-) -> Result<Json<Value>, StatusCode> {
+) -> Result<(HeaderMap, Json<Value>), StatusCode> {
     let user = query_as::<_, User>("SELECT * FROM users WHERE email = ?")
         .bind(&payload.email)
         .fetch_optional(&pool)
@@ -120,16 +137,19 @@ pub async fn login(
                 let token =
                     create_jwt(user.id.clone()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-                Ok(Json(json!({
-                    "token": token,
-                    "user": {
-                        "id": user.id,
-                        "username": user.username,
-                        "email": user.email,
-                        "bio": user.bio,
-                        "avatar_url": user.avatar_url
-                    }
-                })))
+                authenticated_response(
+                    &token,
+                    json!({
+                        "token": token,
+                        "user": {
+                            "id": user.id,
+                            "username": user.username,
+                            "email": user.email,
+                            "bio": user.bio,
+                            "avatar_url": user.avatar_url
+                        }
+                    }),
+                )
             } else {
                 Err(StatusCode::UNAUTHORIZED)
             }
@@ -159,6 +179,42 @@ pub async fn me(
         "bio": user.bio,
         "avatar_url": user.avatar_url
     })))
+}
+
+pub async fn create_session(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+) -> Result<(HeaderMap, Json<Value>), StatusCode> {
+    let user_id = get_current_user(&headers).await?;
+    let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+        .bind(&user_id)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let token = create_jwt(user_id).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    authenticated_response(
+        &token,
+        json!({
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "bio": user.bio,
+                "avatar_url": user.avatar_url
+            }
+        }),
+    )
+}
+
+pub async fn logout() -> Result<(HeaderMap, Json<Value>), StatusCode> {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::SET_COOKIE,
+        clear_session_cookie().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    );
+    Ok((headers, Json(json!({ "message": "Sesiune încheiată" }))))
 }
 
 // Helper function to extract user from token
