@@ -1,4 +1,7 @@
--- Create users table
+-- Historical migration recovered from the legacy SQLite-oriented repository.
+-- Kept for provenance only; the production MySQL baseline is versioned in the
+-- active .sql migration beside this file.
+
 CREATE TABLE users (
     id TEXT PRIMARY KEY NOT NULL,
     username TEXT UNIQUE NOT NULL,
@@ -10,7 +13,6 @@ CREATE TABLE users (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create posts table
 CREATE TABLE posts (
     id TEXT PRIMARY KEY NOT NULL,
     user_id TEXT NOT NULL,
@@ -23,7 +25,6 @@ CREATE TABLE posts (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Create comments table
 CREATE TABLE comments (
     id TEXT PRIMARY KEY NOT NULL,
     post_id TEXT NOT NULL,
@@ -35,7 +36,6 @@ CREATE TABLE comments (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Create likes table
 CREATE TABLE likes (
     id TEXT PRIMARY KEY NOT NULL,
     post_id TEXT NOT NULL,
@@ -46,7 +46,6 @@ CREATE TABLE likes (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Create indexes for better performance
 CREATE INDEX idx_posts_user_id ON posts(user_id);
 CREATE INDEX idx_posts_created_at ON posts(created_at DESC);
 CREATE INDEX idx_comments_post_id ON comments(post_id);
