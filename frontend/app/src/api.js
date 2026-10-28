@@ -158,6 +158,10 @@ class ApiService {
     return this.request(`/users/${userId}/posts`);
   }
 
+  async search(query) {
+    return this.request(`/search?q=${encodeURIComponent(query)}`);
+  }
+
   // Messages
   async sendMessage(receiverId, content) {
     return this.request('/messages', {

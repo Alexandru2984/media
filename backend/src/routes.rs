@@ -59,6 +59,8 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         // Message routes
         .route("/messages", post(handlers::send_message))
         .route("/messages", get(handlers::get_messages))
+        // Discovery routes
+        .route("/search", get(handlers::search))
         .with_state(pool)
         .layer(middleware::from_fn_with_state(
             expected_origin,

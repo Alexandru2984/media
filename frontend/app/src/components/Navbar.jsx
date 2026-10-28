@@ -60,6 +60,13 @@ export default function Navbar() {
               </svg>
               Acasă
             </A>
+            <A href="/search" class={`nav-link ${location.pathname === '/search' ? 'is-active' : ''}`}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8" />
+                <path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+              Caută
+            </A>
             <A href={`/profile/${auth.user()?.id}`} class={`nav-link ${location.pathname.startsWith('/profile/') ? 'is-active' : ''}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" />
@@ -119,6 +126,13 @@ export default function Navbar() {
               <path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
             </svg>
             <span>Acasă</span>
+          </A>
+          <A href="/search" class={location.pathname === '/search' ? 'is-active' : ''}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8" />
+              <path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            <span>Caută</span>
           </A>
           <button type="button" class="mobile-compose" onClick={handleCompose}>
             <span class="mobile-compose-icon" aria-hidden="true">

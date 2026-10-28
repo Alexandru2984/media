@@ -120,7 +120,7 @@ pub struct MessageWithUser {
     pub sender_avatar: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserProfile {
     pub id: String,
     pub username: String,

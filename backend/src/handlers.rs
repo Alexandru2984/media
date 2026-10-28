@@ -19,8 +19,9 @@ use crate::{
     validation::{
         bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
         one_time_token_is_valid, password_is_safe_to_verify, password_is_valid,
-        stored_image_path_belongs_to_user, username_is_valid, MAXIMUM_BIO_CHARACTERS,
-        MAXIMUM_COMMENT_CHARACTERS, MAXIMUM_MESSAGE_CHARACTERS, MAXIMUM_POST_CHARACTERS,
+        search_query_is_valid, stored_image_path_belongs_to_user, username_is_valid,
+        MAXIMUM_BIO_CHARACTERS, MAXIMUM_COMMENT_CHARACTERS, MAXIMUM_MESSAGE_CHARACTERS,
+        MAXIMUM_POST_CHARACTERS,
     },
 };
 
@@ -1392,6 +1393,74 @@ pub async fn get_user_posts(
     Ok(Json(
         rows.into_iter().map(post_feed_row_to_response).collect(),
     ))
+}
+
+pub async fn search(
+    State(pool): State<MySqlPool>,
+    Query(params): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let current_user_id = get_current_user(&headers).await?;
+    let search_term = params
+        .get("q")
+        .map(|value| value.trim())
+        .filter(|value| search_query_is_valid(value))
+        .ok_or(StatusCode::BAD_REQUEST)?;
+
+    let users = query_as::<_, UserProfile>(
+        "SELECT u.id, u.username, u.bio, u.avatar_url,
+                CAST(COALESCE(post_counts.posts_count, 0) AS SIGNED) AS posts_count,
+                u.created_at
+         FROM users u
+         LEFT JOIN (
+             SELECT user_id, COUNT(*) AS posts_count
+             FROM posts
+             GROUP BY user_id
+         ) post_counts ON post_counts.user_id = u.id
+         WHERE INSTR(LOWER(u.username), LOWER(?)) > 0
+         ORDER BY u.username ASC
+         LIMIT 12",
+    )
+    .bind(search_term)
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let post_rows = query_as::<_, PostFeedRow>(
+        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+                u.id AS user_id, u.username, u.bio, u.avatar_url,
+                post_counts.posts_count AS user_posts_count,
+                u.created_at AS user_created_at,
+                (current_like.id IS NOT NULL) AS is_liked
+         FROM posts p
+         INNER JOIN users u ON u.id = p.user_id
+         INNER JOIN (
+             SELECT user_id, COUNT(*) AS posts_count
+             FROM posts
+             GROUP BY user_id
+         ) post_counts ON post_counts.user_id = p.user_id
+         LEFT JOIN likes current_like
+           ON current_like.post_id = p.id AND current_like.user_id = ?
+         WHERE INSTR(LOWER(p.content), LOWER(?)) > 0
+         ORDER BY p.created_at DESC
+         LIMIT 20",
+    )
+    .bind(&current_user_id)
+    .bind(search_term)
+    .fetch_all(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let posts: Vec<PostWithUser> = post_rows
+        .into_iter()
+        .map(post_feed_row_to_response)
+        .collect();
+
+    Ok(Json(json!({
+        "query": search_term,
+        "users": users,
+        "posts": posts
+    })))
 }
 
 // Email verification handlers

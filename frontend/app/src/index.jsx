@@ -11,6 +11,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmailChange from './pages/VerifyEmailChange';
+import Search from './pages/Search';
 import './index.css';
 
 const root = document.getElementById('root');
@@ -24,6 +25,7 @@ render(
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/profile/:id" component={Profile} />
+          <Route path="/search" component={Search} />
           <Route path="/verify-email" component={VerifyEmail} />
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />

@@ -9,6 +9,7 @@ pub const MAXIMUM_BIO_CHARACTERS: usize = 240;
 pub const MAXIMUM_POST_CHARACTERS: usize = 500;
 pub const MAXIMUM_COMMENT_CHARACTERS: usize = 500;
 pub const MAXIMUM_MESSAGE_CHARACTERS: usize = 2_000;
+pub const MAXIMUM_SEARCH_CHARACTERS: usize = 64;
 
 pub fn password_is_valid(password: &str) -> bool {
     let character_count = password.chars().count();
@@ -45,6 +46,14 @@ pub fn username_is_valid(username: &str) -> bool {
             .any(|character| matches!(character, '\n' | '\t'))
 }
 
+pub fn search_query_is_valid(query: &str) -> bool {
+    query == query.trim()
+        && bounded_text_is_valid(query, 2, MAXIMUM_SEARCH_CHARACTERS)
+        && !query
+            .chars()
+            .any(|character| matches!(character, '\n' | '\t'))
+}
+
 pub fn stored_image_path_is_valid(path: &str, expected_prefix: &str) -> bool {
     path.len() <= 512
         && path.starts_with(expected_prefix)
@@ -74,8 +83,8 @@ mod tests {
     use super::{
         bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
         one_time_token_is_valid, password_is_safe_to_verify, password_is_valid,
-        stored_image_path_belongs_to_user, stored_image_path_is_valid, username_is_valid,
-        MAXIMUM_PASSWORD_BYTES, MINIMUM_PASSWORD_CHARACTERS,
+        search_query_is_valid, stored_image_path_belongs_to_user, stored_image_path_is_valid,
+        username_is_valid, MAXIMUM_PASSWORD_BYTES, MINIMUM_PASSWORD_CHARACTERS,
     };
 
     #[test]
@@ -132,6 +141,9 @@ mod tests {
         assert!(bounded_text_is_valid("Mesaj valid", 1, 20));
         assert!(!bounded_text_is_valid("   ", 1, 20));
         assert!(!bounded_text_is_valid("mesaj\0ascuns", 1, 20));
+        assert!(search_query_is_valid("rust web"));
+        assert!(!search_query_is_valid("r"));
+        assert!(!search_query_is_valid("rust\nweb"));
     }
 
     #[test]
