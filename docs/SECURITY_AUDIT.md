@@ -194,7 +194,7 @@ also receive `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
 
 New one-time tokens are stored as SHA-256 digests and consumed transactionally;
 legacy plaintext database records are accepted only for the migration window.
-Umami query-string collection is disabled globally, sensitive routes are marked
+Third-party application analytics have been removed, sensitive routes are marked
 `noindex`, token wildcard injection is rejected, and the email-change link
 targets the correct route.
 
@@ -415,8 +415,8 @@ revenue, incident cost, and control frequency before assigning an ALE.
 GDPR is presumed relevant because the system is operated in the EU and processes
 personal data. A qualifying personal-data breach may require supervisory-authority
 notification within 72 hours. Vendors/processors in observed scope include the
-hosting provider, Cloudflare, Brevo SMTP, GitHub, Let's Encrypt, and the analytics
-service; ownership, DPAs, retention, regions, and last security review are unknown.
+hosting provider, Cloudflare, Brevo SMTP, GitHub, and Let's Encrypt; ownership,
+DPAs, retention, regions, and last security review are unknown.
 
 ## Reference baseline
 
