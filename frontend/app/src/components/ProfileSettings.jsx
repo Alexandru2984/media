@@ -1,4 +1,4 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, For, Show } from 'solid-js';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import { getImageUrl } from '../utils/urls';
@@ -6,6 +6,15 @@ import { getPasswordPolicyError } from '../utils/passwords';
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function formatSessionDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Dată indisponibilă';
+  return date.toLocaleString('ro-RO', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
 
 export default function ProfileSettings(props) {
   const auth = useAuth();
@@ -20,6 +29,10 @@ export default function ProfileSettings(props) {
   const [newEmail, setNewEmail] = createSignal('');
   const [emailPassword, setEmailPassword] = createSignal('');
   const [changingEmail, setChangingEmail] = createSignal(false);
+  const [sessions, setSessions] = createSignal([]);
+  const [sessionsLoaded, setSessionsLoaded] = createSignal(false);
+  const [loadingSessions, setLoadingSessions] = createSignal(false);
+  const [revokingSession, setRevokingSession] = createSignal('');
   const [message, setMessage] = createSignal({ type: '', text: '' });
   let avatarInput;
   let messageTimeout;
@@ -28,6 +41,61 @@ export default function ProfileSettings(props) {
     window.clearTimeout(messageTimeout);
     setMessage({ type, text });
     messageTimeout = window.setTimeout(() => setMessage({ type: '', text: '' }), 6000);
+  };
+
+  const loadSessions = async () => {
+    if (loadingSessions()) return;
+    setLoadingSessions(true);
+    try {
+      const data = await api.getSessions();
+      setSessions(Array.isArray(data.sessions) ? data.sessions : []);
+      setSessionsLoaded(true);
+    } catch (requestError) {
+      console.error('Failed to load sessions:', requestError);
+      showMessage('error', 'Sesiunile active nu au putut fi încărcate.');
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'sessions' && !sessionsLoaded()) loadSessions();
+  };
+
+  const handleSessionRevoke = async (session) => {
+    if (session.current || revokingSession()) return;
+    if (!window.confirm('Închizi această sesiune? Dispozitivul respectiv va trebui să se autentifice din nou.')) return;
+
+    setRevokingSession(session.id);
+    try {
+      await api.revokeSession(session.id);
+      setSessions((current) => current.filter((item) => item.id !== session.id));
+      showMessage('success', 'Sesiunea a fost închisă.');
+    } catch (requestError) {
+      console.error('Failed to revoke session:', requestError);
+      showMessage('error', 'Sesiunea nu a putut fi închisă. Reîncarcă lista și încearcă din nou.');
+    } finally {
+      setRevokingSession('');
+    }
+  };
+
+  const handleOtherSessionsRevoke = async () => {
+    if (sessions().length <= 1 || revokingSession()) return;
+    if (!window.confirm('Închizi toate celelalte sesiuni? Vei rămâne conectat numai aici.')) return;
+
+    setRevokingSession('all');
+    try {
+      const result = await api.revokeOtherSessions();
+      setSessions((current) => current.filter((session) => session.current));
+      const revoked = Number(result.revoked) || 0;
+      showMessage('success', revoked === 1 ? 'Cealaltă sesiune a fost închisă.' : `${revoked} sesiuni au fost închise.`);
+    } catch (requestError) {
+      console.error('Failed to revoke other sessions:', requestError);
+      showMessage('error', 'Celelalte sesiuni nu au putut fi închise.');
+    } finally {
+      setRevokingSession('');
+    }
   };
 
   const handleAvatarChange = (event) => {
@@ -99,6 +167,7 @@ export default function ProfileSettings(props) {
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setSessionsLoaded(false);
       showMessage('success', 'Parola a fost schimbată.');
     } catch (requestError) {
       console.error('Failed to change password:', requestError);
@@ -138,17 +207,21 @@ export default function ProfileSettings(props) {
 
       <div class="settings-grid">
         <div class="settings-nav surface" role="tablist" aria-label="Categorii de setări">
-          <button type="button" role="tab" aria-selected={activeTab() === 'avatar'} class={activeTab() === 'avatar' ? 'is-active' : ''} onClick={() => setActiveTab('avatar')}>
+          <button type="button" role="tab" aria-selected={activeTab() === 'avatar'} class={activeTab() === 'avatar' ? 'is-active' : ''} onClick={() => selectTab('avatar')}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" /><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" /></svg>
             <span><strong>Avatar</strong><small>Poza profilului</small></span>
           </button>
-          <button type="button" role="tab" aria-selected={activeTab() === 'password'} class={activeTab() === 'password' ? 'is-active' : ''} onClick={() => setActiveTab('password')}>
+          <button type="button" role="tab" aria-selected={activeTab() === 'password'} class={activeTab() === 'password' ? 'is-active' : ''} onClick={() => selectTab('password')}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
             <span><strong>Parolă</strong><small>Protecția contului</small></span>
           </button>
-          <button type="button" role="tab" aria-selected={activeTab() === 'email'} class={activeTab() === 'email' ? 'is-active' : ''} onClick={() => setActiveTab('email')}>
+          <button type="button" role="tab" aria-selected={activeTab() === 'email'} class={activeTab() === 'email' ? 'is-active' : ''} onClick={() => selectTab('email')}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
             <span><strong>Email</strong><small>Adresa de conectare</small></span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab() === 'sessions'} class={activeTab() === 'sessions' ? 'is-active' : ''} onClick={() => selectTab('sessions')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 5 6v5c0 4.6 2.9 8.2 7 10 4.1-1.8 7-5.4 7-10V6l-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /><path d="m9.5 12 1.7 1.7 3.6-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <span><strong>Sesiuni</strong><small>Dispozitive conectate</small></span>
           </button>
         </div>
 
@@ -222,6 +295,48 @@ export default function ProfileSettings(props) {
                 </div>
                 <div class="settings-actions"><button type="submit" class="btn btn-primary" disabled={changingEmail()}>{changingEmail() ? 'Se trimite…' : 'Trimite confirmarea'}</button></div>
               </form>
+            </div>
+          </Show>
+
+          <Show when={activeTab() === 'sessions'}>
+            <div class="settings-section">
+              <h3>Sesiuni active</h3>
+              <p class="settings-description">Poți avea cel mult 20 de sesiuni, fiecare valabilă maximum șapte zile. Nu stocăm adresa IP sau modelul dispozitivului.</p>
+
+              <div class="sessions-toolbar">
+                <span>{sessions().length} {sessions().length === 1 ? 'sesiune activă' : 'sesiuni active'}</span>
+                <button type="button" class="btn btn-danger-ghost" onClick={handleOtherSessionsRevoke} disabled={loadingSessions() || sessions().length <= 1 || Boolean(revokingSession())}>
+                  {revokingSession() === 'all' ? 'Se închid…' : 'Închide celelalte sesiuni'}
+                </button>
+              </div>
+
+              <Show
+                when={!loadingSessions()}
+                fallback={<div class="sessions-loading" role="status"><span class="spinner" aria-hidden="true" /> Se încarcă sesiunile…</div>}
+              >
+                <div class="sessions-list">
+                  <For each={sessions()}>
+                    {(session) => (
+                      <article class={`session-item ${session.current ? 'is-current' : ''}`}>
+                        <span class="session-icon" aria-hidden="true"><svg width="21" height="21" viewBox="0 0 24 24" fill="none"><rect x="4" y="3" width="16" height="18" rx="3" stroke="currentColor" stroke-width="1.8" /><path d="M9 17h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg></span>
+                        <div class="session-copy">
+                          <div class="session-title-row">
+                            <strong>{session.current ? 'Sesiunea curentă' : 'Sesiune activă'}</strong>
+                            <Show when={session.current}><span class="session-badge">Acest dispozitiv</span></Show>
+                          </div>
+                          <p>Activitate: <time datetime={session.last_seen_at}>{formatSessionDate(session.last_seen_at)}</time></p>
+                          <p>Creată: <time datetime={session.created_at}>{formatSessionDate(session.created_at)}</time> · Expiră: <time datetime={session.expires_at}>{formatSessionDate(session.expires_at)}</time></p>
+                        </div>
+                        <Show when={!session.current}>
+                          <button type="button" class="btn btn-danger-ghost session-revoke" onClick={() => handleSessionRevoke(session)} disabled={Boolean(revokingSession())}>
+                            {revokingSession() === session.id ? 'Se închide…' : 'Închide'}
+                          </button>
+                        </Show>
+                      </article>
+                    )}
+                  </For>
+                </div>
+              </Show>
             </div>
           </Show>
         </div>

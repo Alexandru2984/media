@@ -63,6 +63,22 @@ class ApiService {
     return this.request('/auth/me');
   }
 
+  async getSessions() {
+    return this.request('/auth/sessions');
+  }
+
+  async revokeSession(sessionId) {
+    return this.request(`/auth/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async revokeOtherSessions() {
+    return this.request('/auth/sessions', {
+      method: 'DELETE',
+    });
+  }
+
   // Users
   async getProfile(userId) {
     return this.request(`/users/${userId}`);

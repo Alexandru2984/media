@@ -1997,6 +1997,100 @@ a {
   line-height: 1.5;
 }
 
+.sessions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sessions-toolbar > span {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.sessions-list {
+  display: grid;
+  gap: 10px;
+}
+
+.sessions-loading {
+  display: flex;
+  min-height: 110px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.session-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+
+.session-item.is-current {
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border));
+  background: color-mix(in srgb, var(--brand) 6%, var(--bg-elevated));
+}
+
+.session-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--brand);
+  box-shadow: var(--shadow-sm);
+}
+
+.session-copy {
+  min-width: 0;
+}
+
+.session-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.session-title-row strong {
+  font-size: 0.88rem;
+}
+
+.session-badge {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success) 12%, var(--bg-elevated));
+  color: var(--success);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.session-copy p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.session-revoke {
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
 @media (min-width: 760px) {
   .settings-grid {
     grid-template-columns: 220px minmax(0, 1fr);
@@ -2324,7 +2418,7 @@ a {
   }
 
   .settings-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .settings-nav button {
@@ -2343,6 +2437,19 @@ a {
 
   .avatar-editor-copy {
     justify-items: center;
+  }
+
+  .sessions-toolbar .btn {
+    width: 100%;
+  }
+
+  .session-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .session-revoke {
+    width: 100%;
+    grid-column: 1 / -1;
   }
 }
 
