@@ -6,14 +6,30 @@ import { getPasswordPolicyError } from '../utils/passwords';
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const SECURITY_EVENT_COPY = Object.freeze({
+  account_created: ['Cont creat', 'Contul și prima sesiune au fost create.'],
+  login_succeeded: ['Autentificare reușită', 'O sesiune nouă a fost deschisă.'],
+  logged_out: ['Deconectare', 'O sesiune a fost închisă normal.'],
+  session_revoked: ['Sesiune închisă de la distanță', 'Ai revocat accesul unei alte sesiuni.'],
+  other_sessions_revoked: ['Celelalte sesiuni închise', 'Ai păstrat activă numai sesiunea curentă.'],
+  password_changed: ['Parolă schimbată', 'Parola a fost actualizată și sesiunile vechi au fost revocate.'],
+  password_reset: ['Parolă resetată', 'Parola a fost înlocuită prin fluxul securizat de recuperare.'],
+  email_change_requested: ['Schimbare de email solicitată', 'A fost trimisă confirmarea către noua adresă.'],
+  email_changed: ['Adresă de email schimbată', 'Noua adresă a fost confirmată și sesiunile vechi au fost închise.'],
+  email_verified: ['Adresă de email verificată', 'Adresa contului a fost confirmată.'],
+});
 
-function formatSessionDate(value) {
+function formatDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Dată indisponibilă';
   return date.toLocaleString('ro-RO', {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+}
+
+function securityEventCopy(eventType) {
+  return SECURITY_EVENT_COPY[eventType] || ['Activitate de securitate', 'A fost înregistrată o acțiune de protecție a contului.'];
 }
 
 export default function ProfileSettings(props) {
@@ -33,6 +49,10 @@ export default function ProfileSettings(props) {
   const [sessionsLoaded, setSessionsLoaded] = createSignal(false);
   const [loadingSessions, setLoadingSessions] = createSignal(false);
   const [revokingSession, setRevokingSession] = createSignal('');
+  const [securityEvents, setSecurityEvents] = createSignal([]);
+  const [securityEventsLoaded, setSecurityEventsLoaded] = createSignal(false);
+  const [loadingSecurityEvents, setLoadingSecurityEvents] = createSignal(false);
+  const [securityEventRetentionDays, setSecurityEventRetentionDays] = createSignal(90);
   const [message, setMessage] = createSignal({ type: '', text: '' });
   let avatarInput;
   let messageTimeout;
@@ -58,9 +78,26 @@ export default function ProfileSettings(props) {
     }
   };
 
+  const loadSecurityEvents = async () => {
+    if (loadingSecurityEvents()) return;
+    setLoadingSecurityEvents(true);
+    try {
+      const data = await api.getSecurityEvents();
+      setSecurityEvents(Array.isArray(data.events) ? data.events : []);
+      setSecurityEventRetentionDays(Number(data.retention_days) || 90);
+      setSecurityEventsLoaded(true);
+    } catch (requestError) {
+      console.error('Failed to load security events:', requestError);
+      showMessage('error', 'Activitatea de securitate nu a putut fi încărcată.');
+    } finally {
+      setLoadingSecurityEvents(false);
+    }
+  };
+
   const selectTab = (tab) => {
     setActiveTab(tab);
     if (tab === 'sessions' && !sessionsLoaded()) loadSessions();
+    if (tab === 'security' && !securityEventsLoaded()) loadSecurityEvents();
   };
 
   const handleSessionRevoke = async (session) => {
@@ -71,6 +108,7 @@ export default function ProfileSettings(props) {
     try {
       await api.revokeSession(session.id);
       setSessions((current) => current.filter((item) => item.id !== session.id));
+      setSecurityEventsLoaded(false);
       showMessage('success', 'Sesiunea a fost închisă.');
     } catch (requestError) {
       console.error('Failed to revoke session:', requestError);
@@ -89,6 +127,7 @@ export default function ProfileSettings(props) {
       const result = await api.revokeOtherSessions();
       setSessions((current) => current.filter((session) => session.current));
       const revoked = Number(result.revoked) || 0;
+      setSecurityEventsLoaded(false);
       showMessage('success', revoked === 1 ? 'Cealaltă sesiune a fost închisă.' : `${revoked} sesiuni au fost închise.`);
     } catch (requestError) {
       console.error('Failed to revoke other sessions:', requestError);
@@ -168,6 +207,7 @@ export default function ProfileSettings(props) {
       setNewPassword('');
       setConfirmPassword('');
       setSessionsLoaded(false);
+      setSecurityEventsLoaded(false);
       showMessage('success', 'Parola a fost schimbată.');
     } catch (requestError) {
       console.error('Failed to change password:', requestError);
@@ -186,6 +226,7 @@ export default function ProfileSettings(props) {
       await api.changeEmail(newEmail().trim(), emailPassword());
       setNewEmail('');
       setEmailPassword('');
+      setSecurityEventsLoaded(false);
       showMessage('success', 'Am trimis confirmarea la noua adresă. Linkul este valabil 24 de ore.');
     } catch (requestError) {
       console.error('Failed to change email:', requestError);
@@ -222,6 +263,10 @@ export default function ProfileSettings(props) {
           <button type="button" role="tab" aria-selected={activeTab() === 'sessions'} class={activeTab() === 'sessions' ? 'is-active' : ''} onClick={() => selectTab('sessions')}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 5 6v5c0 4.6 2.9 8.2 7 10 4.1-1.8 7-5.4 7-10V6l-7-3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /><path d="m9.5 12 1.7 1.7 3.6-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
             <span><strong>Sesiuni</strong><small>Dispozitive conectate</small></span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab() === 'security'} class={`settings-nav-security ${activeTab() === 'security' ? 'is-active' : ''}`} onClick={() => selectTab('security')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3h9A2.5 2.5 0 0 1 19 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 18.5v-13Z" stroke="currentColor" stroke-width="1.8" /><path d="M9 8h6m-6 4h6m-6 4h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+            <span><strong>Activitate</strong><small>Istoric de securitate</small></span>
           </button>
         </div>
 
@@ -324,8 +369,8 @@ export default function ProfileSettings(props) {
                             <strong>{session.current ? 'Sesiunea curentă' : 'Sesiune activă'}</strong>
                             <Show when={session.current}><span class="session-badge">Acest dispozitiv</span></Show>
                           </div>
-                          <p>Activitate: <time datetime={session.last_seen_at}>{formatSessionDate(session.last_seen_at)}</time></p>
-                          <p>Creată: <time datetime={session.created_at}>{formatSessionDate(session.created_at)}</time> · Expiră: <time datetime={session.expires_at}>{formatSessionDate(session.expires_at)}</time></p>
+                          <p>Activitate: <time datetime={session.last_seen_at}>{formatDate(session.last_seen_at)}</time></p>
+                          <p>Creată: <time datetime={session.created_at}>{formatDate(session.created_at)}</time> · Expiră: <time datetime={session.expires_at}>{formatDate(session.expires_at)}</time></p>
                         </div>
                         <Show when={!session.current}>
                           <button type="button" class="btn btn-danger-ghost session-revoke" onClick={() => handleSessionRevoke(session)} disabled={Boolean(revokingSession())}>
@@ -336,6 +381,48 @@ export default function ProfileSettings(props) {
                     )}
                   </For>
                 </div>
+              </Show>
+            </div>
+          </Show>
+
+          <Show when={activeTab() === 'security'}>
+            <div class="settings-section">
+              <h3>Activitate de securitate</h3>
+              <p class="settings-description">Acțiunile importante ale contului, fără adresă IP, model de dispozitiv sau alte date de localizare.</p>
+
+              <div class="security-events-toolbar">
+                <span>Istoric păstrat maximum {securityEventRetentionDays()} de zile</span>
+                <button type="button" class="btn btn-secondary" onClick={loadSecurityEvents} disabled={loadingSecurityEvents()}>
+                  {loadingSecurityEvents() ? 'Se actualizează…' : 'Actualizează'}
+                </button>
+              </div>
+
+              <Show
+                when={!loadingSecurityEvents()}
+                fallback={<div class="sessions-loading" role="status"><span class="spinner" aria-hidden="true" /> Se încarcă activitatea…</div>}
+              >
+                <Show
+                  when={securityEvents().length > 0}
+                  fallback={<div class="security-events-empty"><strong>Nicio activitate înregistrată încă</strong><p>Evenimentele noi vor apărea aici după autentificări și schimbări de securitate.</p></div>}
+                >
+                  <ol class="security-events-list">
+                    <For each={securityEvents()}>
+                      {(event) => {
+                        const copy = securityEventCopy(event.event_type);
+                        return (
+                          <li class="security-event-item">
+                            <span class="security-event-marker" aria-hidden="true"><span /></span>
+                            <div>
+                              <strong>{copy[0]}</strong>
+                              <p>{copy[1]}</p>
+                              <time datetime={event.occurred_at}>{formatDate(event.occurred_at)}</time>
+                            </div>
+                          </li>
+                        );
+                      }}
+                    </For>
+                  </ol>
+                </Show>
               </Show>
             </div>
           </Show>

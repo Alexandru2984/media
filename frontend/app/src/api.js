@@ -67,6 +67,10 @@ class ApiService {
     return this.request('/auth/sessions');
   }
 
+  async getSecurityEvents() {
+    return this.request('/auth/security-events');
+  }
+
   async revokeSession(sessionId) {
     return this.request(`/auth/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'DELETE',

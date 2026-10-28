@@ -2091,6 +2091,109 @@ a {
   padding: 8px 12px;
 }
 
+.security-events-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.security-events-toolbar > span {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.security-events-toolbar .btn {
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+}
+
+.security-events-list {
+  display: grid;
+  max-width: 680px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.security-event-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 12px;
+  padding: 3px 0 19px;
+}
+
+.security-event-marker {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+
+.security-event-marker > span {
+  position: relative;
+  z-index: 1;
+  width: 11px;
+  height: 11px;
+  margin-top: 4px;
+  border: 3px solid var(--bg-elevated);
+  border-radius: 999px;
+  background: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 24%, var(--border));
+}
+
+.security-event-marker::after {
+  position: absolute;
+  top: 17px;
+  bottom: -5px;
+  width: 1px;
+  background: var(--border-strong);
+  content: "";
+}
+
+.security-event-item:last-child .security-event-marker::after {
+  display: none;
+}
+
+.security-event-item strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 0.88rem;
+}
+
+.security-event-item p,
+.security-events-empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.security-event-item time {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.security-events-empty {
+  padding: 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  background: var(--bg-soft);
+  text-align: center;
+}
+
+.security-events-empty strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.88rem;
+}
+
 @media (min-width: 760px) {
   .settings-grid {
     grid-template-columns: 220px minmax(0, 1fr);
@@ -2430,6 +2533,10 @@ a {
     display: none;
   }
 
+  .settings-nav-security {
+    grid-column: 1 / -1;
+  }
+
   .avatar-editor {
     flex-direction: column;
     text-align: center;
@@ -2439,7 +2546,8 @@ a {
     justify-items: center;
   }
 
-  .sessions-toolbar .btn {
+  .sessions-toolbar .btn,
+  .security-events-toolbar .btn {
     width: 100%;
   }
 
