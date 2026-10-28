@@ -16,7 +16,12 @@ use crate::{
     models::*,
     tokens::{generate_one_time_token, hash_one_time_token},
     uploads::validated_image_extension,
-    validation::{email_is_valid, one_time_token_is_valid, password_is_valid},
+    validation::{
+        bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
+        one_time_token_is_valid, password_is_safe_to_verify, password_is_valid,
+        stored_image_path_is_valid, username_is_valid, MAXIMUM_BIO_CHARACTERS,
+        MAXIMUM_COMMENT_CHARACTERS, MAXIMUM_MESSAGE_CHARACTERS, MAXIMUM_POST_CHARACTERS,
+    },
 };
 
 fn authenticated_response(
@@ -36,7 +41,17 @@ pub async fn register(
     State(pool): State<MySqlPool>,
     Json(payload): Json<CreateUser>,
 ) -> Result<(HeaderMap, Json<Value>), StatusCode> {
-    if !password_is_valid(&payload.password) {
+    let username = payload.username.trim().to_owned();
+    let email = payload.email.trim().to_owned();
+    let bio = payload.bio.map(|bio| bio.trim().to_owned());
+
+    if !password_is_valid(&payload.password)
+        || !username_is_valid(&username)
+        || !email_is_valid(&email)
+        || bio
+            .as_deref()
+            .is_some_and(|bio| !bounded_text_is_valid(bio, 0, MAXIMUM_BIO_CHARACTERS))
+    {
         return Err(StatusCode::BAD_REQUEST);
     }
 
@@ -51,10 +66,10 @@ pub async fn register(
          VALUES (?, ?, ?, ?, 0, ?, ?, ?)"
     )
     .bind(&user_id)
-    .bind(&payload.username)
-    .bind(&payload.email)
+    .bind(&username)
+    .bind(&email)
     .bind(&password_hash)
-    .bind(&payload.bio)
+    .bind(&bio)
     .bind(now)
     .bind(now)
     .execute(&pool)
@@ -84,11 +99,15 @@ pub async fn register(
             // Send verification email (don't block registration if email fails)
             let email_service =
                 EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-            let email = payload.email.clone();
-            let username = payload.username.clone();
+            let email_for_delivery = email.clone();
+            let username_for_delivery = username.clone();
             tokio::spawn(async move {
                 let result = email_service
-                    .send_verification_email(&email, &username, &verification_token)
+                    .send_verification_email(
+                        &email_for_delivery,
+                        &username_for_delivery,
+                        &verification_token,
+                    )
                     .await;
 
                 if let Err(e) = result {
@@ -105,9 +124,9 @@ pub async fn register(
                     "token": token,
                     "user": {
                         "id": user_id,
-                        "username": payload.username,
-                        "email": payload.email,
-                        "bio": payload.bio
+                        "username": username,
+                        "email": email,
+                        "bio": bio
                     }
                 }),
             )
@@ -120,8 +139,13 @@ pub async fn login(
     State(pool): State<MySqlPool>,
     Json(payload): Json<LoginUser>,
 ) -> Result<(HeaderMap, Json<Value>), StatusCode> {
+    let email = payload.email.trim();
+    if !email_is_valid(email) || !password_is_safe_to_verify(&payload.password) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
     let user = query_as::<_, User>("SELECT * FROM users WHERE email = ?")
-        .bind(&payload.email)
+        .bind(email)
         .fetch_optional(&pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -255,6 +279,16 @@ pub async fn create_post(
     Json(payload): Json<CreatePost>,
 ) -> Result<Json<Post>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
+    let content = payload.content.trim();
+    if !bounded_text_is_valid(content, 1, MAXIMUM_POST_CHARACTERS)
+        || payload
+            .image_url
+            .as_deref()
+            .is_some_and(|path| !stored_image_path_is_valid(path, "/uploads/posts/"))
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let post_id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -264,7 +298,7 @@ pub async fn create_post(
     )
     .bind(&post_id)
     .bind(&user_id)
-    .bind(&payload.content)
+    .bind(content)
     .bind(&payload.image_url)
     .bind(now)
     .bind(now)
@@ -293,14 +327,16 @@ pub async fn get_posts(
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
     let current_user_id = get_current_user(&headers).await.ok();
-    let limit: i64 = params
+    let limit = params
         .get("limit")
-        .and_then(|l| l.parse().ok())
-        .unwrap_or(10);
-    let offset: i64 = params
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(10)
+        .clamp(1, 50);
+    let offset = params
         .get("offset")
-        .and_then(|o| o.parse().ok())
-        .unwrap_or(0);
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(0)
+        .clamp(0, 1_000_000);
 
     // First get all posts
     let posts =
@@ -426,6 +462,11 @@ pub async fn create_comment(
     Json(payload): Json<CreateComment>,
 ) -> Result<Json<Comment>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
+    let content = payload.content.trim();
+    if !bounded_text_is_valid(content, 1, MAXIMUM_COMMENT_CHARACTERS) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let comment_id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -436,7 +477,7 @@ pub async fn create_comment(
     .bind(&comment_id)
     .bind(&post_id)
     .bind(&user_id)
-    .bind(&payload.content)
+    .bind(content)
     .bind(now)
     .bind(now)
     .execute(&pool)
@@ -492,8 +533,9 @@ pub async fn get_comments(
     }
 
     Ok(Json(result))
-} // Fișier temporar pentru handler-ele noi - voi merge manual
-  // Update User Profile
+}
+
+// Update User Profile
 pub async fn update_profile(
     State(pool): State<MySqlPool>,
     headers: HeaderMap,
@@ -506,17 +548,36 @@ pub async fn update_profile(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let username = payload.username.map(|username| username.trim().to_owned());
+    let bio = payload.bio.map(|bio| bio.trim().to_owned());
+    let avatar_url = payload
+        .avatar_url
+        .map(|avatar_url| avatar_url.trim().to_owned());
+
+    if username
+        .as_deref()
+        .is_some_and(|username| !username_is_valid(username))
+        || bio
+            .as_deref()
+            .is_some_and(|bio| !bounded_text_is_valid(bio, 0, MAXIMUM_BIO_CHARACTERS))
+        || avatar_url
+            .as_deref()
+            .is_some_and(|path| !stored_image_path_is_valid(path, "/uploads/avatars/"))
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let mut builder = QueryBuilder::<MySql>::new("UPDATE users SET ");
     {
         let mut updates = builder.separated(", ");
 
-        if let Some(username) = &payload.username {
+        if let Some(username) = username {
             updates.push("username = ").push_bind(username);
         }
-        if let Some(bio) = &payload.bio {
+        if let Some(bio) = bio {
             updates.push("bio = ").push_bind(bio);
         }
-        if let Some(avatar_url) = &payload.avatar_url {
+        if let Some(avatar_url) = avatar_url {
             updates.push("avatar_url = ").push_bind(avatar_url);
         }
 
@@ -554,7 +615,10 @@ pub async fn change_password(
 ) -> Result<Json<Value>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
 
-    if !password_is_valid(&payload.new_password) || payload.old_password == payload.new_password {
+    if !password_is_valid(&payload.new_password)
+        || !password_is_safe_to_verify(&payload.old_password)
+        || payload.old_password == payload.new_password
+    {
         return Err(StatusCode::BAD_REQUEST);
     }
 
@@ -600,7 +664,7 @@ pub async fn change_email(
     let user_id = get_current_user(&headers).await?;
     let new_email = payload.new_email.trim();
 
-    if !email_is_valid(new_email) {
+    if !email_change_address_is_valid(new_email) || !password_is_safe_to_verify(&payload.password) {
         return Err(StatusCode::BAD_REQUEST);
     }
 
@@ -891,6 +955,16 @@ pub async fn update_post(
     Json(payload): Json<UpdatePost>,
 ) -> Result<Json<Post>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
+    let content = payload.content.trim();
+    if !bounded_text_is_valid(content, 1, MAXIMUM_POST_CHARACTERS)
+        || payload
+            .image_url
+            .as_deref()
+            .is_some_and(|path| !stored_image_path_is_valid(path, "/uploads/posts/"))
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let now = Utc::now();
 
     // Check ownership
@@ -906,7 +980,7 @@ pub async fn update_post(
     }
 
     query("UPDATE posts SET content = ?, image_url = ?, updated_at = ? WHERE id = ?")
-        .bind(&payload.content)
+        .bind(content)
         .bind(&payload.image_url)
         .bind(now)
         .bind(&post_id)
@@ -960,6 +1034,11 @@ pub async fn update_comment(
     Json(payload): Json<UpdateComment>,
 ) -> Result<Json<Comment>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
+    let content = payload.content.trim();
+    if !bounded_text_is_valid(content, 1, MAXIMUM_COMMENT_CHARACTERS) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let now = Utc::now();
 
     // Check ownership
@@ -975,7 +1054,7 @@ pub async fn update_comment(
     }
 
     query("UPDATE comments SET content = ?, updated_at = ? WHERE id = ?")
-        .bind(&payload.content)
+        .bind(content)
         .bind(now)
         .bind(&comment_id)
         .execute(&pool)
@@ -1036,6 +1115,14 @@ pub async fn send_message(
     Json(payload): Json<CreateMessage>,
 ) -> Result<Json<Message>, StatusCode> {
     let sender_id = get_current_user(&headers).await?;
+    let content = payload.content.trim();
+    if !bounded_text_is_valid(content, 1, MAXIMUM_MESSAGE_CHARACTERS)
+        || Uuid::parse_str(&payload.receiver_id).is_err()
+        || payload.receiver_id == sender_id
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let message_id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -1046,7 +1133,7 @@ pub async fn send_message(
     .bind(&message_id)
     .bind(&sender_id)
     .bind(&payload.receiver_id)
-    .bind(&payload.content)
+    .bind(content)
     .bind(now)
     .execute(&pool)
     .await
@@ -1295,6 +1382,11 @@ pub async fn forgot_password(
         .map(|value| value.trim())
         .filter(|value| !value.is_empty())
         .ok_or(StatusCode::BAD_REQUEST)?;
+    if !email_is_valid(email) {
+        return Ok(Json(json!({
+            "message": "Dacă există un cont pentru această adresă, vei primi instrucțiunile de resetare"
+        })));
+    }
     let email_service = EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // A missing account is intentionally indistinguishable from an existing one.
