@@ -6,7 +6,8 @@ password recovery, user profiles, avatars, posts, image uploads, likes, and
 comments. It also includes a paginated feed, community search, responsive mobile
 navigation, active-session controls, a private security-activity timeline,
 public project/community pages, real HTTP 404 handling, and account-bound upload
-quotas with automatic cleanup of abandoned images.
+quotas with automatic cleanup of abandoned images. Authenticated members can
+also keep a private, paginated collection of saved posts.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the

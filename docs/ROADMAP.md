@@ -187,6 +187,13 @@ the remaining product pages are open.
 
 ## Phase 4 — Core social product features
 
+**Progress (2026-10-29):** private saved posts are deployed with an authenticated
+paginated API, per-session `is_saved` state across feed/profile/search results,
+transactional toggles, foreign-key cleanup, and a dedicated responsive page.
+The collection is explicitly `noindex`, is not exposed to other accounts, and
+was visually checked at 1440, 390, and 320 px. Relationships, notifications,
+moderation, richer publishing, and multiple named collections remain open.
+
 ### Profiles and relationships
 
 - Unique handles, display names, pronouns, bio, links, avatar, cover, and badges.
@@ -199,13 +206,14 @@ the remaining product pages are open.
 - Text posts with drafts, autosave, mentions, hashtags, link previews, and polls.
 - Multi-image carousel, cropping, alt text, captions, and later short video.
 - Edit history, delete/restore window, scheduling, audience, and content warnings.
-- Reposts, quote posts, bookmarks/collections, richer reactions, and share links.
+- Private bookmarks and a saved feed. ✅ Add named collections, reposts, quote
+  posts, richer reactions, and share links.
 - Threaded comments, mentions, sorting, pagination, editing, and moderation.
 - Optimistic updates with correct rollback and offline draft recovery.
 
 ### Feed and discovery
 
-- Following, chronological, recommended, and saved feeds.
+- Private saved feed. ✅ Add following, chronological, and recommended feeds.
 - Cursor pagination, relevance signals, deduplication, and explainable suggestions.
 - Search across people/posts/hashtags; trends and explore topics.
 - User controls for recommendations, muted words, language, and sensitive media.

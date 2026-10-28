@@ -6,7 +6,9 @@
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
-**Verdict:** 🟠 Core containment, revocable sessions, and versioned migrations are deployed; image re-encoding, authorization coverage, alerting, and recovery work remain
+**Verdict:** 🟠 Core containment, revocable sessions, versioned migrations, and
+bounded image re-encoding are deployed; broader authorization coverage,
+alerting, and recovery work remain
 
 ## Scope and limitations
 
@@ -20,8 +22,9 @@ real user uploads, and merged with the hardened deployment repository. A Rust
 lockfile and minimal unit tests now exist, and the backend was rebuilt and
 deployed from the tracked source. Disposable accounts exercised login, session
 lookup, individual/bulk remote logout, cross-account IDOR rejection, the
-20-session cap, idle expiry, revoked-cookie rejection, and cleanup against canary
-processes; the production database returned to zero users and sessions afterward.
+20-session cap, idle expiry, revoked-cookie rejection, private saved-post
+isolation, and cleanup against canary processes; the production database returned
+to zero users, sessions, posts, and saved rows afterward.
 A staging environment remains absent, so IDOR for other objects, privilege
 boundaries, message privacy, and destructive actions are not yet safely covered
 end to end. No evidence of compromise was found, but absence of evidence is not
@@ -50,8 +53,12 @@ transactional, and feed N+1 queries were collapsed. Embedded versioned MySQL
 migrations now replace startup DDL. Session inventory, scoped remote logout,
 24-hour idle expiry, seven-day absolute expiry, and a 20-session account cap are
 deployed. A private, data-minimized security-event timeline is also deployed
-with per-user isolation and bounded retention. Centralized authorization tests,
-image re-encoding, metrics/alerting, and tested recovery remain open. One-time links now
+with per-user isolation and bounded retention. Image re-encoding, upload quotas,
+and abandoned-file cleanup are deployed. Private saved posts use session-scoped
+state, transactional toggles, bounded pagination, and foreign-key cleanup; a
+two-account production canary verified that saved state does not cross account
+boundaries. Centralized authorization tests, metrics/alerting, and tested
+recovery remain open. One-time links now
 keep secrets in URL fragments, scrub them from browser history, and exchange them
 through POST bodies. API requests emit redacted JSON events with request IDs,
 status, path, and latency.
