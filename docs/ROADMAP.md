@@ -43,7 +43,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-28: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 23 unit
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 26 unit
 tests, a validated canary flow, and deployed rollback artifacts. The frontend has
 a locked dependency graph with zero npm audit findings and builds from a source
 directory into an ignored release output served outside the repository. Broader
@@ -70,8 +70,9 @@ and release automation remain open.
 HttpOnly cookie, legacy browser-readable tokens are migrated and cleared, auth
 responses no longer expose credentials, unsafe methods enforce the exact
 configured origin, password inputs are bounded, and new one-time tokens are
-hashed and consumed atomically. Opaque server-side storage, revocation, device
-management, and MFA remain open.
+hashed and consumed atomically. Recovery links use non-transmitted URL fragments,
+remove secrets from history, and exchange through POST. Opaque server-side
+storage, revocation, device management, and MFA remain open.
 
 - Opaque server-side sessions in `__Host-` HttpOnly cookies.
 - CSRF tokens, origin checks, session rotation, idle/absolute timeouts, and
@@ -121,8 +122,10 @@ quotas, thumbnails, and scheduled cleanup for abandoned uploads remain open.
 authenticated three-column feed, navigation, composer, post/comment cards,
 profiles, account settings, recovery/verification flows, skeletons, empty/error
 states, accessible SVG controls, reduced-motion handling, and mobile layouts are
-deployed. Browser-based visual regression, a mobile bottom navigation, toasts,
-dialogs, accessibility automation, and the remaining product pages are open.
+deployed. The mobile bottom navigation, responsive search, expanded landing,
+public about/community pages, footer, and branded 404 state are also live.
+Browser-based visual regression, toasts, dialogs, accessibility automation, and
+the remaining product pages are open.
 
 ### Design system
 
@@ -196,9 +199,11 @@ dialogs, accessibility automation, and the remaining product pages are open.
 canonical and social tags, WebSite JSON-LD, manifest, favicon, crawler policy,
 and a valid XML sitemap. Route-aware titles, descriptions, canonical URLs, and
 client-side robots directives are implemented; Nginx also returns real
-`X-Robots-Tag: noindex` headers for private and token-bearing routes. Public SSR
-or prerendering, share images, public profile/post URLs, real 404 responses,
-landing/legal content, Search Console, and Core Web Vitals monitoring remain open.
+`X-Robots-Tag: noindex` headers for private and token-bearing routes. The public
+landing, about and community-rules pages are in the sitemap, while unknown paths
+render the branded SPA state with HTTP 404 and `noindex`. Public SSR or
+prerendering, share images, public profile/post URLs, privacy/terms/help content,
+Search Console, and Core Web Vitals monitoring remain open.
 
 1. Render public profiles/posts on the server or pre-render them; keep private and
    application-only routes out of the index.
@@ -206,8 +211,8 @@ landing/legal content, Search Console, and Core Web Vitals monitoring remain ope
    Open Graph, Twitter cards, and high-quality share images.
 3. Add appropriate JSON-LD for the site, breadcrumbs, people, and public posts;
    validate against current Google guidance rather than emitting unsupported data.
-4. Generate real sitemap indexes with updated timestamps and return real
-   XML/content types. Return true 404/410 responses instead of SPA soft-404 pages.
+4. Keep sitemap timestamps and XML/content types valid; add deliberate `410`
+   responses for permanently removed public content alongside the live 404 flow.
 5. Add a valid web manifest, icons, favicon, theme colors, installability, and an
    offline shell that never caches private API data.
 6. Create indexable landing/about/safety/privacy/terms/help pages with useful copy.
@@ -218,19 +223,21 @@ landing/legal content, Search Console, and Core Web Vitals monitoring remain ope
 9. Monitor Search Console, crawl/index coverage, rich-result validity, 404s,
    sitemap freshness, and real-user CWV.
 
-The original urgent metadata and MIME-routing defects are closed. The highest
-remaining SEO constraint is architectural: public content is still a client-side
-SPA behind authenticated routes, so crawlers have only the public landing page
-to index and unknown paths can still become soft 404s.
+The original urgent metadata, MIME-routing, and soft-404 defects are closed. The
+highest remaining SEO constraint is architectural: public content is still a
+client-side SPA, and profiles/posts do not yet have server-rendered public pages.
 
 ## Phase 6 — Reliability, observability, and operations
 
 **Progress (2026-10-28):** public liveness and dependency-aware readiness routes
-are deployed and used after each release. Structured logs, metrics, alerts,
-restore drills, and release automation remain open.
+are deployed and used after each release. Privacy-redacted JSON request logs
+carry request IDs, methods, paths, status codes, and latency; query strings and
+bodies are excluded. Metrics, alerts, retention policy, restore drills, and
+release automation remain open.
 
 - `/health/live`, `/health/ready`, and dependency-specific readiness checks.
-- Structured JSON logs with request IDs, privacy redaction, and retention limits.
+- Structured JSON logs with request IDs and privacy redaction; define and enforce
+  retention limits.
 - Metrics for traffic, latency, errors, saturation, auth, email, DB pool, uploads,
   moderation, queues, and product funnels.
 - SLOs and burn-rate alerts; restart/crash, 5xx, abuse, egress, disk, certificate,

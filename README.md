@@ -3,7 +3,8 @@
 Media is a social platform hosted at [media.micutu.com](https://media.micutu.com).
 The application currently provides account management, email verification and
 password recovery, user profiles, avatars, posts, image uploads, likes, and
-comments.
+comments. It also includes a paginated feed, community search, responsive mobile
+navigation, public project/community pages, and real HTTP 404 handling.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -66,12 +67,12 @@ The next project goals are:
 2. Replace startup DDL with versioned migrations and add integration/browser CI.
 3. Complete upload decode/re-encode, metadata stripping, quotas, and scheduled
    cleanup for abandoned uploads.
-4. Add structured logs, metrics, alerts, and restore drills around the deployed
-   liveness/readiness endpoints.
-5. Expand the responsive product with relationships, discovery, notifications,
-   moderation, privacy controls, and pagination.
-6. Add server-rendered or pre-rendered public content, legal/help pages, real
-   404s, share images, and Core Web Vitals monitoring.
+4. Add metrics, alerts, retention policy, and restore drills around the deployed
+   health endpoints and privacy-redacted JSON request logs.
+5. Expand the responsive product with relationships, notifications, moderation,
+   privacy controls, cursor pagination, and richer discovery.
+6. Add server-rendered or pre-rendered public profiles/posts, privacy/terms/help
+   pages, share images, and Core Web Vitals monitoring.
 
 See the [security audit](docs/SECURITY_AUDIT.md) and the
 [implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,

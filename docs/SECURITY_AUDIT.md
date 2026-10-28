@@ -6,7 +6,7 @@
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
-**Verdict:** 🟠 Core containment is deployed; revocable sessions, migrations, image re-encoding, and observability work remains
+**Verdict:** 🟠 Core containment is deployed; revocable sessions, migrations, image re-encoding, alerting, and recovery work remain
 
 ## Scope and limitations
 
@@ -32,9 +32,8 @@ bind locally, the database account is not root, dotfiles are denied, SQLx bound
 queries are visible in the binary, passwords use bcrypt, secrets are not short
 placeholders, and core tables have foreign keys and uniqueness constraints.
 
-Recovery tokens still enter URLs and browser history, while browser sessions now
-use hardened cookies but remain stateless JWTs without server-side revocation.
-Follow-up containment on 2026-10-28
+Browser sessions now use hardened cookies but remain stateless JWTs without
+server-side revocation. Follow-up containment on 2026-10-28
 recovered and sanitized the source history, replaced a publicly known hard-coded
 JWT key, eliminated all known RustSec and npm audit findings, blocked direct-origin
 access, added layered edge limits, restricted CORS, stopped access logging on
@@ -46,7 +45,10 @@ methods now require the exact configured origin, one-time tokens are hashed at
 rest, input boundaries are enforced server-side, engagement writes are
 transactional, and feed N+1 queries were collapsed. Revocable server-side
 sessions, centralized authorization tests, versioned migrations, image
-re-encoding, and observability remain open.
+re-encoding, metrics/alerting, and tested recovery remain open. One-time links
+now keep secrets in URL fragments, scrub them from browser history, and exchange
+them through POST bodies. API requests emit redacted JSON events with request
+IDs, status, path, and latency.
 
 ## Findings
 
@@ -109,7 +111,7 @@ PEM dependency branches. The unmaintained `dotenv` crate was replaced by
 | `sqlx` | 0.7.4 | RUSTSEC-2024-0363 | Binary protocol integer cast issue; fixed in 0.8.1+ |
 | `webpki-roots` | 0.25.4 | RUSTSEC-2026-0381 | Bundled trust store includes distrusted intermediates |
 
-The locked graph dropped from 296 to 260 packages. `cargo clippy --all-targets
+The locked graph dropped from 296 to 265 packages. `cargo clippy --all-targets
 -- -D warnings`, unit tests, a release build, and `cargo audit` all pass. The
 candidate connected to the production database and passed API, JWT, CORS, and
 upload-serving smoke tests before atomic deployment. RustSec reported no known
@@ -180,25 +182,30 @@ filtering, and a restrictive `UMask`.
 protection, private temp/devices, restricted address families/namespaces, and
 resource limits. Validate email, MySQL, DNS, and uploads on staging before rollout.
 
-#### SEC-006 — Recovery and verification secrets travel in query strings
+#### SEC-006 — Recovery and verification secrets traveled in query strings
 
-**Status (2026-10-28): token-at-rest and logging risks mitigated; URL transport remains.** Access logging is disabled
-for the known recovery and verification routes, and those responses receive
-`Cache-Control: no-store` and `Referrer-Policy: no-referrer`. New one-time tokens
-are stored as SHA-256 digests and consumed transactionally; legacy plaintext
-records are accepted only for the migration window. Umami query-string
-collection is disabled globally, sensitive routes are marked `noindex`, token
-wildcard injection is rejected, and the email-change link targets the correct
-route. URL tokens, browser history, and the POST exchange still require changes.
+**Status (2026-10-28): mitigated and deployed.** New email links place one-time
+secrets in URL fragments, which are not transmitted to Cloudflare or Nginx. The
+frontend immediately replaces the history entry and sends the secret only in a
+POST JSON body; direct GET exchanges return `405`. Already-issued query-string
+links remain compatible through the frontend and are scrubbed before the API
+request. Access logging remains disabled on browser and exchange routes, which
+also receive `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
 
-The frontend routes use `?token=` for password reset, email verification, and
-email change. Query strings can enter Nginx logs, browser history, screenshots,
-analytics page URLs, support reports, and referrers.
+New one-time tokens are stored as SHA-256 digests and consumed transactionally;
+legacy plaintext database records are accepted only for the migration window.
+Umami query-string collection is disabled globally, sensitive routes are marked
+`noindex`, token wildcard injection is rejected, and the email-change link
+targets the correct route.
 
-**Remediation:** exchange a one-time token through a POST body, hash tokens at
-rest, make them single-use and short-lived, immediately remove secrets from the
-address bar, disable analytics on secret-bearing routes, redact request logging,
-and return `Referrer-Policy: no-referrer` plus `Cache-Control: no-store`.
+At initial review, the frontend routes used `?token=` for password reset, email
+verification, and email change. Those query strings could enter Nginx logs,
+browser history, screenshots, analytics page URLs, support reports, and
+referrers.
+
+**Follow-up:** expire the legacy plaintext-token migration window, add recovery
+audit events without token material, and cover token reuse/expiry in integration
+tests.
 
 #### SEC-007 — Upload validation is insufficient
 
@@ -252,15 +259,19 @@ generic auth/recovery responses.
 
 #### SEC-009 — Detection, response, and recovery are not demonstrated
 
-**Status (2026-10-28): health endpoints deployed; broader observability and recovery remain open.**
+**Status (2026-10-28): health endpoints and privacy-redacted request logs deployed; alerting and recovery remain open.**
 
 - `/api/health/live` and dependency-aware `/api/health/ready` are deployed and
   exercised after releases through Cloudflare.
-- No Media-specific structured security log, alert, dashboard, on-call path,
-  incident runbook, tested restore, or documented rollback was found.
-- Application errors are mostly empty responses or console messages.
+- API requests emit JSON logs with a validated request ID, method, path, status,
+  and latency. Query strings and bodies are deliberately excluded.
+- API failures use non-cacheable problem JSON and repeat the request ID for
+  support correlation without disclosing internal errors.
+- No Media-specific alert, dashboard, on-call path, incident runbook, retention
+  policy, or tested restore was found. Per-release rollback artifacts exist, but
+  the process is not yet automated.
 
-**Remediation:** define SLOs, structured redacted logs, metrics, actionable alerts,
+**Remediation:** define SLOs, metrics, actionable alerts, log retention,
 backup/restore tests, a rollback command, and tabletop-tested incident runbooks.
 
 #### SEC-010 — Privacy and data lifecycle controls are not demonstrated
