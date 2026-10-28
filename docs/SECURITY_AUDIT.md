@@ -4,9 +4,9 @@
 
 **Audit date:** 2026-10-28
 
-**Status:** Living audit; P0 remediation in progress
+**Status:** Living audit; initial P0 containment complete, application hardening in progress
 
-**Verdict:** 🔴 Mitigate P0 risks before feature expansion
+**Verdict:** 🟠 Core containment is deployed; session, migration, upload-processing, and observability work remains
 
 ## Scope and limitations
 
@@ -19,10 +19,11 @@ The legacy source and history were recovered on 2026-10-28, sanitized to remove
 real user uploads, and merged with the hardened deployment repository. A Rust
 lockfile and minimal unit tests now exist, and the backend was rebuilt and
 deployed from the tracked source. Authenticated test accounts and a staging
-environment remain absent, so IDOR, privilege boundaries, authenticated uploads,
-account recovery, message privacy, and destructive actions are not yet safely
-covered. No evidence of compromise was found, but absence of evidence is not
-evidence of absence.
+environment remain absent, so IDOR, privilege boundaries, message privacy, and
+destructive actions are not yet safely covered end to end. Authenticated upload
+validation and account-recovery rejection paths were exercised with low-impact
+canaries, but not with a disposable full user journey. No evidence of compromise
+was found, but absence of evidence is not evidence of absence.
 
 ## Executive summary
 
@@ -31,14 +32,16 @@ bind locally, the database account is not root, dotfiles are denied, SQLx bound
 queries are visible in the binary, passwords use bcrypt, secrets are not short
 placeholders, and core tables have foreign keys and uniqueness constraints.
 
-The system is nevertheless not ready for broad feature development. Browser
-sessions are exposed to XSS through `localStorage`, and recovery tokens may still
-enter URLs and browser history. Follow-up containment on 2026-10-28 recovered the
-source, replaced a publicly known hard-coded JWT key, eliminated the nine known
-RustSec findings, blocked direct-origin access, added edge limits, restricted
-CORS, stopped access logging on secret-bearing routes, sandboxed the API service,
-and repaired upload ownership. Application-level authorization, upload
-validation, session security, and observability remain open.
+Browser sessions are still exposed to XSS through `localStorage`, and recovery
+tokens still enter URLs and browser history. Follow-up containment on 2026-10-28
+recovered and sanitized the source history, replaced a publicly known hard-coded
+JWT key, eliminated all known RustSec and npm audit findings, blocked direct-origin
+access, added layered edge limits, restricted CORS, stopped access logging on
+secret-bearing routes, sandboxed the API service, separated source from immutable
+frontend releases, and deployed content-aware upload validation. Password bounds,
+generic recovery responses, email configuration, and email-change verification
+were also repaired. Server-side sessions, centralized authorization tests,
+versioned migrations, image re-encoding, and observability remain open.
 
 ## Findings
 
@@ -46,18 +49,19 @@ validation, session security, and observability remain open.
 
 #### SEC-001 — Production source and build history were missing
 
-**Status (2026-10-28): backend mitigated; frontend partially mitigated.** The
+**Status (2026-10-28): mitigated for source recovery and production release isolation.** The
 legacy Git history was imported after removing user uploads from every imported
 commit. Backend source, migrations, `Cargo.lock`, unit tests, and a reproducible
-release command are tracked; the deployed binary was built from commit
-`aa4353a`. Frontend source and `package-lock.json` are recovered, but its build
-output still needs separation from the live document root and a verified release.
+release command are tracked. Frontend source and `package-lock.json` are recovered;
+Vite builds from `frontend/app`, writes to the ignored `frontend/dist`, and Nginx
+serves an immutable release under `/var/lib/media` instead of the repository.
+Direct requests for source paths no longer expose manifests or application source.
 
 - At initial review, only a minified frontend bundle and an unstripped backend
   executable existed in this checkout.
 - The initial checkout had no manifest, source, migration, test, or CI history.
-- CI, staging, complete integration tests, and a consolidated release procedure
-  remain open.
+- CI, staging, complete integration tests, signed provenance, and release
+  automation remain open.
 
 **Remediation:** recover the exact source and history if possible. Otherwise,
 reconstruct behind a new test suite and migrate through a staging/canary release.
@@ -167,12 +171,14 @@ resource limits. Validate email, MySQL, DNS, and uploads on staging before rollo
 
 #### SEC-006 — Recovery and verification secrets travel in query strings
 
-**Status (2026-10-28): partially mitigated at Nginx.** Access logging is disabled
+**Status (2026-10-28): partially mitigated.** Access logging is disabled
 for the known recovery and verification routes, and those responses receive
 `Cache-Control: no-store` and `Referrer-Policy: no-referrer`. URL tokens,
-storage design, browser history, and the POST exchange still require source
-changes. Umami query-string collection is disabled globally, and sensitive
-routes are marked `noindex`.
+plaintext token storage, browser history, and the POST exchange still require
+source changes. Umami query-string collection is disabled globally, sensitive
+routes are marked `noindex`, token wildcard injection is rejected, email-change
+tokens are consumed transactionally, and the email-change link now targets the
+correct route.
 
 The frontend routes use `?token=` for password reset, email verification, and
 email change. Query strings can enter Nginx logs, browser history, screenshots,
@@ -185,16 +191,19 @@ and return `Referrer-Policy: no-referrer` plus `Cache-Control: no-store`.
 
 #### SEC-007 — Upload validation is insufficient
 
-**Status (2026-10-28): filesystem and edge limits mitigated.** The upload tree is
+**Status (2026-10-28): content and filesystem controls improved; re-encoding remains open.** The upload tree is
 now owned by `www-data:www-data` with `0750` directories and `0640` files, is the
 service's only writable application path, and remains readable through Nginx.
 Nginx enforces route-specific body limits and serves only selected image media
-types. Recovered source confirms that content validation and re-encoding are
-absent.
+types. The backend now checks filename extension, declared MIME, magic bytes,
+basic JPEG/PNG/WebP structure, and decoded dimensions before creating a
+server-controlled filename. GIF, SVG, mismatches, excessive dimensions, and
+malformed headers are rejected. Full decoder validation, metadata stripping,
+re-encoding, quotas, and orphan cleanup remain absent.
 
 - The UI permits files up to 10 MB; the initial vhost had no explicit body limit.
-- Upload handling trusts filename extensions and does not verify MIME, magic
-  bytes, decoded-image dimensions, or decompression cost.
+- Upload handling still does not fully decode/re-encode images or cap processing
+  time and decompression cost beyond header-derived pixel limits.
 - Uploads are served from the primary origin, increasing active-content risk.
 - At initial review, upload directories were `755 micu:micu` while the service
   ran as `www-data`, preventing backend writes.
@@ -207,11 +216,16 @@ cookieless media origin with strict content headers.
 
 #### SEC-008 — Authentication controls are below a safe baseline
 
-- Client validation accepts passwords with six characters.
+**Status (2026-10-28): password and recovery baseline improved; session model remains high risk.**
+
+- Registration, password change, and reset now enforce 12 characters minimum and
+  72 bytes maximum in both backend and frontend, avoiding bcrypt truncation.
+- Password recovery returns one generic response for existing and nonexistent
+  accounts, and email-change verification rejects wildcard tokens.
 - No MFA/passkeys, server-side session revocation, recovery codes, breached-
   password check, security event history, or login alert was observed.
-- JWT claims visible in the binary appear minimal; issuer, audience, token ID,
-  rotation, and revocation could not be verified.
+- JWT claims remain minimal and lack issuer, audience, token ID, rotation, and
+  revocation.
 
 **Remediation:** adopt modern password guidance, Argon2id for new hashes with
 transparent migration, email verification gates, optional passkeys/TOTP, hashed
@@ -265,13 +279,15 @@ separate migration role/job, transaction-safe data changes, and restore tests.
 
 #### SEC-013 — Insecure configuration fallbacks are embedded
 
-**Status (2026-10-28): partially mitigated.** JWT and CORS configuration now fail
-closed at startup, and server bind configuration is validated. Database, SMTP,
-and application-URL fallbacks still require removal.
+**Status (2026-10-28): mitigated for security-sensitive production configuration.** JWT,
+CORS, database, environment, SMTP credentials/sender, and application URLs now
+fail closed or are validated at startup. Production application URLs require
+HTTPS, database configuration has no embedded credential fallback, and SMTP
+recipient addresses are no longer written to application logs. The SMTP port has
+a conventional `587` default and the loopback server bind retains a safe default.
 
-The executable still includes development defaults for the database, SMTP, and
-application URL. Production supplies stronger values, but a missing environment
-variable may still start an unsafe partial configuration.
+Placeholder values remain only in the non-secret `.env.example`; production
+startup rejects missing required values.
 
 **Remediation:** make production secrets and URLs mandatory, validate them at
 startup, reject placeholders and non-loopback database defaults, and emit only
@@ -287,6 +303,12 @@ receive only a short edge cache lifetime.
 revalidation for HTML, and one-year immutable caching for content-hashed assets.
 
 #### SEC-015 — Data consistency and indexing need source-level review
+
+**Status (2026-10-28): response exposure reduced; consistency review remains open.**
+The database-only `User` type is no longer serializable, and profile-update
+responses explicitly select safe fields, preventing accidental password-hash
+serialization. Like/comment counter transactions, length constraints, and query
+plans remain unresolved.
 
 Post like/comment counters are denormalized and likely updated separately from
 their rows. The schema lacks visible length constraints and some useful composite

@@ -16,6 +16,12 @@ unpatchable or weakly isolated service only increases the blast radius.
 
 ## Phase 0 — Contain production risk
 
+**Progress (2026-10-28):** the tracked Nginx/systemd configuration, direct-origin
+enforcement, layered rate limits, strict CORS, upload ownership, systemd sandbox,
+secret-route logging policy, immutable static releases, security headers, and
+rollback artifacts are deployed. Application-aware throttling, automated restore
+drills, owned alert routing, and scripted release/rollback remain open.
+
 1. Version the active Nginx vhost, rate-limit zones, and systemd unit.
 2. Add Cloudflare-only origin enforcement while preserving ACME and loopback.
 3. Add real-client-IP rate and connection limits:
@@ -36,10 +42,13 @@ unpatchable or weakly isolated service only increases the blast radius.
 ## Phase 1 — Recover a maintainable application
 
 Progress on 2026-10-28: the sanitized legacy history, backend and frontend
-source, manifests, lockfiles, and migrations are recovered. The backend has a
-locked SQLx 0.9 build, zero known RustSec findings, strict linting, initial unit
-tests, a validated canary flow, and a deployed rollback artifact. Frontend build
-separation, broader tests, CI, staging, and release provenance remain open.
+source, manifests, lockfiles, and recovered migrations are present. The backend
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 14 unit
+tests, a validated canary flow, and deployed rollback artifacts. The frontend has
+a locked dependency graph with zero npm audit findings and builds from a source
+directory into an ignored release output served outside the repository. Broader
+integration/browser tests, CI, staging, versioned live migrations, provenance,
+and release automation remain open.
 
 1. Recover the original Git history or reconstruct the backend and frontend.
 2. Restore Rust manifests and lockfile; use a supported Rust toolchain.
@@ -89,6 +98,13 @@ separation, broader tests, CI, staging, and release provenance remain open.
   third-party scripts on sensitive routes.
 
 ## Phase 3 — Massive design and responsive rebuild
+
+**Progress (2026-10-28):** a light/dark token system, responsive public landing,
+authenticated three-column feed, navigation, composer, post/comment cards,
+profiles, account settings, recovery/verification flows, skeletons, empty/error
+states, accessible SVG controls, reduced-motion handling, and mobile layouts are
+deployed. Browser-based visual regression, a mobile bottom navigation, toasts,
+dialogs, accessibility automation, and the remaining product pages are open.
 
 ### Design system
 
@@ -158,6 +174,14 @@ separation, broader tests, CI, staging, and release provenance remain open.
 
 ## Phase 5 — SEO and shareability
 
+**Progress (2026-10-28):** the public shell has Romanian language metadata,
+canonical and social tags, WebSite JSON-LD, manifest, favicon, crawler policy,
+and a valid XML sitemap. Route-aware titles, descriptions, canonical URLs, and
+client-side robots directives are implemented; Nginx also returns real
+`X-Robots-Tag: noindex` headers for private and token-bearing routes. Public SSR
+or prerendering, share images, public profile/post URLs, real 404 responses,
+landing/legal content, Search Console, and Core Web Vitals monitoring remain open.
+
 1. Render public profiles/posts on the server or pre-render them; keep private and
    application-only routes out of the index.
 2. Use `lang="ro"`, route-specific title/description, canonical URL, robots,
@@ -176,9 +200,10 @@ separation, broader tests, CI, staging, and release provenance remain open.
 9. Monitor Search Console, crawl/index coverage, rich-result validity, 404s,
    sitemap freshness, and real-user CWV.
 
-Current urgent SEO defects include a generic title, incorrect `lang="en"`, no
-description/canonical/social metadata, no structured data, and `/sitemap.xml`
-plus `/manifest.webmanifest` returning the SPA HTML with status 200.
+The original urgent metadata and MIME-routing defects are closed. The highest
+remaining SEO constraint is architectural: public content is still a client-side
+SPA behind authenticated routes, so crawlers have only the public landing page
+to index and unknown paths can still become soft 404s.
 
 ## Phase 6 — Reliability, observability, and operations
 

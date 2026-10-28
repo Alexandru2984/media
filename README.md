@@ -8,9 +8,9 @@ comments.
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
 > legacy `social_media` repository on 2026-10-28. Real user uploads were removed
-> from the imported history. The backend now has a locked, tested release build;
-> the frontend source is present but still needs its source template and build
-> output separated from the current production document root.
+> from the imported history. Both applications now have locked, tested release
+> builds. Frontend source and build output are separated, and production Nginx
+> serves an immutable release outside the repository.
 
 ## Current architecture
 
@@ -44,29 +44,31 @@ backend/
   uploads/              # user-generated content; never committed
 frontend/
   package.json / package-lock.json # frontend manifest and lockfile
-  src/                  # Solid.js application source
-  index.html            # current SPA entry document and global metadata
-  icon.svg              # scalable application mark
-  manifest.webmanifest  # browser/PWA metadata
-  robots.txt            # crawler policy for this hostname
-  sitemap.xml           # currently indexable public URLs
-  assets/               # generated hashed bundles; never committed
+  app/
+    src/                # Solid.js application source
+    index.html          # SPA entry document and global metadata
+  public/               # icon, manifest, robots policy, and sitemap
+  dist/                 # generated release output; never committed
+deploy/
+  nginx/                # tracked vhost, snippets, and rate-limit zones
+  systemd/              # tracked hardened API service unit
+docs/                   # living security audit and delivery roadmap
 ```
 
 Generated artifacts and runtime data must stay out of Git.
 
 ## Development status
 
-The immediate project goals are:
+The next project goals are:
 
-1. Separate frontend source from production build output and reproduce the SPA.
-2. Expand automated tests, linting, dependency auditing, and CI.
-3. Harden authentication, authorization, uploads, CORS, rate limits, Nginx,
-   and the systemd sandbox.
-4. Replace browser-readable JWT storage with revocable, cookie-based sessions.
-5. Rebuild the interface as an accessible, responsive, mobile-first product.
-6. Add complete technical SEO, social metadata, structured data, and public
-   indexable pages where appropriate.
+1. Replace browser-readable JWT storage with revocable, cookie-based sessions.
+2. Replace startup DDL with versioned migrations and add integration/browser CI.
+3. Complete upload decode/re-encode, metadata stripping, quotas, and cleanup.
+4. Add health/readiness endpoints, structured logs, metrics, alerts, and restore drills.
+5. Expand the responsive product with relationships, discovery, notifications,
+   moderation, privacy controls, and pagination.
+6. Add server-rendered or pre-rendered public content, legal/help pages, real
+   404s, share images, and Core Web Vitals monitoring.
 
 See the [security audit](docs/SECURITY_AUDIT.md) and the
 [implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,
@@ -101,6 +103,17 @@ The complete local environment, frontend release flow, migrations, health
 checks, and incident-response procedures still need consolidation. Production
 changes must remain independently reversible and verified before reloads or
 restarts.
+
+Frontend checks and its production build run from the `frontend` directory:
+
+```bash
+npm ci
+npm audit --audit-level=low
+npm run build
+```
+
+Vite writes the generated application to `frontend/dist`; that directory must
+never be used as a source directory or committed.
 
 ## Git workflow
 
