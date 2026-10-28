@@ -49,8 +49,9 @@ rest, input boundaries are enforced server-side, engagement writes are
 transactional, and feed N+1 queries were collapsed. Embedded versioned MySQL
 migrations now replace startup DDL. Session inventory, scoped remote logout,
 24-hour idle expiry, seven-day absolute expiry, and a 20-session account cap are
-deployed. Centralized authorization tests, security-event history, image
-re-encoding, metrics/alerting, and tested recovery remain open. One-time links now
+deployed. A private, data-minimized security-event timeline is also deployed
+with per-user isolation and bounded retention. Centralized authorization tests,
+image re-encoding, metrics/alerting, and tested recovery remain open. One-time links now
 keep secrets in URL fragments, scrub them from browser history, and exchange them
 through POST bodies. API requests emit redacted JSON events with request IDs,
 status, path, and latency.
@@ -149,8 +150,8 @@ The compiled app also relies heavily on inline style attributes.
   seven-day absolute timeout, and a 20-session cap are deployed. IP addresses and
   User-Agent strings are deliberately not retained, so device labels are absent.
 
-**Remediation:** add synchronizer CSRF tokens, security-event history, and anomaly
-alerts. Remove inline code/styles and deploy a nonce- or hash-based CSP.
+**Remediation:** add synchronizer CSRF tokens and anomaly alerts. Remove inline
+code/styles and deploy a nonce- or hash-based CSP.
 
 #### SEC-004 — Cloudflare can be bypassed and auth abuse is not throttled
 
@@ -264,12 +265,16 @@ baseline improved.**
   revoke every active session and password change rotates into a fresh session.
 - Users can inspect active sessions and revoke one or all other sessions. Inactive
   sessions expire after 24 hours and each account is capped at 20.
-- No MFA/passkeys, recovery codes, breached-password check, security-event
-  history, or login alert was observed.
+- Users can inspect the last 50 important account-security events. Events contain
+  only a server-controlled type and timestamp, are isolated by account, and are
+  retained for at most 90 days and 100 records per user.
+- No MFA/passkeys, recovery codes, breached-password check, or login alert was
+  observed.
 
 **Remediation:** add email verification gates, optional passkeys/TOTP, hashed
-recovery codes, reauthentication for risk events, security-event history, and
-generic auth/recovery responses.
+recovery codes, reauthentication for risk events, and generic auth/recovery
+responses. The user-facing timeline is not a tamper-evident forensic audit log;
+add a separately protected audit pipeline before relying on it for investigations.
 
 #### SEC-009 — Detection, response, and recovery are not demonstrated
 

@@ -4,7 +4,8 @@ Media is a social platform hosted at [media.micutu.com](https://media.micutu.com
 The application currently provides account management, email verification and
 password recovery, user profiles, avatars, posts, image uploads, likes, and
 comments. It also includes a paginated feed, community search, responsive mobile
-navigation, public project/community pages, and real HTTP 404 handling.
+navigation, active-session controls, a private security-activity timeline,
+public project/community pages, and real HTTP 404 handling.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -64,7 +65,7 @@ Generated artifacts and runtime data must stay out of Git.
 
 The next project goals are:
 
-1. Add security-event history, login alerts, MFA/passkeys, and stronger
+1. Add login alerts, MFA/passkeys, breached-password screening, and stronger
    reauthentication for high-risk account changes.
 2. Add database integration tests, browser CI, migration checks, and automated
    release/rollback workflows around the deployed versioned migrations.

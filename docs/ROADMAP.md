@@ -43,7 +43,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-28: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 31 unit
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 32 unit
 tests, embedded versioned MySQL migrations, a validated canary flow, and deployed
 rollback artifacts. The frontend has
 a locked dependency graph with zero npm audit findings and builds from a source
@@ -76,8 +76,10 @@ enforce the exact configured origin. Recovery links use non-transmitted URL
 fragments, scrub browser history, and exchange through POST. An active-session
 dashboard supports scoped remote logout without collecting IP or User-Agent data;
 sessions have a 24-hour idle timeout, a seven-day absolute timeout, and a limit of
-20 per account. Security event history, MFA, login alerts, and explicit
-synchronizer CSRF tokens remain open.
+20 per account. A responsive private timeline now exposes data-minimized login,
+logout, session, password, and email events; storage is capped at 100 records per
+account and 90 days. MFA, login alerts, and explicit synchronizer CSRF tokens
+remain open.
 
 New and changed passwords use an explicit Argon2id v19 profile. Legacy bcrypt
 and outdated Argon2id credentials upgrade atomically after successful
@@ -88,7 +90,8 @@ and protected against attacker-sized stored parameters.
 - Origin checks, absolute timeout, password-change rotation, and revocation on
   password reset or verified email change. ✅
 - Idle expiry and a session dashboard with scoped remote logout. ✅
-- Synchronizer CSRF tokens and security event history.
+- Data-minimized security event history with bounded retention. ✅ Add a
+  tamper-evident operational audit sink and explicit synchronizer CSRF tokens.
 - Passkeys/WebAuthn, optional TOTP, hashed recovery codes, and login alerts.
 - Strong password policy and Argon2id migration. ✅ Add breached-password
   screening and stronger reauthentication for high-risk changes.
