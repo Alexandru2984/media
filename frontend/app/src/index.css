@@ -828,6 +828,89 @@ a {
   font-size: 0.78rem;
 }
 
+.account-flow-page {
+  display: grid;
+  min-height: calc(100vh - var(--nav-height));
+  place-items: center;
+  padding: 40px 16px 64px;
+}
+
+.account-flow-card {
+  width: min(470px, 100%);
+  padding: clamp(24px, 6vw, 38px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.account-flow-header,
+.account-status {
+  text-align: center;
+}
+
+.account-flow-header {
+  margin-bottom: 25px;
+}
+
+.account-flow-header h1,
+.account-status h1 {
+  margin: 16px 0 8px;
+  font-size: clamp(1.55rem, 7vw, 2rem);
+  letter-spacing: -0.04em;
+}
+
+.account-flow-header p,
+.account-status p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.account-status p {
+  margin-bottom: 24px;
+}
+
+.account-status-mark {
+  display: grid;
+  width: 60px;
+  height: 60px;
+  margin-inline: auto;
+  place-items: center;
+  border-radius: 18px;
+}
+
+.account-status-mark.is-info {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.account-status-mark.is-success {
+  background: color-mix(in srgb, var(--success) 13%, var(--bg-elevated));
+  color: var(--success);
+}
+
+.account-status-mark.is-error {
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-elevated));
+  color: var(--danger);
+}
+
+.account-flow-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.account-flow-form .btn-primary {
+  min-height: 49px;
+}
+
+.account-flow-footer {
+  margin: 23px 0 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
 /* Post composer and feed cards */
 .composer {
   margin-bottom: 18px;

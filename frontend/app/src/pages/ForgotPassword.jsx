@@ -1,160 +1,63 @@
-import { createSignal } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { A } from '@solidjs/router';
+import { createSignal, Show } from 'solid-js';
 import { api } from '../api';
+import AccountFlow, { StatusMark } from '../components/AccountFlow';
 
 export default function ForgotPassword() {
-  const navigate = useNavigate();
   const [email, setEmail] = createSignal('');
   const [loading, setLoading] = createSignal(false);
   const [sent, setSent] = createSignal(false);
   const [error, setError] = createSignal('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      await api.forgotPassword(email());
+      await api.forgotPassword(email().trim());
       setSent(true);
-    } catch (err) {
+    } catch (requestError) {
+      console.error('Password reset request failed:', requestError);
       setError('Solicitarea nu a putut fi procesată. Încearcă din nou.');
     } finally {
       setLoading(false);
     }
   };
 
-  const styles = {
-    container: {
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f7fafc',
-      padding: '20px',
-    },
-    card: {
-      background: 'white',
-      borderRadius: '12px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      padding: '40px',
-      maxWidth: '500px',
-      width: '100%',
-    },
-    title: {
-      fontSize: '28px',
-      fontWeight: '700',
-      marginBottom: '8px',
-      color: '#2d3748',
-      textAlign: 'center',
-    },
-    subtitle: {
-      fontSize: '14px',
-      color: '#718096',
-      marginBottom: '32px',
-      textAlign: 'center',
-    },
-    form: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '16px',
-    },
-    input: {
-      padding: '12px 16px',
-      borderRadius: '8px',
-      border: '1px solid #e2e8f0',
-      fontSize: '14px',
-      width: '100%',
-    },
-    button: {
-      padding: '12px',
-      borderRadius: '8px',
-      border: 'none',
-      background: '#667eea',
-      color: 'white',
-      fontSize: '16px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      marginTop: '8px',
-    },
-    buttonDisabled: {
-      opacity: 0.6,
-      cursor: 'not-allowed',
-    },
-    error: {
-      background: '#fff5f5',
-      color: '#c53030',
-      padding: '12px',
-      borderRadius: '8px',
-      fontSize: '14px',
-      border: '1px solid #feb2b2',
-    },
-    success: {
-      background: '#f0fff4',
-      color: '#22543d',
-      padding: '12px',
-      borderRadius: '8px',
-      fontSize: '14px',
-      border: '1px solid #9ae6b4',
-      marginBottom: '16px',
-    },
-    backLink: {
-      textAlign: 'center',
-      marginTop: '16px',
-      color: '#667eea',
-      textDecoration: 'none',
-      fontSize: '14px',
-      cursor: 'pointer',
-    },
-  };
-
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Resetare Parolă</h1>
-        <p style={styles.subtitle}>
-          Introdu adresa de email și îți vom trimite un link de resetare
-        </p>
+    <AccountFlow>
+      <Show
+        when={!sent()}
+        fallback={
+          <div class="account-status">
+            <StatusMark tone="success">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </StatusMark>
+            <h1>Verifică-ți inboxul</h1>
+            <p>Dacă există un cont pentru această adresă, vei primi instrucțiunile de resetare în următoarele minute.</p>
+            <A href="/login" class="btn btn-primary">Înapoi la conectare</A>
+          </div>
+        }
+      >
+        <header class="account-flow-header">
+          <StatusMark tone="info">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="4" y="10" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" /></svg>
+          </StatusMark>
+          <h1>Ai uitat parola?</h1>
+          <p>Introdu adresa contului și îți trimitem un link valabil timp de o oră.</p>
+        </header>
 
-        {sent() ? (
-          <>
-            <div style={styles.success}>
-              Dacă există un cont pentru această adresă, vei primi instrucțiunile de resetare.
-            </div>
-            <div style={styles.backLink} onClick={() => navigate('/login')}>
-              ← Înapoi la autentificare
-            </div>
-          </>
-        ) : (
-          <form onSubmit={handleSubmit} style={styles.form}>
-            {error() && <div style={styles.error}>{error()}</div>}
+        <Show when={error()}><div class="alert alert-error" role="alert">{error()}</div></Show>
 
-            <input
-              type="email"
-              placeholder="Email"
-              value={email()}
-              onInput={(e) => setEmail(e.target.value)}
-              required
-              style={styles.input}
-            />
-
-            <button
-              type="submit"
-              disabled={loading()}
-              style={{
-                ...styles.button,
-                ...(loading() ? styles.buttonDisabled : {}),
-              }}
-            >
-              {loading() ? 'Se trimite...' : 'Trimite Link de Resetare'}
-            </button>
-
-            <div style={styles.backLink} onClick={() => navigate('/login')}>
-              ← Înapoi la autentificare
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
+        <form class="account-flow-form" onSubmit={handleSubmit}>
+          <div>
+            <label class="field-label" for="recovery-email">Adresă de email</label>
+            <input id="recovery-email" class="input" type="email" value={email()} onInput={(event) => setEmail(event.currentTarget.value)} autocomplete="email" inputmode="email" placeholder="nume@exemplu.ro" required />
+          </div>
+          <button type="submit" class="btn btn-primary" disabled={loading()}>{loading() ? 'Se trimite…' : 'Trimite linkul de resetare'}</button>
+        </form>
+        <p class="account-flow-footer"><A href="/login" class="text-link">Înapoi la conectare</A></p>
+      </Show>
+    </AccountFlow>
   );
 }

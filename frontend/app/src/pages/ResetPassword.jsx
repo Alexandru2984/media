@@ -1,6 +1,7 @@
-import { createSignal, onMount } from 'solid-js';
-import { useNavigate, useSearchParams } from '@solidjs/router';
+import { A, useNavigate, useSearchParams } from '@solidjs/router';
+import { createSignal, onCleanup, Show } from 'solid-js';
 import { api } from '../api';
+import AccountFlow, { StatusMark } from '../components/AccountFlow';
 import { getPasswordPolicyError } from '../utils/passwords';
 
 export default function ResetPassword() {
@@ -11,181 +12,74 @@ export default function ResetPassword() {
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal('');
   const [success, setSuccess] = createSignal(false);
+  let redirectTimer;
+  onCleanup(() => window.clearTimeout(redirectTimer));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
-
     if (password() !== confirmPassword()) {
-      setError('Parolele nu se potrivesc');
+      setError('Parolele introduse nu se potrivesc.');
       return;
     }
-
-    const passwordError = getPasswordPolicyError(password());
-    if (passwordError) {
-      setError(passwordError);
+    const policyError = getPasswordPolicyError(password());
+    if (policyError) {
+      setError(policyError);
       return;
     }
-
     const token = searchParams.token;
     if (!token) {
-      setError('Token invalid');
+      setError('Linkul de resetare este incomplet. Solicită unul nou.');
       return;
     }
 
     setLoading(true);
-
     try {
       await api.resetPassword(token, password());
       setSuccess(true);
-      setTimeout(() => navigate('/login'), 2000);
-    } catch (err) {
-      setError('Token invalid sau expirat');
+      redirectTimer = window.setTimeout(() => navigate('/login'), 2500);
+    } catch (requestError) {
+      console.error('Password reset failed:', requestError);
+      setError('Linkul este invalid sau a expirat. Solicită un link nou.');
     } finally {
       setLoading(false);
     }
   };
 
-  const styles = {
-    container: {
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f7fafc',
-      padding: '20px',
-    },
-    card: {
-      background: 'white',
-      borderRadius: '12px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      padding: '40px',
-      maxWidth: '500px',
-      width: '100%',
-    },
-    title: {
-      fontSize: '28px',
-      fontWeight: '700',
-      marginBottom: '8px',
-      color: '#2d3748',
-      textAlign: 'center',
-    },
-    subtitle: {
-      fontSize: '14px',
-      color: '#718096',
-      marginBottom: '32px',
-      textAlign: 'center',
-    },
-    form: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '16px',
-    },
-    input: {
-      padding: '12px 16px',
-      borderRadius: '8px',
-      border: '1px solid #e2e8f0',
-      fontSize: '14px',
-      width: '100%',
-    },
-    button: {
-      padding: '12px',
-      borderRadius: '8px',
-      border: 'none',
-      background: '#667eea',
-      color: 'white',
-      fontSize: '16px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      marginTop: '8px',
-    },
-    buttonDisabled: {
-      opacity: 0.6,
-      cursor: 'not-allowed',
-    },
-    error: {
-      background: '#fff5f5',
-      color: '#c53030',
-      padding: '12px',
-      borderRadius: '8px',
-      fontSize: '14px',
-      border: '1px solid #feb2b2',
-    },
-    success: {
-      background: '#f0fff4',
-      color: '#22543d',
-      padding: '12px',
-      borderRadius: '8px',
-      fontSize: '14px',
-      border: '1px solid #9ae6b4',
-      textAlign: 'center',
-    },
-    icon: {
-      fontSize: '48px',
-      textAlign: 'center',
-      marginBottom: '16px',
-    },
-  };
-
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        {success() ? (
-          <>
-            <div style={styles.icon}>✅</div>
-            <div style={styles.success}>
-              Parola a fost resetată cu succes!<br />
-              Te redirecționăm la autentificare...
-            </div>
-          </>
-        ) : (
-          <>
-            <h1 style={styles.title}>Setează Parola Nouă</h1>
-            <p style={styles.subtitle}>
-              Introdu noua ta parolă mai jos
-            </p>
+    <AccountFlow>
+      <Show
+        when={!success()}
+        fallback={
+          <div class="account-status">
+            <StatusMark tone="success"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></StatusMark>
+            <h1>Parolă actualizată</h1>
+            <p>Poți folosi noua parolă la următoarea conectare. Te redirecționăm acum.</p>
+            <A href="/login" class="btn btn-primary">Mergi la conectare</A>
+          </div>
+        }
+      >
+        <header class="account-flow-header">
+          <StatusMark tone="info"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 15v2m-6-7V7a6 6 0 0 1 12 0v3M5 10h14a2 2 0 0 1 2 2v8H3v-8a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></StatusMark>
+          <h1>Alege o parolă nouă</h1>
+          <p>Folosește între 12 și 72 de caractere și nu reutiliza o parolă de pe alt site.</p>
+        </header>
 
-            <form onSubmit={handleSubmit} style={styles.form}>
-              {error() && <div style={styles.error}>{error()}</div>}
+        <Show when={error()}><div class="alert alert-error" role="alert">{error()}</div></Show>
 
-              <input
-                type="password"
-                placeholder="Parola nouă"
-                value={password()}
-                onInput={(e) => setPassword(e.target.value)}
-                required
-                minLength="12"
-                maxLength="72"
-                autocomplete="new-password"
-                style={styles.input}
-              />
-
-              <input
-                type="password"
-                placeholder="Confirmă parola"
-                value={confirmPassword()}
-                onInput={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength="12"
-                maxLength="72"
-                autocomplete="new-password"
-                style={styles.input}
-              />
-
-              <button
-                type="submit"
-                disabled={loading()}
-                style={{
-                  ...styles.button,
-                  ...(loading() ? styles.buttonDisabled : {}),
-                }}
-              >
-                {loading() ? 'Se salvează...' : 'Resetează Parola'}
-              </button>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
+        <form class="account-flow-form" onSubmit={handleSubmit}>
+          <div>
+            <label class="field-label" for="reset-password">Parola nouă</label>
+            <input id="reset-password" class="input" type="password" value={password()} onInput={(event) => setPassword(event.currentTarget.value)} autocomplete="new-password" minlength="12" maxlength="72" required />
+          </div>
+          <div>
+            <label class="field-label" for="reset-password-confirmation">Confirmă parola</label>
+            <input id="reset-password-confirmation" class="input" type="password" value={confirmPassword()} onInput={(event) => setConfirmPassword(event.currentTarget.value)} autocomplete="new-password" minlength="12" maxlength="72" required />
+          </div>
+          <button type="submit" class="btn btn-primary" disabled={loading()}>{loading() ? 'Se salvează…' : 'Salvează parola'}</button>
+        </form>
+        <p class="account-flow-footer"><A href="/forgot-password" class="text-link">Solicită alt link</A></p>
+      </Show>
+    </AccountFlow>
   );
 }

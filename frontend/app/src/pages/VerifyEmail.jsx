@@ -1,109 +1,54 @@
-import { createSignal, onMount } from 'solid-js';
-import { useNavigate, useSearchParams } from '@solidjs/router';
+import { A, useNavigate, useSearchParams } from '@solidjs/router';
+import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { api } from '../api';
+import AccountFlow, { StatusMark } from '../components/AccountFlow';
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [status, setStatus] = createSignal('verifying'); // verifying, success, error
-  const [message, setMessage] = createSignal('');
+  const [status, setStatus] = createSignal('loading');
+  const [message, setMessage] = createSignal('Confirmăm adresa ta de email…');
+  let redirectTimer;
+  onCleanup(() => window.clearTimeout(redirectTimer));
 
   onMount(async () => {
     const token = searchParams.token;
     if (!token) {
       setStatus('error');
-      setMessage('Token invalid');
+      setMessage('Linkul de verificare este incomplet.');
       return;
     }
 
     try {
       await api.verifyEmail(token);
       setStatus('success');
-      setMessage('Email verificat cu succes! Te redirecționăm...');
-      setTimeout(() => navigate('/'), 2000);
-    } catch (error) {
+      setMessage('Adresa a fost confirmată. Contul tău este pregătit.');
+      redirectTimer = window.setTimeout(() => navigate('/'), 2200);
+    } catch (requestError) {
+      console.error('Email verification failed:', requestError);
       setStatus('error');
-      setMessage('Token invalid sau expirat');
+      setMessage('Linkul este invalid, a expirat sau a fost deja folosit.');
     }
   });
 
-  const styles = {
-    container: {
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f7fafc',
-      padding: '20px',
-    },
-    card: {
-      background: 'white',
-      borderRadius: '12px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-      padding: '40px',
-      maxWidth: '500px',
-      width: '100%',
-      textAlign: 'center',
-    },
-    icon: {
-      fontSize: '64px',
-      marginBottom: '20px',
-    },
-    title: {
-      fontSize: '24px',
-      fontWeight: '700',
-      marginBottom: '16px',
-      color: '#2d3748',
-    },
-    message: {
-      fontSize: '16px',
-      color: '#718096',
-      marginBottom: '24px',
-    },
-    button: {
-      padding: '12px 24px',
-      borderRadius: '8px',
-      border: 'none',
-      background: '#667eea',
-      color: 'white',
-      fontSize: '16px',
-      fontWeight: '600',
-      cursor: 'pointer',
-      textDecoration: 'none',
-      display: 'inline-block',
-    },
-  };
-
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        {status() === 'verifying' && (
-          <>
-            <div style={styles.icon}>⏳</div>
-            <h1 style={styles.title}>Se verifică...</h1>
-            <p style={styles.message}>Te rugăm să aștepți</p>
-          </>
-        )}
-
-        {status() === 'success' && (
-          <>
-            <div style={styles.icon}>✅</div>
-            <h1 style={styles.title}>Verificare Reușită!</h1>
-            <p style={styles.message}>{message()}</p>
-          </>
-        )}
-
-        {status() === 'error' && (
-          <>
-            <div style={styles.icon}>❌</div>
-            <h1 style={styles.title}>Eroare</h1>
-            <p style={styles.message}>{message()}</p>
-            <a href="/" style={styles.button}>
-              Înapoi la pagina principală
-            </a>
-          </>
-        )}
+    <AccountFlow>
+      <div class="account-status">
+        <Show when={status() === 'loading'}>
+          <StatusMark tone="info"><svg class="spinner" width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg></StatusMark>
+          <h1>Se verifică adresa</h1>
+        </Show>
+        <Show when={status() === 'success'}>
+          <StatusMark tone="success"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></StatusMark>
+          <h1>Email verificat</h1>
+        </Show>
+        <Show when={status() === 'error'}>
+          <StatusMark tone="error"><svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg></StatusMark>
+          <h1>Verificarea nu a reușit</h1>
+        </Show>
+        <p>{message()}</p>
+        <Show when={status() !== 'loading'}><A href="/" class="btn btn-primary">Înapoi la Media</A></Show>
       </div>
-    </div>
+    </AccountFlow>
   );
 }
