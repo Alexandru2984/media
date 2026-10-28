@@ -67,6 +67,12 @@ export default function Navbar() {
               </svg>
               Caută
             </A>
+            <A href="/salvate" class={`nav-link ${location.pathname === '/salvate' ? 'is-active' : ''}`}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-3.8L6 21V4.8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+              </svg>
+              Salvate
+            </A>
             <A href={`/profile/${auth.user()?.id}`} class={`nav-link ${location.pathname.startsWith('/profile/') ? 'is-active' : ''}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" />
@@ -147,6 +153,12 @@ export default function Navbar() {
             </span>
             <span>Publică</span>
           </button>
+          <A href="/salvate" class={location.pathname === '/salvate' ? 'is-active' : ''}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-3.8L6 21V4.8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+            </svg>
+            <span>Salvate</span>
+          </A>
           <A href={`/profile/${auth.user()?.id}`} class={location.pathname.startsWith('/profile/') ? 'is-active' : ''}>
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" />

@@ -145,4 +145,5 @@ pub struct PostWithUser {
     pub created_at: DateTime<Utc>,
     pub user: UserProfile,
     pub is_liked: bool,
+    pub is_saved: bool,
 }

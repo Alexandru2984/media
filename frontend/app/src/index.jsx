@@ -14,6 +14,7 @@ import VerifyEmailChange from './pages/VerifyEmailChange';
 import Search from './pages/Search';
 import About from './pages/About';
 import CommunityGuidelines from './pages/CommunityGuidelines';
+import SavedPosts from './pages/SavedPosts';
 import NotFound from './pages/NotFound';
 import './index.css';
 
@@ -29,6 +30,7 @@ render(
           <Route path="/register" component={Register} />
           <Route path="/profile/:id" component={Profile} />
           <Route path="/search" component={Search} />
+          <Route path="/salvate" component={SavedPosts} />
           <Route path="/despre" component={About} />
           <Route path="/reguli" component={CommunityGuidelines} />
           <Route path="/verify-email" component={VerifyEmail} />

@@ -49,6 +49,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         // Post routes
         .route("/posts", get(handlers::get_posts))
         .route("/posts", post(handlers::create_post))
+        .route("/saved-posts", get(handlers::get_saved_posts))
         .route(
             "/posts/upload-image",
             post(handlers::upload_post_image).layer(DefaultBodyLimit::max(11 * 1024 * 1024)),
@@ -56,6 +57,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/posts/:id", put(handlers::update_post))
         .route("/posts/:id", delete(handlers::delete_post))
         .route("/posts/:id/like", post(handlers::like_post))
+        .route("/posts/:id/save", post(handlers::save_post))
         // Comment routes
         .route("/posts/:id/comments", get(handlers::get_comments))
         .route("/posts/:id/comments", post(handlers::create_comment))

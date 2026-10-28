@@ -75,6 +75,7 @@ struct PostFeedRow {
     user_posts_count: i64,
     user_created_at: DateTime<Utc>,
     is_liked: bool,
+    is_saved: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -121,6 +122,7 @@ fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
             created_at: row.user_created_at,
         },
         is_liked: row.is_liked,
+        is_saved: row.is_saved,
     }
 }
 
@@ -640,7 +642,8 @@ pub async fn get_posts(
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
-                (current_like.id IS NOT NULL) AS is_liked
+                (current_like.id IS NOT NULL) AS is_liked,
+                (current_save.user_id IS NOT NULL) AS is_saved
          FROM posts p
          INNER JOIN users u ON u.id = p.user_id
          INNER JOIN (
@@ -650,9 +653,12 @@ pub async fn get_posts(
          ) post_counts ON post_counts.user_id = p.user_id
          LEFT JOIN likes current_like
            ON current_like.post_id = p.id AND current_like.user_id = ?
+         LEFT JOIN saved_posts current_save
+           ON current_save.post_id = p.id AND current_save.user_id = ?
          ORDER BY p.created_at DESC
          LIMIT ? OFFSET ?",
     )
+    .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(limit)
     .bind(offset)
@@ -745,6 +751,122 @@ pub async fn like_post(
         "liked": liked,
         "likes_count": likes_count
     })))
+}
+
+pub async fn save_post(
+    State(pool): State<MySqlPool>,
+    Path(post_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let user_id = get_current_user(&pool, &headers).await?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // The post lock serializes concurrent toggles and guarantees that the
+    // foreign-key target remains present until this transaction completes.
+    let post_exists: Option<String> = query_scalar("SELECT id FROM posts WHERE id = ? FOR UPDATE")
+        .bind(&post_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if post_exists.is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    let already_saved: Option<String> = query_scalar(
+        "SELECT user_id FROM saved_posts
+         WHERE user_id = ? AND post_id = ? FOR UPDATE",
+    )
+    .bind(&user_id)
+    .bind(&post_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let saved = if already_saved.is_some() {
+        query("DELETE FROM saved_posts WHERE user_id = ? AND post_id = ?")
+            .bind(&user_id)
+            .bind(&post_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        false
+    } else {
+        query(
+            "INSERT INTO saved_posts (user_id, post_id, created_at)
+             VALUES (?, ?, ?)",
+        )
+        .bind(&user_id)
+        .bind(&post_id)
+        .bind(Utc::now())
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        true
+    };
+
+    transaction
+        .commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(json!({ "saved": saved })))
+}
+
+pub async fn get_saved_posts(
+    State(pool): State<MySqlPool>,
+    Query(params): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
+    let user_id = get_current_user(&pool, &headers).await?;
+    let limit = params
+        .get("limit")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(10)
+        .clamp(1, 50);
+    let offset = params
+        .get("offset")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(0)
+        .clamp(0, 1_000_000);
+
+    let rows = query_as::<_, PostFeedRow>(
+        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+                u.id AS user_id, u.username, u.bio, u.avatar_url,
+                post_counts.posts_count AS user_posts_count,
+                u.created_at AS user_created_at,
+                (current_like.id IS NOT NULL) AS is_liked,
+                TRUE AS is_saved
+         FROM saved_posts saved
+         INNER JOIN posts p ON p.id = saved.post_id
+         INNER JOIN users u ON u.id = p.user_id
+         INNER JOIN (
+             SELECT user_id, COUNT(*) AS posts_count
+             FROM posts
+             GROUP BY user_id
+         ) post_counts ON post_counts.user_id = p.user_id
+         LEFT JOIN likes current_like
+           ON current_like.post_id = p.id AND current_like.user_id = ?
+         WHERE saved.user_id = ?
+         ORDER BY saved.created_at DESC
+         LIMIT ? OFFSET ?",
+    )
+    .bind(&user_id)
+    .bind(&user_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to fetch saved posts");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(
+        rows.into_iter().map(post_feed_row_to_response).collect(),
+    ))
 }
 
 // Comment handlers
@@ -1690,7 +1812,8 @@ pub async fn get_user_posts(
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
-                (current_like.id IS NOT NULL) AS is_liked
+                (current_like.id IS NOT NULL) AS is_liked,
+                (current_save.user_id IS NOT NULL) AS is_saved
          FROM posts p
          INNER JOIN users u ON u.id = p.user_id
          INNER JOIN (
@@ -1700,10 +1823,13 @@ pub async fn get_user_posts(
          ) post_counts ON post_counts.user_id = p.user_id
          LEFT JOIN likes current_like
            ON current_like.post_id = p.id AND current_like.user_id = ?
+         LEFT JOIN saved_posts current_save
+           ON current_save.post_id = p.id AND current_save.user_id = ?
          WHERE p.user_id = ?
          ORDER BY p.created_at DESC
          LIMIT ? OFFSET ?",
     )
+    .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(&user_id)
     .bind(limit)
@@ -1753,7 +1879,8 @@ pub async fn search(
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
-                (current_like.id IS NOT NULL) AS is_liked
+                (current_like.id IS NOT NULL) AS is_liked,
+                (current_save.user_id IS NOT NULL) AS is_saved
          FROM posts p
          INNER JOIN users u ON u.id = p.user_id
          INNER JOIN (
@@ -1763,10 +1890,13 @@ pub async fn search(
          ) post_counts ON post_counts.user_id = p.user_id
          LEFT JOIN likes current_like
            ON current_like.post_id = p.id AND current_like.user_id = ?
+         LEFT JOIN saved_posts current_save
+           ON current_save.post_id = p.id AND current_save.user_id = ?
          WHERE INSTR(LOWER(p.content), LOWER(?)) > 0
          ORDER BY p.created_at DESC
          LIMIT 20",
     )
+    .bind(&current_user_id)
     .bind(&current_user_id)
     .bind(search_term)
     .fetch_all(&pool)

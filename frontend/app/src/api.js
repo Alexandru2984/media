@@ -106,6 +106,16 @@ class ApiService {
     });
   }
 
+  async savePost(postId) {
+    return this.request(`/posts/${postId}/save`, {
+      method: 'POST',
+    });
+  }
+
+  async getSavedPosts(limit = 10, offset = 0) {
+    return this.request(`/saved-posts?limit=${limit}&offset=${offset}`);
+  }
+
   // Comments
   async getComments(postId) {
     return this.request(`/posts/${postId}/comments`);

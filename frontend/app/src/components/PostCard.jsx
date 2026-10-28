@@ -34,6 +34,8 @@ export default function PostCard(props) {
   const [likesCount, setLikesCount] = createSignal(Number(props.post.likes_count) || 0);
   const [commentsCount, setCommentsCount] = createSignal(Number(props.post.comments_count) || 0);
   const [likePending, setLikePending] = createSignal(false);
+  const [saved, setSaved] = createSignal(Boolean(props.post.is_saved));
+  const [savePending, setSavePending] = createSignal(false);
   const [showComments, setShowComments] = createSignal(false);
   const [commentsLoading, setCommentsLoading] = createSignal(false);
   const [comments, setComments] = createSignal([]);
@@ -79,6 +81,23 @@ export default function PostCard(props) {
       setError('Aprecierea nu a putut fi salvată.');
     } finally {
       setLikePending(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (savePending()) return;
+    setSavePending(true);
+    setError('');
+    try {
+      const result = await api.savePost(props.post.id);
+      const isSaved = Boolean(result.saved);
+      setSaved(isSaved);
+      await props.onSavedChange?.(isSaved, props.post.id);
+    } catch (requestError) {
+      console.error('Failed to save post:', requestError);
+      setError('Postarea nu a putut fi salvată.');
+    } finally {
+      setSavePending(false);
     }
   };
 
@@ -331,11 +350,25 @@ export default function PostCard(props) {
           <svg width="19" height="19" viewBox="0 0 24 24" fill={liked() ? 'currentColor' : 'none'} aria-hidden="true">
             <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
           </svg>
-          {likesCount()} {likesCount() === 1 ? 'apreciere' : 'aprecieri'}
+          <span>{likesCount()} <span class="post-action-word">{likesCount() === 1 ? 'apreciere' : 'aprecieri'}</span></span>
         </button>
         <button type="button" class="post-action" onClick={toggleComments} aria-expanded={showComments()}>
           <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.5 9.5 9.5 0 0 1-4-.9L3 21l1.5-4.2A8.5 8.5 0 1 1 21 11.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
-          {commentsCount()} {commentsCount() === 1 ? 'comentariu' : 'comentarii'}
+          <span>{commentsCount()} <span class="post-action-word">{commentsCount() === 1 ? 'comentariu' : 'comentarii'}</span></span>
+        </button>
+        <button
+          type="button"
+          class={`post-action ${saved() ? 'is-saved' : ''}`}
+          onClick={handleSave}
+          disabled={savePending()}
+          aria-pressed={saved()}
+          aria-label={saved() ? 'Elimină postarea din salvate' : 'Salvează postarea'}
+          title={saved() ? 'Elimină din salvate' : 'Salvează'}
+        >
+          <svg width="19" height="19" viewBox="0 0 24 24" fill={saved() ? 'currentColor' : 'none'} aria-hidden="true">
+            <path d="M6 4.8A1.8 1.8 0 0 1 7.8 3h8.4A1.8 1.8 0 0 1 18 4.8V21l-6-3.8L6 21V4.8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+          </svg>
+          <span class="post-save-label">{saved() ? 'Salvată' : 'Salvează'}</span>
         </button>
       </div>
 

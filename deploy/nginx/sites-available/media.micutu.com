@@ -61,7 +61,7 @@ server {
 
     # Private application routes must not enter a search index. Serve the SPA
     # directly so the route keeps this response policy.
-    location ~ ^/(login|register|forgot-password|search|profile/[^/]+)/?$ {
+    location ~ ^/(login|register|forgot-password|search|salvate|profile/[^/]+)/?$ {
         try_files /index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
