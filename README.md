@@ -28,7 +28,7 @@ Browser
 - Frontend: Solid.js single-page application built with Vite
 - API: Rust with Axum
 - Data: MySQL
-- Authentication: JWT-backed `__Host-` HttpOnly cookie sessions and bcrypt password hashes
+- Authentication: hashed, revocable server-side sessions in a `__Host-` HttpOnly cookie and bcrypt password hashes
 - Email: SMTP for verification and password-reset messages
 - Edge and origin: Cloudflare Tunnel, Nginx, and a systemd-managed API process
 
@@ -38,7 +38,7 @@ Browser
 backend/
   Cargo.toml / Cargo.lock # Rust manifest and locked dependency graph
   src/                  # Axum application source
-  migrations/           # recovered SQL migration history
+  migrations/           # embedded, versioned MySQL migrations
   .env                  # local production secrets; never committed
   .env.example          # safe variable-name and development-value template
   social-media-backend  # generated executable; never committed
@@ -62,9 +62,10 @@ Generated artifacts and runtime data must stay out of Git.
 
 The next project goals are:
 
-1. Replace stateless JWT cookies with opaque, revocable server-side sessions and
-   add session/device management.
-2. Replace startup DDL with versioned migrations and add integration/browser CI.
+1. Add session/device management, idle expiry, login alerts, and stronger
+   reauthentication for high-risk account changes.
+2. Add database integration tests, browser CI, migration checks, and automated
+   release/rollback workflows around the deployed versioned migrations.
 3. Complete upload decode/re-encode, metadata stripping, quotas, and scheduled
    cleanup for abandoned uploads.
 4. Add metrics, alerts, retention policy, and restore drills around the deployed
@@ -82,7 +83,8 @@ and planned product work.
 
 Runtime configuration is supplied through environment variables. The current
 deployment uses values for the application URLs, allowed CORS origin, database,
-JWT signing secret, SMTP, and server binding.
+SMTP, environment, and loopback server binding. Authentication tokens are random
+opaque values; no signing secret or browser-readable credential is used.
 
 - Never commit `.env` files, credentials, tokens, database dumps, private keys,
   email-provider secrets, or real user uploads.

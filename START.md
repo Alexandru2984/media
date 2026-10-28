@@ -1,170 +1,101 @@
-# 🚀 Ghid Rapid de Pornire
+# Ghid rapid de dezvoltare
 
-## Stack Tehnologic
+## Stack
 
-### Backend (Rust)
-- **Framework**: Axum 0.7 (framework web modern de la echipa Tokio)
-- **Database**: SQLite cu SQLx (async database driver)
-- **Auth**: JWT cu jsonwebtoken + bcrypt pentru parole
-- **CORS**: tower-http pentru cross-origin requests
+- Backend: Rust, Axum 0.7, SQLx 0.9 și MySQL
+- Frontend: Solid.js, Vite și routerul Solid
+- Autentificare: sesiuni opace revocabile, cookie HttpOnly și parole bcrypt
+- Producție: Cloudflare Tunnel, Nginx și serviciu systemd izolat
 
-### Frontend (JavaScript)
-- **Framework**: Solid.js (framework reactiv similar cu React dar mai rapid)
-- **Build Tool**: Vite
-- **Routing**: @solidjs/router
-- **State Management**: Signals (built-in în Solid.js)
+## Configurare locală
 
-## Pornire Rapidă
+1. Creează o bază MySQL goală și un utilizator dedicat.
+2. Copiază `backend/.env.example` în `backend/.env` și înlocuiește toate
+   valorile demonstrative. Nu copia secretele de producție.
+3. Păstrează backendul și frontendul pe loopback. Configurația Vite face proxy
+   pentru `/api` și `/uploads` către API.
 
-### 1. Backend (Terminal 1)
+Backend:
 
 ```bash
-cd backend
-cargo run
+cargo run --manifest-path backend/Cargo.toml
 ```
 
-Serverul va rula pe: **http://localhost:8080**
+La pornire, SQLx aplică migrațiile versionate din `backend/migrations` și API-ul
+ascultă implicit pe `http://127.0.0.1:8083`.
 
-Primul build va dura câteva minute pentru a descărca și compila dependențele.
-
-### 2. Frontend (Terminal 2)
+Frontend, din alt terminal:
 
 ```bash
 cd frontend
+npm ci
 npm run dev
 ```
 
-Aplicația va rula pe: **http://localhost:3000**
+Vite ascultă strict pe `http://127.0.0.1:3005`.
 
-## API Endpoints
+## Verificări înainte de commit
 
-Toate endpoint-urile încep cu `/api`:
+```bash
+cargo fmt --check --manifest-path backend/Cargo.toml
+cargo clippy --locked --manifest-path backend/Cargo.toml --all-targets -- -D warnings
+cargo test --locked --manifest-path backend/Cargo.toml
+cargo audit --file backend/Cargo.lock
+cd frontend
+npm audit --audit-level=low
+npm run build
+```
 
-### Autentificare
-- `POST /api/auth/register` - Înregistrare
-  ```json
-  {
-    "username": "john",
-    "email": "john@example.com",
-    "password": "secret123",
-    "bio": "Hello world!" (opțional)
-  }
-  ```
-
-- `POST /api/auth/login` - Login
-  ```json
-  {
-    "email": "john@example.com",
-    "password": "secret123"
-  }
-  ```
-
-### Postări
-- `GET /api/posts?limit=10&offset=0` - Lista postări (necesită autentificare)
-- `POST /api/posts` - Creează postare (necesită autentificare)
-  ```json
-  {
-    "content": "Prima mea postare!",
-    "image_url": "https://..." (opțional)
-  }
-  ```
-- `POST /api/posts/:id/like` - Like/Unlike (necesită autentificare)
-
-### Comentarii
-- `GET /api/posts/:id/comments` - Obține comentarii
-- `POST /api/posts/:id/comments` - Adaugă comentariu
-  ```json
-  {
-    "content": "Comentariu frumos!"
-  }
-  ```
-
-### Utilizatori
-- `GET /api/users/:id` - Profilul unui utilizator
+Outputul frontend este generat în `frontend/dist` și nu se comite.
 
 ## Autentificare
 
-Backend-ul folosește **JWT (JSON Web Tokens)**. După login/register, primești un token care trebuie trimis în header:
+Loginul și înregistrarea setează cookie-ul de sesiune. În producție acesta se
+numește `__Host-media_session` și are `Secure`, `HttpOnly`, `SameSite=Strict`,
+`Path=/` și expirare absolută de șapte zile. Browserul îl trimite automat;
+aplicația nu acceptă `Authorization: Bearer` și nu păstrează credentiale în
+`localStorage`.
 
+În baza de date se stochează numai hashul SHA-256 al tokenului aleator. Logoutul
+revocă sesiunea curentă. Schimbarea sau resetarea parolei și confirmarea unei noi
+adrese de email revocă sesiunile existente.
+
+Requesturile nesigure (`POST`, `PUT`, `DELETE`) trebuie să aibă exact originea
+configurată în `CORS_ORIGIN`. Clienții de dezvoltare trebuie să folosească proxy-ul
+Vite sau să trimită originea locală configurată.
+
+## Endpointuri principale
+
+- `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `POST /api/auth/forgot-password`, `POST /api/auth/reset-password`
+- `GET /api/posts`, `POST /api/posts`, `PUT|DELETE /api/posts/:id`
+- `POST /api/posts/:id/like`
+- `GET|POST /api/posts/:id/comments`, `PUT|DELETE /api/comments/:id`
+- `GET /api/search?q=...`
+- `GET /api/users/:id`, `PUT /api/users/me/profile`
+- `POST /api/users/me/avatar`, `POST /api/posts/upload-image`
+- `GET|POST /api/messages`
+- `GET /api/health/live`, `GET /api/health/ready`
+
+Parolele trebuie să aibă minimum 12 caractere și maximum 72 de octeți.
+Conținutul și uploadurile au limite validate din nou în backend.
+
+## Structură
+
+```text
+backend/
+  migrations/  migrații MySQL încorporate în binar
+  src/         API, autentificare, email, validare și securitate
+frontend/
+  app/src/     componentele și paginile Solid.js
+  public/      icon, manifest, robots și sitemap
+  dist/        output generat și ignorat de Git
+deploy/
+  nginx/       vhost și politici de securitate/rate limiting
+  systemd/     unitatea izolată a API-ului
+docs/          auditul viu și roadmapul
 ```
-Authorization: Bearer <token>
-```
 
-Token-ul este valid 7 zile și este stocat automat în localStorage de către frontend.
-
-## Structura Proiectului
-
-```
-social-media-app/
-├── backend/               # Rust + Axum
-│   ├── src/
-│   │   ├── main.rs       # Entry point, setup server
-│   │   ├── routes.rs     # API routes
-│   │   ├── handlers.rs   # Request handlers
-│   │   ├── models.rs     # Data models
-│   │   ├── database.rs   # Database connection
-│   │   └── auth.rs       # JWT logic
-│   ├── migrations/       # SQL migrations
-│   └── Cargo.toml        # Rust dependencies
-│
-└── frontend/             # Solid.js + Vite
-    ├── src/
-    │   ├── index.jsx     # Entry point, routing
-    │   ├── api.js        # API client
-    │   ├── AuthContext.jsx  # Auth state management
-    │   ├── components/   # UI components
-    │   │   ├── Navbar.jsx
-    │   │   ├── PostCard.jsx
-    │   │   └── CreatePost.jsx
-    │   └── pages/        # Page components
-    │       ├── Home.jsx
-    │       ├── Login.jsx
-    │       └── Register.jsx
-    ├── index.html
-    ├── vite.config.js
-    └── package.json
-
-```
-
-## Funcționalități
-
-✅ Înregistrare și autentificare utilizatori
-✅ Creare postări
-✅ Like/Unlike postări
-✅ Comentarii la postări
-✅ Feed cu toate postările
-✅ Profile utilizatori
-✅ Interface modernă și responsive
-
-## De Reținut
-
-1. **Backend pornește pe portul 8080** și acceptă request-uri de la orice origine (CORS permissive)
-2. **Frontend pornește pe portul 3000** și face request-uri către backend
-3. **Baza de date SQLite** se creează automat la primul run (`social_media.db`)
-4. **JWT secret** trebuie schimbat în producție (vezi `backend/src/auth.rs`)
-
-## Depanare
-
-### Backend nu pornește?
-- Verifică că ai Rust instalat: `rustc --version`
-- Instalează Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-
-### Frontend nu pornește?
-- Verifică că ai Node.js instalat: `node --version`
-- Rulează: `npm install` în directorul frontend
-
-### Erori CORS?
-- Verifică că backend-ul rulează pe port 8080
-- Verifică că frontend-ul face request-uri la `http://localhost:8080`
-
-## Next Steps
-
-Funcționalități care pot fi adăugate:
-- 📸 Upload imagini (cu multer sau similar)
-- 👥 Sistem de follow/unfollow
-- 🔔 Notificări în timp real (WebSockets)
-- 🔍 Căutare utilizatori și postări
-- ✏️ Edit/Delete pentru postări proprii
-- 📱 Avatar upload pentru profile
-- 🌙 Dark mode
-- ♾️ Infinite scroll pentru feed
+Pentru producție și rollback folosește [DEPLOYMENT.md](DEPLOYMENT.md), nu serverul
+Vite și nu un binar pornit manual.

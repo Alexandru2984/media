@@ -6,7 +6,7 @@
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
-**Verdict:** 🟠 Core containment is deployed; revocable sessions, migrations, image re-encoding, alerting, and recovery work remain
+**Verdict:** 🟠 Core containment, revocable sessions, and versioned migrations are deployed; image re-encoding, authorization coverage, alerting, and recovery work remain
 
 ## Scope and limitations
 
@@ -18,12 +18,12 @@ Only low-volume, non-destructive public requests were made.
 The legacy source and history were recovered on 2026-10-28, sanitized to remove
 real user uploads, and merged with the hardened deployment repository. A Rust
 lockfile and minimal unit tests now exist, and the backend was rebuilt and
-deployed from the tracked source. Authenticated test accounts and a staging
-environment remain absent, so IDOR, privilege boundaries, message privacy, and
-destructive actions are not yet safely covered end to end. Authenticated upload
-validation and account-recovery rejection paths were exercised with low-impact
-canaries, but not with a disposable full user journey. No evidence of compromise
-was found, but absence of evidence is not evidence of absence.
+deployed from the tracked source. A disposable account exercised login, session
+lookup, logout, revoked-cookie rejection, and cleanup against a canary process;
+the production database returned to zero users and sessions afterward. A staging
+environment remains absent, so IDOR, privilege boundaries, message privacy, and
+destructive actions are not yet safely covered end to end. No evidence of
+compromise was found, but absence of evidence is not evidence of absence.
 
 ## Executive summary
 
@@ -32,8 +32,9 @@ bind locally, the database account is not root, dotfiles are denied, SQLx bound
 queries are visible in the binary, passwords use bcrypt, secrets are not short
 placeholders, and core tables have foreign keys and uniqueness constraints.
 
-Browser sessions now use hardened cookies but remain stateless JWTs without
-server-side revocation. Follow-up containment on 2026-10-28
+Browser sessions now use hashed opaque server-side credentials with expiry,
+activity tracking, and revocation; JWT and bearer-token support were removed.
+Follow-up containment on 2026-10-28
 recovered and sanitized the source history, replaced a publicly known hard-coded
 JWT key, eliminated all known RustSec and npm audit findings, blocked direct-origin
 access, added layered edge limits, restricted CORS, stopped access logging on
@@ -43,12 +44,12 @@ generic recovery responses, email configuration, and email-change verification
 were also repaired. Browser-readable session storage was removed, unsafe API
 methods now require the exact configured origin, one-time tokens are hashed at
 rest, input boundaries are enforced server-side, engagement writes are
-transactional, and feed N+1 queries were collapsed. Revocable server-side
-sessions, centralized authorization tests, versioned migrations, image
-re-encoding, metrics/alerting, and tested recovery remain open. One-time links
-now keep secrets in URL fragments, scrub them from browser history, and exchange
-them through POST bodies. API requests emit redacted JSON events with request
-IDs, status, path, and latency.
+transactional, and feed N+1 queries were collapsed. Embedded versioned MySQL
+migrations now replace startup DDL. Centralized authorization tests, session
+device management, image re-encoding, metrics/alerting, and tested recovery remain
+open. One-time links now keep secrets in URL fragments, scrub them from browser
+history, and exchange them through POST bodies. API requests emit redacted JSON
+events with request IDs, status, path, and latency.
 
 ## Findings
 
@@ -76,17 +77,16 @@ Require locked builds, checksums, an SBOM, migrations, and a rollback artifact.
 
 #### SEC-001A — JWTs used a public hard-coded signing key
 
-**Status (2026-10-28): critical issue mitigated and deployed.** Recovered source
+**Status (2026-10-28): retired and deployed.** Recovered source
 revealed that `JWT_SECRET` was ignored and every token used the literal example
 key `your-secret-key-here-change-in-production`. A non-destructive token for an
-inexistent UUID proved that the live backend accepted that key. The backend now
-requires a configured secret of at least 32 bytes, validates it at startup, pins
-HS256 explicitly, and uses the production environment secret. The old key now
-returns `401`; previous sessions were invalidated by the rotation.
+inexistent UUID proved that the live backend accepted that key. An intermediate
+release corrected secret handling and rotated the key. The final remediation
+removed JWT creation, validation, bearer-token routes, the dependency, and
+frontend `localStorage` credentials. The retired migration endpoint returns `404`.
 
-**Follow-up:** migrate to revocable server-side sessions, add key versioning and
-rotation procedures, alert on invalid-token spikes, and review logs and account
-activity for evidence of forged-session use.
+**Follow-up:** add session anomaly alerts and review logs and account activity for
+evidence of forged-session use before the retirement.
 
 ### High
 
@@ -111,9 +111,9 @@ PEM dependency branches. The unmaintained `dotenv` crate was replaced by
 | `sqlx` | 0.7.4 | RUSTSEC-2024-0363 | Binary protocol integer cast issue; fixed in 0.8.1+ |
 | `webpki-roots` | 0.25.4 | RUSTSEC-2026-0381 | Bundled trust store includes distrusted intermediates |
 
-The locked graph dropped from 296 to 265 packages. `cargo clippy --all-targets
+The locked graph dropped from 296 to 242 packages. `cargo clippy --all-targets
 -- -D warnings`, unit tests, a release build, and `cargo audit` all pass. The
-candidate connected to the production database and passed API, JWT, CORS, and
+candidate connected to the production database and passed API, session, CORS, and
 upload-serving smoke tests before atomic deployment. RustSec reported no known
 vulnerabilities or maintenance warnings in the deployed lockfile.
 
@@ -123,29 +123,29 @@ ever moves off loopback or changes authentication method.
 
 #### SEC-003 — XSS can become immediate account takeover
 
-**Status (2026-10-28): browser token exposure mitigated; CSP and revocation work remains.** The
-site-specific CSP now denies objects, base URL changes, foreign form actions,
-inline event-handler attributes, and inline style elements. Cloudflare injects a
-dynamic inline challenge script at the edge, so `script-src 'unsafe-inline'`
-cannot yet be removed without changing that Cloudflare feature. The compiled app
-also relies heavily on inline style attributes.
+**Status (2026-10-28): browser token exposure and session replay mitigated; CSP
+work remains.** The site-specific CSP now denies objects, base URL changes,
+foreign form actions, inline event-handler attributes, and inline style elements.
+Cloudflare injects a dynamic inline challenge script at the edge, so `script-src
+'unsafe-inline'` cannot yet be removed without changing that Cloudflare feature.
+The compiled app also relies heavily on inline style attributes.
 
 - New sessions use a `__Host-media_session` cookie with `Secure`, `HttpOnly`,
   `SameSite=Strict`, and host-only scope. Login/register responses no longer copy
   the credential into JSON.
-- The frontend performs a one-time migration for legacy `localStorage` bearer
-  tokens and immediately removes them after exchanging for the cookie.
+- The frontend deletes any legacy `localStorage` token and never reads or sends
+  bearer credentials; the backend no longer accepts them.
 - Unsafe API methods require the exact configured `Origin`, mitigating cookie-
   based CSRF including untrusted sibling sites.
 - The CSP still permits inline scripts and style attributes for the compatibility
   constraints above.
-- The cookie still carries a stateless JWT, so individual session revocation,
-  device inventory, idle timeout, and remote logout are not available.
+- Only a SHA-256 digest of each high-entropy token is stored. Logout revokes the
+  current session; password and verified-email changes revoke all sessions.
+- Device inventory, idle timeout, and remote logout are not yet available.
 
-**Remediation:** replace browser-readable bearer tokens with an opaque server-side
-session in a `__Host-` prefixed `Secure; HttpOnly; SameSite` cookie. Add CSRF
-protection, rotation, revocation, idle/absolute expiry, and a session-management
-screen. Remove inline code/styles and deploy a nonce- or hash-based CSP.
+**Remediation:** add synchronizer CSRF tokens, idle expiry, a session-management
+screen, and anomaly alerts. Remove inline code/styles and deploy a nonce- or
+hash-based CSP.
 
 #### SEC-004 — Cloudflare can be bypassed and auth abuse is not throttled
 
@@ -238,7 +238,8 @@ cookieless media origin with strict content headers.
 
 #### SEC-008 — Authentication controls are below a safe baseline
 
-**Status (2026-10-28): password, recovery, cookie, and CSRF baseline improved; revocation remains open.**
+**Status (2026-10-28): password, recovery, cookie, CSRF-origin, and revocation
+baseline improved.**
 
 - Registration, password change, and reset now enforce 12 characters minimum and
   72 bytes maximum in both backend and frontend, avoiding bcrypt truncation.
@@ -247,14 +248,14 @@ cookieless media origin with strict content headers.
 - Login and reauthentication inputs are bounded before bcrypt verification.
 - New browser sessions are script-inaccessible, and unsafe requests require the
   exact production origin.
-- No MFA/passkeys, server-side session revocation, recovery codes, breached-
-  password check, security event history, or login alert was observed.
-- JWT claims remain minimal and lack issuer, audience, token ID, rotation, and
-  revocation.
+- Server-side logout revocation is deployed; password and verified-email changes
+  revoke every active session and password change rotates into a fresh session.
+- No MFA/passkeys, recovery codes, breached-password check, security event
+  history, device inventory, remote logout, or login alert was observed.
 
 **Remediation:** adopt modern password guidance, Argon2id for new hashes with
 transparent migration, email verification gates, optional passkeys/TOTP, hashed
-recovery codes, server-side sessions, reauthentication for risk events, and
+recovery codes, device/session management, reauthentication for risk events, and
 generic auth/recovery responses.
 
 #### SEC-009 — Detection, response, and recovery are not demonstrated
@@ -302,16 +303,18 @@ reflected arbitrary origin with credentials.
 
 #### SEC-012 — Database schema is mutated at application startup
 
-The binary contains `CREATE TABLE IF NOT EXISTS` and index statements instead of
-versioned migrations. This hides drift, prevents reliable rollback, and couples
-application startup to DDL privileges.
+**Status (2026-10-28): mitigated with versioned migrations.** SQLx embeds and
+records forward-only MySQL migrations in `_sqlx_migrations`; the recovered SQLite
+artifact is explicitly disabled. Baseline and session migrations were applied
+twice to an isolated schema, then through a production canary after a checksummed
+root-only database dump. The application still owns migration privileges.
 
-**Remediation:** add forward-only reviewed migrations, schema versioning, a
-separate migration role/job, transaction-safe data changes, and restore tests.
+**Follow-up:** move production migration privileges into a separate role/job, add
+schema-drift CI and migration rollback/restore drills.
 
 #### SEC-013 — Insecure configuration fallbacks are embedded
 
-**Status (2026-10-28): mitigated for security-sensitive production configuration.** JWT,
+**Status (2026-10-28): mitigated for security-sensitive production configuration.**
 CORS, database, environment, SMTP credentials/sender, and application URLs now
 fail closed or are validated at startup. Production application URLs require
 HTTPS, database configuration has no embedded credential fallback, and SMTP
@@ -379,7 +382,7 @@ messages; keep detailed causes only in redacted server logs.
 ### Threat model (STRIDE)
 
 1. **Spoofing / elevation of privilege — medium likelihood, high impact:**
-   stateless session replay, credential stuffing, or an untested authorization bypass.
+   credential stuffing, stolen opaque-session replay, or an untested authorization bypass.
 2. **Information disclosure / tampering — medium likelihood, high impact:**
    unsafe upload handling, token leakage, IDOR, or a compromised unsandboxed API.
 3. **Denial of service — high likelihood, medium impact:** expensive bcrypt,
@@ -388,7 +391,7 @@ messages; keep detailed causes only in redacted server logs.
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
-profile data, media, one-time tokens, the JWT signing secret, SMTP credentials,
+profile data, media, one-time tokens, active session hashes, SMTP credentials,
 and database credentials available to the application could be exposed or
 modified. The user count and revenue impact were not available, so a defensible
 FAIR annualized-loss estimate cannot yet be produced. Inventory user count,
@@ -428,12 +431,11 @@ DPAs, retention, regions, and last security review are unknown.
 
 ## Exit criteria for the P0 gate
 
-- Source and a locked backend build are recoverable from a clean checkout;
-  frontend release reproduction remains open.
+- Source and locked backend/frontend builds are recoverable from a clean checkout.
 - Critical dependencies are upgraded and `cargo audit` has no unaccepted finding.
 - Origin bypass, wildcard CORS, auth abuse, and upload permissions are fixed.
-- Cookie-session migration, CSRF origin enforcement, and token-log containment
-  are deployed; server-side revocation remains open.
+- Opaque cookie sessions, CSRF origin enforcement, token-log containment, and
+  server-side revocation are deployed; device management remains open.
 - systemd sandbox score is materially reduced without breaking required I/O.
 - Health checks, alerts, backup restore, rollback, and incident ownership work.
 - Authz/IDOR, recovery, upload, and data lifecycle tests pass on staging.

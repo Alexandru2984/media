@@ -43,18 +43,19 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-28: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 26 unit
-tests, a validated canary flow, and deployed rollback artifacts. The frontend has
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 25 unit
+tests, embedded versioned MySQL migrations, a validated canary flow, and deployed
+rollback artifacts. The frontend has
 a locked dependency graph with zero npm audit findings and builds from a source
 directory into an ignored release output served outside the repository. Broader
-integration/browser tests, CI, staging, versioned live migrations, provenance,
-and release automation remain open.
+integration/browser tests, CI, staging, a separate least-privilege migration job,
+provenance, and release automation remain open.
 
 1. Recover the original Git history or reconstruct the backend and frontend.
 2. Restore Rust manifests and lockfile; use a supported Rust toolchain.
 3. Restore the frontend manifest and lockfile with a documented framework.
-4. Replace startup DDL with reviewed SQL migrations and a least-privilege
-   migration role.
+4. Replace startup DDL with reviewed SQL migrations. ✅ Separate migration
+   execution into a least-privilege role/job.
 5. Add unit, integration, contract, browser, accessibility, and security tests.
 6. Add CI gates: format, lint, test, migration check, dependency audit, secret
    scan, SAST, SBOM, license policy, and reproducible release build.
@@ -66,17 +67,20 @@ and release automation remain open.
 
 ### Identity and sessions
 
-**Progress (2026-10-28):** new browser sessions use a hardened `__Host-`
-HttpOnly cookie, legacy browser-readable tokens are migrated and cleared, auth
-responses no longer expose credentials, unsafe methods enforce the exact
-configured origin, password inputs are bounded, and new one-time tokens are
-hashed and consumed atomically. Recovery links use non-transmitted URL fragments,
-remove secrets from history, and exchange through POST. Opaque server-side
-storage, revocation, device management, and MFA remain open.
+**Progress (2026-10-28):** browser sessions are random opaque values whose hashes
+are stored server-side with absolute expiry, activity timestamps, and revocation.
+They use a hardened `__Host-` HttpOnly cookie; JWT and browser-readable credential
+support have been removed. Logout revokes the current session, while password
+reset/change and verified email changes revoke every session. Unsafe methods
+enforce the exact configured origin. Recovery links use non-transmitted URL
+fragments, scrub browser history, and exchange through POST. Device management,
+idle expiry, security event history, MFA, and explicit synchronizer CSRF tokens
+remain open.
 
-- Opaque server-side sessions in `__Host-` HttpOnly cookies.
-- CSRF tokens, origin checks, session rotation, idle/absolute timeouts, and
-  revocation on password or email change.
+- Opaque server-side sessions in `__Host-` HttpOnly cookies. ✅
+- Origin checks, absolute timeout, password-change rotation, and revocation on
+  password reset or verified email change. ✅
+- Synchronizer CSRF tokens and idle expiry.
 - Session/device dashboard with remote logout and security event history.
 - Passkeys/WebAuthn, optional TOTP, hashed recovery codes, and login alerts.
 - Strong password policy, breached-password screening, Argon2id migration, and
