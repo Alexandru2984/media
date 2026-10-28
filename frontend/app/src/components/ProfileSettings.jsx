@@ -2,6 +2,7 @@ import { createSignal, Show, createMemo } from 'solid-js';
 import { api } from '../api';
 import { useTheme } from '../ThemeContext';
 import { useAuth } from '../AuthContext';
+import { getPasswordPolicyError } from '../utils/passwords';
 
 export default function ProfileSettings(props) {
   const { theme } = useTheme();
@@ -228,8 +229,9 @@ export default function ProfileSettings(props) {
       return;
     }
 
-    if (newPassword().length < 6) {
-      showMessage('error', 'Parola trebuie să aibă minim 6 caractere');
+    const passwordError = getPasswordPolicyError(newPassword());
+    if (passwordError) {
+      showMessage('error', passwordError);
       return;
     }
 
@@ -368,11 +370,13 @@ export default function ProfileSettings(props) {
                     value={newPassword()}
                     onInput={(e) => setNewPassword(e.target.value)}
                     required
-                    minLength="6"
-                    placeholder="Minim 6 caractere"
+                    minLength="12"
+                    maxLength="72"
+                    autocomplete="new-password"
+                    placeholder="Cel puțin 12 caractere"
                   />
                   <div style={styles().hint}>
-                    Minim 6 caractere
+                    Între 12 și 72 de caractere
                   </div>
                 </div>
 
@@ -384,6 +388,9 @@ export default function ProfileSettings(props) {
                     value={confirmPassword()}
                     onInput={(e) => setConfirmPassword(e.target.value)}
                     required
+                    minLength="12"
+                    maxLength="72"
+                    autocomplete="new-password"
                     placeholder="Repetă parola nouă"
                   />
                 </div>

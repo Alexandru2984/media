@@ -1,6 +1,7 @@
 import { createSignal, onMount } from 'solid-js';
 import { useNavigate, useSearchParams } from '@solidjs/router';
 import { api } from '../api';
+import { getPasswordPolicyError } from '../utils/passwords';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -20,8 +21,9 @@ export default function ResetPassword() {
       return;
     }
 
-    if (password().length < 6) {
-      setError('Parola trebuie să aibă minimum 6 caractere');
+    const passwordError = getPasswordPolicyError(password());
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -152,6 +154,9 @@ export default function ResetPassword() {
                 value={password()}
                 onInput={(e) => setPassword(e.target.value)}
                 required
+                minLength="12"
+                maxLength="72"
+                autocomplete="new-password"
                 style={styles.input}
               />
 
@@ -161,6 +166,9 @@ export default function ResetPassword() {
                 value={confirmPassword()}
                 onInput={(e) => setConfirmPassword(e.target.value)}
                 required
+                minLength="12"
+                maxLength="72"
+                autocomplete="new-password"
                 style={styles.input}
               />
 

@@ -5,6 +5,7 @@ mod handlers;
 mod models;
 mod routes;
 mod uploads;
+mod validation;
 
 use axum::http::{header, HeaderValue, Method};
 use std::net::{IpAddr, SocketAddr};

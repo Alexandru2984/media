@@ -2,6 +2,7 @@ import { A, useNavigate } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
+import { getPasswordPolicyError } from '../utils/passwords';
 
 export default function Register() {
   const [username, setUsername] = createSignal('');
@@ -17,8 +18,9 @@ export default function Register() {
     event.preventDefault();
     setError('');
 
-    if (password().length < 6) {
-      setError('Parola trebuie să conțină cel puțin 6 caractere.');
+    const passwordError = getPasswordPolicyError(password());
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -97,10 +99,11 @@ export default function Register() {
                   onInput={(event) => setPassword(event.currentTarget.value)}
                   autocomplete="new-password"
                   placeholder="Alege o parolă"
-                  minlength="6"
+                  minlength="12"
+                  maxlength="72"
                   required
                 />
-                <p class="password-hint">Folosește cel puțin 6 caractere și evită parolele reutilizate.</p>
+                <p class="password-hint">Folosește 12–72 de caractere și evită parolele reutilizate.</p>
               </div>
 
               <div>

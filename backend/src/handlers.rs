@@ -15,6 +15,7 @@ use crate::{
     email::EmailService,
     models::*,
     uploads::validated_image_extension,
+    validation::password_is_valid,
 };
 use rand::Rng;
 
@@ -23,6 +24,10 @@ pub async fn register(
     State(pool): State<MySqlPool>,
     Json(payload): Json<CreateUser>,
 ) -> Result<Json<Value>, StatusCode> {
+    if !password_is_valid(&payload.password) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let user_id = Uuid::new_v4().to_string();
     let password_hash =
         hash(&payload.password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -507,6 +512,10 @@ pub async fn change_password(
     Json(payload): Json<ChangePassword>,
 ) -> Result<Json<Value>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
+
+    if !password_is_valid(&payload.new_password) || payload.old_password == payload.new_password {
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     // Get current user
     let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
@@ -1242,6 +1251,10 @@ pub async fn reset_password(
 ) -> Result<Json<Value>, StatusCode> {
     let token = payload.get("token").ok_or(StatusCode::BAD_REQUEST)?;
     let new_password = payload.get("password").ok_or(StatusCode::BAD_REQUEST)?;
+
+    if !password_is_valid(new_password) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     // Find token
     let token_record: (String, String, chrono::DateTime<Utc>) = query_as(
