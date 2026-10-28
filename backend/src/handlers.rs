@@ -212,7 +212,6 @@ pub async fn register(
             authenticated_response(
                 &token,
                 json!({
-                    "token": token,
                     "user": {
                         "id": user_id,
                         "username": username,
@@ -253,7 +252,6 @@ pub async fn login(
                 authenticated_response(
                     &token,
                     json!({
-                        "token": token,
                         "user": {
                             "id": user.id,
                             "username": user.username,
