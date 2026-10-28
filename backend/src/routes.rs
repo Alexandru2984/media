@@ -17,7 +17,6 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         // Auth routes
         .route("/auth/register", post(handlers::register))
         .route("/auth/login", post(handlers::login))
-        .route("/auth/session", post(handlers::create_session))
         .route("/auth/logout", post(handlers::logout))
         .route("/auth/me", get(handlers::me))
         .route(

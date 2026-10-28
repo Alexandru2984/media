@@ -7,22 +7,11 @@ export function AuthProvider(props) {
   const [user, setUser] = createSignal(null);
   const [loading, setLoading] = createSignal(true);
 
-  // Migrate old browser-readable bearer tokens once, then rely on HttpOnly cookies.
   onMount(async () => {
-    const legacyToken = localStorage.getItem('token');
     try {
-      if (legacyToken) {
-        api.setToken(legacyToken);
-        const data = await api.migrateSession();
-        setUser(data.user);
-        api.clearToken();
-      } else {
-        const userData = await api.getCurrentUser();
-        setUser(userData);
-      }
-    } catch (error) {
-      api.clearToken();
-    }
+      const userData = await api.getCurrentUser();
+      setUser(userData);
+    } catch {}
     setLoading(false);
   });
 

@@ -29,7 +29,7 @@ async fn main() {
         .with_target(false)
         .init();
 
-    auth::validate_configuration().expect("Invalid JWT configuration");
+    auth::validate_configuration().expect("Invalid authentication configuration");
     email::validate_configuration().expect("Invalid email configuration");
 
     let server_host: IpAddr = std::env::var("SERVER_HOST")

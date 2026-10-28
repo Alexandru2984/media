@@ -11,7 +11,10 @@ use std::{collections::HashMap, path::Path as FileSystemPath};
 use uuid::Uuid;
 
 use crate::{
-    auth::{clear_session_cookie, create_jwt, get_user_id_from_headers, session_cookie},
+    auth::{
+        clear_session_cookie, get_user_id_from_headers, issue_session, revoke_current_session,
+        session_cookie,
+    },
     email::EmailService,
     models::*,
     tokens::{generate_one_time_token, hash_one_time_token},
@@ -207,8 +210,9 @@ pub async fn register(
                 }
             });
 
-            let token =
-                create_jwt(user_id.clone()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let token = issue_session(&pool, &user_id)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
             authenticated_response(
                 &token,
@@ -247,8 +251,9 @@ pub async fn login(
                 .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
             if is_valid {
-                let token =
-                    create_jwt(user.id.clone()).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                let token = issue_session(&pool, &user.id)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
                 authenticated_response(
                     &token,
@@ -275,7 +280,7 @@ pub async fn me(
     State(pool): State<MySqlPool>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
 
     let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
         .bind(&user_id)
@@ -293,34 +298,13 @@ pub async fn me(
     })))
 }
 
-pub async fn create_session(
+pub async fn logout(
     State(pool): State<MySqlPool>,
     headers: HeaderMap,
 ) -> Result<(HeaderMap, Json<Value>), StatusCode> {
-    let user_id = get_current_user(&headers).await?;
-    let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
-        .bind(&user_id)
-        .fetch_optional(&pool)
+    revoke_current_session(&pool, &headers)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-    let token = create_jwt(user_id).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    authenticated_response(
-        &token,
-        json!({
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "bio": user.bio,
-                "avatar_url": user.avatar_url
-            }
-        }),
-    )
-}
-
-pub async fn logout() -> Result<(HeaderMap, Json<Value>), StatusCode> {
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let mut headers = HeaderMap::new();
     headers.insert(
         header::SET_COOKIE,
@@ -330,8 +314,8 @@ pub async fn logout() -> Result<(HeaderMap, Json<Value>), StatusCode> {
 }
 
 // Helper function to extract user from token
-pub async fn get_current_user(headers: &HeaderMap) -> Result<String, StatusCode> {
-    get_user_id_from_headers(headers)
+pub async fn get_current_user(pool: &MySqlPool, headers: &HeaderMap) -> Result<String, StatusCode> {
+    get_user_id_from_headers(pool, headers).await
 }
 
 // User handlers
@@ -368,7 +352,7 @@ pub async fn create_post(
     headers: HeaderMap,
     Json(payload): Json<CreatePost>,
 ) -> Result<Json<Post>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let content = payload.content.trim();
     let image_filename_prefix = format!("post_{}_", user_id);
     if !bounded_text_is_valid(content, 1, MAXIMUM_POST_CHARACTERS)
@@ -416,7 +400,7 @@ pub async fn get_posts(
     Query(params): Query<HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
-    let current_user_id = get_current_user(&headers).await.ok();
+    let current_user_id = get_current_user(&pool, &headers).await.ok();
     let limit = params
         .get("limit")
         .and_then(|value| value.parse::<i64>().ok())
@@ -463,7 +447,7 @@ pub async fn like_post(
     Path(post_id): Path<String>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let like_id = Uuid::new_v4().to_string();
     let now = Utc::now();
     let mut transaction = pool
@@ -547,7 +531,7 @@ pub async fn create_comment(
     headers: HeaderMap,
     Json(payload): Json<CreateComment>,
 ) -> Result<Json<Comment>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let content = payload.content.trim();
     if !bounded_text_is_valid(content, 1, MAXIMUM_COMMENT_CHARACTERS) {
         return Err(StatusCode::BAD_REQUEST);
@@ -646,7 +630,7 @@ pub async fn update_profile(
     headers: HeaderMap,
     Json(payload): Json<UpdateUser>,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let now = Utc::now();
 
     if payload.username.is_none() && payload.bio.is_none() && payload.avatar_url.is_none() {
@@ -718,8 +702,8 @@ pub async fn change_password(
     State(pool): State<MySqlPool>,
     headers: HeaderMap,
     Json(payload): Json<ChangePassword>,
-) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+) -> Result<(HeaderMap, Json<Value>), StatusCode> {
+    let user_id = get_current_user(&pool, &headers).await?;
 
     if !password_is_valid(&payload.new_password)
         || !password_is_safe_to_verify(&payload.old_password)
@@ -747,18 +731,42 @@ pub async fn change_password(
     let new_password_hash =
         hash(&payload.new_password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Update password
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Change the credential and revoke every existing session atomically.
     query("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
         .bind(&new_password_hash)
         .bind(Utc::now())
         .bind(&user_id)
-        .execute(&pool)
+        .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(Json(json!({
-        "message": "Parola a fost schimbată cu succes"
-    })))
+    query("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+        .bind(Utc::now())
+        .bind(&user_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let token = issue_session(&pool, &user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    authenticated_response(
+        &token,
+        json!({
+            "message": "Parola a fost schimbată cu succes"
+        }),
+    )
 }
 
 // Change Email (send verification)
@@ -767,7 +775,7 @@ pub async fn change_email(
     headers: HeaderMap,
     Json(payload): Json<ChangeEmail>,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let new_email = payload.new_email.trim();
 
     if !email_change_address_is_valid(new_email) || !password_is_safe_to_verify(&payload.password) {
@@ -910,6 +918,13 @@ pub async fn verify_email_change(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    query("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+        .bind(Utc::now())
+        .bind(&user_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     transaction
         .commit()
         .await
@@ -926,7 +941,7 @@ pub async fn upload_avatar(
     headers: HeaderMap,
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
 
     // Get the file from multipart
     while let Some(field) = multipart
@@ -1021,10 +1036,11 @@ pub async fn upload_avatar(
 
 // Upload Post Image
 pub async fn upload_post_image(
+    State(pool): State<MySqlPool>,
     headers: HeaderMap,
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
 
     // Get the file from multipart
     while let Some(field) = multipart
@@ -1093,7 +1109,7 @@ pub async fn update_post(
     headers: HeaderMap,
     Json(payload): Json<UpdatePost>,
 ) -> Result<Json<Post>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let content = payload.content.trim();
     let image_filename_prefix = format!("post_{}_", user_id);
     if !bounded_text_is_valid(content, 1, MAXIMUM_POST_CHARACTERS)
@@ -1147,7 +1163,7 @@ pub async fn delete_post(
     Path(post_id): Path<String>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
 
     // Check ownership
     let post = query_as::<_, Post>("SELECT * FROM posts WHERE id = ?")
@@ -1180,7 +1196,7 @@ pub async fn update_comment(
     headers: HeaderMap,
     Json(payload): Json<UpdateComment>,
 ) -> Result<Json<Comment>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let content = payload.content.trim();
     if !bounded_text_is_valid(content, 1, MAXIMUM_COMMENT_CHARACTERS) {
         return Err(StatusCode::BAD_REQUEST);
@@ -1223,7 +1239,7 @@ pub async fn delete_comment(
     Path(comment_id): Path<String>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let mut transaction = pool
         .begin()
         .await
@@ -1269,7 +1285,7 @@ pub async fn send_message(
     headers: HeaderMap,
     Json(payload): Json<CreateMessage>,
 ) -> Result<Json<Message>, StatusCode> {
-    let sender_id = get_current_user(&headers).await?;
+    let sender_id = get_current_user(&pool, &headers).await?;
     let content = payload.content.trim();
     if !bounded_text_is_valid(content, 1, MAXIMUM_MESSAGE_CHARACTERS)
         || Uuid::parse_str(&payload.receiver_id).is_err()
@@ -1309,7 +1325,7 @@ pub async fn get_messages(
     Query(params): Query<HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<MessageWithUser>>, StatusCode> {
-    let user_id = get_current_user(&headers).await?;
+    let user_id = get_current_user(&pool, &headers).await?;
     let other_user_id = params.get("user_id").ok_or(StatusCode::BAD_REQUEST)?;
 
     if Uuid::parse_str(other_user_id).is_err() || other_user_id == &user_id {
@@ -1351,7 +1367,7 @@ pub async fn get_user_posts(
     Query(params): Query<HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
-    let current_user_id = get_current_user(&headers).await.ok();
+    let current_user_id = get_current_user(&pool, &headers).await.ok();
     let limit = params
         .get("limit")
         .and_then(|value| value.parse::<i64>().ok())
@@ -1400,7 +1416,7 @@ pub async fn search(
     Query(params): Query<HashMap<String, String>>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
-    let current_user_id = get_current_user(&headers).await?;
+    let current_user_id = get_current_user(&pool, &headers).await?;
     let search_term = params
         .get("q")
         .map(|value| value.trim())
@@ -1468,7 +1484,7 @@ pub async fn send_verification_email(
     State(pool): State<MySqlPool>,
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
-    let user_id = get_user_id_from_headers(&headers)?;
+    let user_id = get_user_id_from_headers(&pool, &headers).await?;
 
     // Get user info
     let user: User = query_as("SELECT * FROM users WHERE id = ?")
@@ -1675,6 +1691,13 @@ pub async fn reset_password(
 
     query("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
         .bind(&password_hash)
+        .bind(Utc::now())
+        .bind(&token_record.1)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    query("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
         .bind(Utc::now())
         .bind(&token_record.1)
         .execute(&mut *transaction)

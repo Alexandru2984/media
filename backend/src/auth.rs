@@ -1,67 +1,17 @@
+use crate::tokens::{generate_one_time_token, hash_one_time_token, ONE_TIME_TOKEN_LENGTH};
 use anyhow::{bail, Context, Result};
-use axum::http::{header, HeaderMap, HeaderValue};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use serde::{Deserialize, Serialize};
+use sqlx::{query, query_scalar, MySqlPool};
+use uuid::Uuid;
 
-const MINIMUM_JWT_SECRET_BYTES: usize = 32;
 const SESSION_MAX_AGE_SECONDS: usize = 7 * 24 * 60 * 60;
+const SESSION_ACTIVITY_WRITE_INTERVAL_MINUTES: i64 = 5;
 const PRODUCTION_COOKIE_NAME: &str = "__Host-media_session";
 const DEVELOPMENT_COOKIE_NAME: &str = "media_session";
 
-fn validate_secret(secret: String) -> Result<String> {
-    if secret.len() < MINIMUM_JWT_SECRET_BYTES {
-        bail!(
-            "JWT_SECRET must contain at least {} bytes",
-            MINIMUM_JWT_SECRET_BYTES
-        );
-    }
-
-    Ok(secret)
-}
-
-fn jwt_secret() -> Result<String> {
-    let secret = std::env::var("JWT_SECRET").context("JWT_SECRET must be configured")?;
-    validate_secret(secret)
-}
-
 pub fn validate_configuration() -> Result<()> {
-    jwt_secret().map(|_| ())
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: String, // user id
-    pub exp: usize,  // expiry time
-}
-
-impl Claims {
-    pub fn new(user_id: String) -> Self {
-        Self {
-            sub: user_id,
-            exp: (Utc::now() + Duration::days(7)).timestamp() as usize,
-        }
-    }
-}
-
-pub fn create_jwt(user_id: String) -> Result<String> {
-    let claims = Claims::new(user_id);
-    let header = Header::default();
-    let secret = jwt_secret()?;
-    let encoding_key = EncodingKey::from_secret(secret.as_bytes());
-
-    encode(&header, &claims, &encoding_key)
-        .map_err(|e| anyhow::anyhow!("Failed to create JWT: {}", e))
-}
-
-pub fn verify_jwt(token: &str) -> Result<Claims> {
-    let secret = jwt_secret()?;
-    let decoding_key = DecodingKey::from_secret(secret.as_bytes());
-    let validation = Validation::new(Algorithm::HS256);
-
-    decode::<Claims>(token, &decoding_key, &validation)
-        .map(|data| data.claims)
-        .map_err(|e| anyhow::anyhow!("Failed to verify JWT: {}", e))
+    is_production().map(|_| ())
 }
 
 fn is_production() -> Result<bool> {
@@ -102,6 +52,9 @@ fn build_clear_session_cookie(production: bool) -> String {
 }
 
 pub fn session_cookie(token: &str) -> Result<HeaderValue> {
+    if !session_token_is_valid(token) {
+        bail!("Invalid session token format");
+    }
     HeaderValue::from_str(&build_session_cookie(token, is_production()?))
         .context("Failed to build session cookie")
 }
@@ -130,43 +83,118 @@ fn cookie_token_for_name<'a>(headers: &'a HeaderMap, expected_name: &str) -> Opt
         .find_map(|(name, value)| (name == expected_name && !value.is_empty()).then_some(value))
 }
 
-use axum::http::StatusCode;
+fn session_token_is_valid(token: &str) -> bool {
+    token.len() == ONE_TIME_TOKEN_LENGTH && token.bytes().all(|byte| byte.is_ascii_alphanumeric())
+}
 
-pub fn get_user_id_from_headers(headers: &HeaderMap) -> Result<String, StatusCode> {
-    let bearer_token = headers
-        .get("Authorization")
-        .and_then(|h| h.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "));
-    let token = bearer_token
-        .or_else(|| cookie_token(headers))
-        .ok_or(StatusCode::UNAUTHORIZED)?;
+pub async fn issue_session(pool: &MySqlPool, user_id: &str) -> Result<String> {
+    let token = generate_one_time_token();
+    let token_hash = hash_one_time_token(&token);
+    let now = Utc::now();
+    let expires_at = now + Duration::seconds(SESSION_MAX_AGE_SECONDS as i64);
 
-    let claims = verify_jwt(token).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    Ok(claims.sub)
+    query(
+        "INSERT INTO sessions
+            (id, user_id, token_hash, created_at, last_seen_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?)",
+    )
+    .bind(Uuid::new_v4().to_string())
+    .bind(user_id)
+    .bind(token_hash)
+    .bind(now)
+    .bind(now)
+    .bind(expires_at)
+    .execute(pool)
+    .await
+    .context("Failed to create session")?;
+
+    let cleanup_before = now - Duration::days(1);
+    if let Err(error) = query(
+        "DELETE FROM sessions
+         WHERE expires_at <= ? OR (revoked_at IS NOT NULL AND revoked_at <= ?)
+         LIMIT 100",
+    )
+    .bind(now)
+    .bind(cleanup_before)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(error = %error, "failed to prune expired sessions");
+    }
+
+    Ok(token)
+}
+
+pub async fn get_user_id_from_headers(
+    pool: &MySqlPool,
+    headers: &HeaderMap,
+) -> Result<String, StatusCode> {
+    let token = cookie_token(headers).ok_or(StatusCode::UNAUTHORIZED)?;
+    if !session_token_is_valid(token) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let token_hash = hash_one_time_token(token);
+    let now = Utc::now();
+    let user_id = query_scalar::<_, String>(
+        "SELECT user_id FROM sessions
+         WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?
+         LIMIT 1",
+    )
+    .bind(&token_hash)
+    .bind(now)
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to validate session");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let activity_cutoff = now - Duration::minutes(SESSION_ACTIVITY_WRITE_INTERVAL_MINUTES);
+    if let Err(error) = query(
+        "UPDATE sessions SET last_seen_at = ?
+         WHERE token_hash = ? AND last_seen_at < ?",
+    )
+    .bind(now)
+    .bind(&token_hash)
+    .bind(activity_cutoff)
+    .execute(pool)
+    .await
+    {
+        tracing::warn!(error = %error, "failed to update session activity");
+    }
+
+    Ok(user_id)
+}
+
+pub async fn revoke_current_session(pool: &MySqlPool, headers: &HeaderMap) -> Result<()> {
+    let Some(token) = cookie_token(headers).filter(|token| session_token_is_valid(token)) else {
+        return Ok(());
+    };
+
+    query("UPDATE sessions SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL")
+        .bind(Utc::now())
+        .bind(hash_one_time_token(token))
+        .execute(pool)
+        .await
+        .context("Failed to revoke current session")?;
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        build_clear_session_cookie, build_session_cookie, cookie_token_for_name, validate_secret,
-        MINIMUM_JWT_SECRET_BYTES,
+        build_clear_session_cookie, build_session_cookie, cookie_token_for_name,
+        session_token_is_valid, ONE_TIME_TOKEN_LENGTH,
     };
     use axum::http::{header, HeaderMap, HeaderValue};
 
     #[test]
-    fn short_secrets_are_rejected() {
-        assert!(validate_secret("x".repeat(MINIMUM_JWT_SECRET_BYTES - 1)).is_err());
-    }
-
-    #[test]
-    fn minimum_length_secrets_are_accepted() {
-        assert!(validate_secret("x".repeat(MINIMUM_JWT_SECRET_BYTES)).is_ok());
-    }
-
-    #[test]
     fn production_cookie_is_host_bound_and_script_inaccessible() {
-        let cookie = build_session_cookie("token", true);
-        assert!(cookie.starts_with("__Host-media_session=token;"));
+        let token = "a".repeat(ONE_TIME_TOKEN_LENGTH);
+        let cookie = build_session_cookie(&token, true);
+        assert!(cookie.starts_with(&format!("__Host-media_session={};", token)));
         assert!(cookie.contains("; Path=/;"));
         assert!(cookie.contains("; HttpOnly;"));
         assert!(cookie.contains("; SameSite=Strict"));
@@ -187,12 +215,22 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             header::COOKIE,
-            HeaderValue::from_static("theme=dark; __Host-media_session=signed.jwt; other=value"),
+            HeaderValue::from_static("theme=dark; __Host-media_session=opaque; other=value"),
         );
         assert_eq!(
             cookie_token_for_name(&headers, "__Host-media_session"),
-            Some("signed.jwt")
+            Some("opaque")
         );
         assert_eq!(cookie_token_for_name(&headers, "media_session"), None);
+    }
+
+    #[test]
+    fn session_tokens_have_one_strict_format() {
+        assert!(session_token_is_valid(&"a".repeat(ONE_TIME_TOKEN_LENGTH)));
+        assert!(!session_token_is_valid(&"a".repeat(32)));
+        assert!(!session_token_is_valid(&format!(
+            "{}-",
+            "a".repeat(ONE_TIME_TOKEN_LENGTH - 1)
+        )));
     }
 }

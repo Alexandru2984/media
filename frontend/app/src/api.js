@@ -17,16 +17,7 @@ async function apiError(response) {
 
 class ApiService {
   constructor() {
-    this.token = localStorage.getItem('token');
-  }
-
-  setToken(token) {
-    this.token = token;
-    localStorage.setItem('token', token);
-  }
-
-  clearToken() {
-    this.token = null;
+    // Remove browser-readable credentials left by releases predating HttpOnly sessions.
     localStorage.removeItem('token');
   }
 
@@ -35,10 +26,6 @@ class ApiService {
       'Content-Type': 'application/json',
       ...options.headers,
     };
-
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
@@ -68,16 +55,8 @@ class ApiService {
     });
   }
 
-  async migrateSession() {
-    return this.request('/auth/session', { method: 'POST' });
-  }
-
   async logout() {
-    try {
-      return await this.request('/auth/logout', { method: 'POST' });
-    } finally {
-      this.clearToken();
-    }
+    return this.request('/auth/logout', { method: 'POST' });
   }
 
   async getCurrentUser() {
@@ -230,15 +209,10 @@ class ApiService {
     const formData = new FormData();
     formData.append('avatar', file);
 
-    const headers = {};
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
     const response = await fetch(`${API_URL}/users/me/avatar`, {
       method: 'POST',
-      headers,
       body: formData, // Don't set Content-Type, browser will set it with boundary
+      credentials: 'same-origin',
     });
 
     if (!response.ok) {
@@ -253,15 +227,10 @@ class ApiService {
     const formData = new FormData();
     formData.append('image', file);
 
-    const headers = {};
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
     const response = await fetch(`${API_URL}/posts/upload-image`, {
       method: 'POST',
-      headers,
       body: formData,
+      credentials: 'same-origin',
     });
 
     if (!response.ok) {
