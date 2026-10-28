@@ -1,460 +1,231 @@
-import { createSignal, Show, createMemo } from 'solid-js';
+import { createSignal, Show } from 'solid-js';
 import { api } from '../api';
-import { useTheme } from '../ThemeContext';
 import { useAuth } from '../AuthContext';
+import { getImageUrl } from '../utils/urls';
 import { getPasswordPolicyError } from '../utils/passwords';
 
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 export default function ProfileSettings(props) {
-  const { theme } = useTheme();
   const auth = useAuth();
   const [activeTab, setActiveTab] = createSignal('avatar');
-
-  // Avatar upload state
   const [avatarFile, setAvatarFile] = createSignal(null);
   const [avatarPreview, setAvatarPreview] = createSignal(null);
   const [uploadingAvatar, setUploadingAvatar] = createSignal(false);
-
-  // Change password state
   const [oldPassword, setOldPassword] = createSignal('');
   const [newPassword, setNewPassword] = createSignal('');
   const [confirmPassword, setConfirmPassword] = createSignal('');
   const [changingPassword, setChangingPassword] = createSignal(false);
-
-  // Change email state
   const [newEmail, setNewEmail] = createSignal('');
   const [emailPassword, setEmailPassword] = createSignal('');
   const [changingEmail, setChangingEmail] = createSignal(false);
-
-  // Messages
   const [message, setMessage] = createSignal({ type: '', text: '' });
+  let avatarInput;
+  let messageTimeout;
 
   const showMessage = (type, text) => {
+    window.clearTimeout(messageTimeout);
     setMessage({ type, text });
-    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+    messageTimeout = window.setTimeout(() => setMessage({ type: '', text: '' }), 6000);
   };
 
-  // Reactive styles using createMemo
-  const styles = createMemo(() => ({
-    container: {
-      'border-radius': '16px',
-      overflow: 'hidden',
-      'margin-bottom': '2rem',
-    },
-    tabs: {
-      display: 'flex',
-      gap: '8px',
-      'margin-bottom': '16px',
-      padding: '8px',
-      background: theme() === 'dark' ? 'rgba(15, 23, 42, 0.5)' : 'rgba(241, 245, 249, 0.5)',
-      'border-radius': '12px',
-    },
-    tab: (isActive) => ({
-      flex: 1,
-      padding: '12px 20px',
-      background: isActive
-        ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-        : 'transparent',
-      border: 'none',
-      'border-radius': '8px',
-      color: isActive ? '#ffffff' : (theme() === 'dark' ? '#cbd5e1' : '#64748b'),
-      'font-weight': isActive ? '700' : '500',
-      'font-size': '15px',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      'box-shadow': isActive ? '0 4px 12px rgba(102, 126, 234, 0.4)' : 'none',
-    }),
-    contentWrapper: {
-      background: theme() === 'dark' ? '#1e293b' : '#ffffff',
-      'border-radius': '12px',
-      padding: '32px',
-      'box-shadow': theme() === 'dark'
-        ? '0 4px 12px rgba(0,0,0,0.4)'
-        : '0 4px 12px rgba(0,0,0,0.08)',
-    },
-    content: {
-      'max-width': '600px',
-    },
-    section: {
-      'margin-bottom': '24px',
-    },
-    sectionTitle: {
-      'font-size': '18px',
-      'font-weight': '700',
-      color: theme() === 'dark' ? '#f1f5f9' : '#1e293b',
-      'margin-bottom': '20px',
-      'padding-bottom': '12px',
-      'border-bottom': theme() === 'dark' ? '2px solid #334155' : '2px solid #e2e8f0',
-    },
-    form: {
-      display: 'flex',
-      'flex-direction': 'column',
-      gap: '20px',
-    },
-    inputGroup: {
-      display: 'flex',
-      'flex-direction': 'column',
-      gap: '8px',
-    },
-    label: {
-      'font-size': '14px',
-      'font-weight': '600',
-      color: theme() === 'dark' ? '#cbd5e1' : '#475569',
-    },
-    input: {
-      width: '100%',
-      padding: '12px 16px',
-      border: theme() === 'dark' ? '2px solid #334155' : '2px solid #e2e8f0',
-      'border-radius': '8px',
-      'font-size': '15px',
-      'font-family': 'inherit',
-      transition: 'all 0.2s ease',
-      'box-sizing': 'border-box',
-      background: theme() === 'dark' ? '#0f172a' : '#ffffff',
-      color: theme() === 'dark' ? '#f1f5f9' : '#1e293b',
-    },
-    fileInput: {
-      display: 'none',
-    },
-    fileLabel: {
-      display: 'inline-block',
-      padding: '12px 24px',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      color: 'white',
-      'border-radius': '10px',
-      'font-size': '15px',
-      'font-weight': '600',
-      cursor: 'pointer',
-      'text-align': 'center',
-      transition: 'all 0.2s ease',
-      'user-select': 'none',
-      'box-shadow': '0 4px 12px rgba(102, 126, 234, 0.3)',
-    },
-    preview: {
-      width: '150px',
-      height: '150px',
-      'border-radius': '50%',
-      'object-fit': 'cover',
-      border: '4px solid #667eea',
-      margin: '16px 0',
-      'box-shadow': '0 4px 12px rgba(102, 126, 234, 0.3)',
-    },
-    button: {
-      width: '100%',
-      padding: '12px 24px',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      color: 'white',
-      border: 'none',
-      'border-radius': '10px',
-      'font-size': '15px',
-      'font-weight': '600',
-      cursor: 'pointer',
-      transition: 'all 0.2s ease',
-      'box-shadow': '0 4px 12px rgba(102, 126, 234, 0.3)',
-    },
-    buttonDisabled: {
-      width: '100%',
-      padding: '12px 24px',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      color: 'white',
-      border: 'none',
-      'border-radius': '10px',
-      'font-size': '15px',
-      'font-weight': '600',
-      cursor: 'not-allowed',
-      transition: 'all 0.2s ease',
-      'box-shadow': '0 4px 12px rgba(102, 126, 234, 0.3)',
-      opacity: 0.6,
-    },
-    message: (type) => ({
-      padding: '14px 18px',
-      'border-radius': '12px',
-      'font-size': '14px',
-      'font-weight': '500',
-      'margin-bottom': '24px',
-      background: type === 'success' ? '#d1fae5' : '#fed7d7',
-      color: type === 'success' ? '#047857' : '#c53030',
-      border: `2px solid ${type === 'success' ? '#34d399' : '#f87171'}`,
-    }),
-    hint: {
-      'font-size': '13px',
-      color: theme() === 'dark' ? '#64748b' : '#94a3b8',
-      'margin-top': '6px',
-    },
-  }));
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setAvatarFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+  const handleAvatarChange = (event) => {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      event.currentTarget.value = '';
+      showMessage('error', 'Alege o imagine JPG, PNG sau WebP.');
+      return;
     }
-  };
-
-  const handleAvatarUpload = async (e) => {
-    e.preventDefault();
-    if (!avatarFile()) {
-      showMessage('error', 'Te rog selectează o imagine');
+    if (file.size > MAX_AVATAR_SIZE) {
+      event.currentTarget.value = '';
+      showMessage('error', 'Avatarul nu poate depăși 5 MB.');
       return;
     }
 
-    try {
-      setUploadingAvatar(true);
-      const result = await api.uploadAvatar(avatarFile());
-      showMessage('success', 'Avatar actualizat cu succes!');
-      setAvatarFile(null);
-      setAvatarPreview(null);
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setAvatarPreview(reader.result);
+    reader.onerror = () => showMessage('error', 'Imaginea nu a putut fi citită.');
+    reader.readAsDataURL(file);
+  };
 
-      // Refresh user data to update avatar everywhere
+  const clearAvatarSelection = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    if (avatarInput) avatarInput.value = '';
+  };
+
+  const handleAvatarUpload = async (event) => {
+    event.preventDefault();
+    if (!avatarFile() || uploadingAvatar()) return;
+
+    setUploadingAvatar(true);
+    try {
+      await api.uploadAvatar(avatarFile());
+      clearAvatarSelection();
       const userData = await api.getCurrentUser();
       auth.setUser(userData);
-
-      if (props.onUpdate) props.onUpdate();
-    } catch (error) {
-      console.error('Failed to upload avatar:', error);
-      showMessage('error', 'Nu s-a putut încărca imaginea');
+      await props.onUpdate?.();
+      showMessage('success', 'Avatarul a fost actualizat.');
+    } catch (requestError) {
+      console.error('Failed to upload avatar:', requestError);
+      showMessage('error', 'Avatarul nu a putut fi încărcat.');
     } finally {
       setUploadingAvatar(false);
     }
   };
 
-  const handlePasswordChange = async (e) => {
-    e.preventDefault();
-
+  const handlePasswordChange = async (event) => {
+    event.preventDefault();
     if (newPassword() !== confirmPassword()) {
-      showMessage('error', 'Parolele nu se potrivesc');
+      showMessage('error', 'Parolele noi nu se potrivesc.');
+      return;
+    }
+    const policyError = getPasswordPolicyError(newPassword());
+    if (policyError) {
+      showMessage('error', policyError);
+      return;
+    }
+    if (oldPassword() === newPassword()) {
+      showMessage('error', 'Parola nouă trebuie să fie diferită de cea actuală.');
       return;
     }
 
-    const passwordError = getPasswordPolicyError(newPassword());
-    if (passwordError) {
-      showMessage('error', passwordError);
-      return;
-    }
-
+    setChangingPassword(true);
     try {
-      setChangingPassword(true);
       await api.changePassword(oldPassword(), newPassword());
-      showMessage('success', 'Parola a fost schimbată cu succes!');
       setOldPassword('');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (error) {
-      console.error('Failed to change password:', error);
-      showMessage('error', 'Parola veche este incorectă');
+      showMessage('success', 'Parola a fost schimbată.');
+    } catch (requestError) {
+      console.error('Failed to change password:', requestError);
+      showMessage('error', 'Parola nu a putut fi schimbată. Verifică parola actuală.');
     } finally {
       setChangingPassword(false);
     }
   };
 
-  const handleEmailChange = async (e) => {
-    e.preventDefault();
+  const handleEmailChange = async (event) => {
+    event.preventDefault();
+    if (!newEmail().trim() || !emailPassword() || changingEmail()) return;
 
-    if (!newEmail() || !emailPassword()) {
-      showMessage('error', 'Completează toate câmpurile');
-      return;
-    }
-
+    setChangingEmail(true);
     try {
-      setChangingEmail(true);
-      await api.changeEmail(newEmail(), emailPassword());
-      showMessage('success', 'Email de verificare trimis! Verifică inbox-ul.');
+      await api.changeEmail(newEmail().trim(), emailPassword());
       setNewEmail('');
       setEmailPassword('');
-    } catch (error) {
-      console.error('Failed to change email:', error);
-      showMessage('error', 'Email-ul există deja sau parola este incorectă');
+      showMessage('success', 'Am trimis confirmarea la noua adresă. Linkul este valabil 24 de ore.');
+    } catch (requestError) {
+      console.error('Failed to change email:', requestError);
+      showMessage('error', 'Adresa nu a putut fi schimbată. Verifică parola și adresa introdusă.');
     } finally {
       setChangingEmail(false);
     }
   };
 
   return (
-    <div style={styles().container}>
-      <div style={styles().tabs}>
-        <button
-          style={styles().tab(activeTab() === 'avatar')}
-          onClick={() => setActiveTab('avatar')}
-        >
-          🖼️ Avatar
-        </button>
-        <button
-          style={styles().tab(activeTab() === 'password')}
-          onClick={() => setActiveTab('password')}
-        >
-          🔒 Parolă
-        </button>
-        <button
-          style={styles().tab(activeTab() === 'email')}
-          onClick={() => setActiveTab('email')}
-        >
-          📧 Email
-        </button>
-      </div>
+    <section class="settings-layout" aria-labelledby="account-settings-title">
+      <header class="settings-heading">
+        <div>
+          <p class="sidebar-eyebrow">Contul tău</p>
+          <h2 id="account-settings-title">Setări și securitate</h2>
+          <p>Administrează identitatea și datele de acces ale contului.</p>
+        </div>
+      </header>
 
-      <div style={styles().contentWrapper}>
-        <div style={styles().content}>
+      <div class="settings-grid">
+        <div class="settings-nav surface" role="tablist" aria-label="Categorii de setări">
+          <button type="button" role="tab" aria-selected={activeTab() === 'avatar'} class={activeTab() === 'avatar' ? 'is-active' : ''} onClick={() => setActiveTab('avatar')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" /><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" /></svg>
+            <span><strong>Avatar</strong><small>Poza profilului</small></span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab() === 'password'} class={activeTab() === 'password' ? 'is-active' : ''} onClick={() => setActiveTab('password')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+            <span><strong>Parolă</strong><small>Protecția contului</small></span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab() === 'email'} class={activeTab() === 'email' ? 'is-active' : ''} onClick={() => setActiveTab('email')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="m4 7 8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+            <span><strong>Email</strong><small>Adresa de conectare</small></span>
+          </button>
+        </div>
+
+        <div class="surface settings-panel">
           <Show when={message().text}>
-            <div style={styles().message(message().type)}>
-              {message().text}
-            </div>
+            <div class={`alert ${message().type === 'error' ? 'alert-error' : 'alert-success'}`} role="status">{message().text}</div>
           </Show>
 
-          {/* Avatar Upload Tab */}
           <Show when={activeTab() === 'avatar'}>
-            <div style={styles().section}>
-              <h3 style={styles().sectionTitle}>
-                Schimbă Poza de Profil
-              </h3>
-              <form style={styles().form} onSubmit={handleAvatarUpload}>
-                <Show when={avatarPreview()}>
-                  <img src={avatarPreview()} alt="Preview" style={styles().preview} />
-                </Show>
-
-                <div style={styles().inputGroup}>
-                  <input
-                    type="file"
-                    id="avatar-upload"
-                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                    style={styles().fileInput}
-                    onChange={handleAvatarChange}
-                  />
-                  <label for="avatar-upload" style={styles().fileLabel}>
-                    {avatarFile() ? '✅ Imagine selectată' : '📁 Selectează Imagine'}
-                  </label>
-                  <div style={styles().hint}>
-                    Formate acceptate: JPG, PNG, WEBP (max. 5 MB)
-                  </div>
-                </div>
-
-                <Show when={avatarFile()}>
-                  <button
-                    type="submit"
-                    style={uploadingAvatar() ? styles().buttonDisabled : styles().button}
-                    disabled={uploadingAvatar()}
+            <div class="settings-section">
+              <h3>Schimbă avatarul</h3>
+              <p class="settings-description">Folosește o imagine clară, pătrată, de maximum 5 MB.</p>
+              <form class="settings-form" onSubmit={handleAvatarUpload}>
+                <div class="avatar-editor">
+                  <Show
+                    when={avatarPreview() || auth.user()?.avatar_url}
+                    fallback={<span class="settings-avatar avatar-fallback">{auth.user()?.username?.charAt(0).toUpperCase()}</span>}
                   >
-                    {uploadingAvatar() ? '⏳ Se încarcă...' : '✨ Actualizează Avatar'}
-                  </button>
+                    <img class="settings-avatar avatar" src={avatarPreview() || getImageUrl(auth.user()?.avatar_url)} alt="Previzualizarea avatarului" />
+                  </Show>
+                  <div class="avatar-editor-copy">
+                    <input ref={avatarInput} id="avatar-upload" class="sr-only" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={handleAvatarChange} />
+                    <label for="avatar-upload" class="btn btn-secondary">{avatarFile() ? 'Alege altă imagine' : 'Alege o imagine'}</label>
+                    <p>JPG, PNG sau WebP. Maximum 5 MB.</p>
+                  </div>
+                </div>
+                <Show when={avatarFile()}>
+                  <div class="settings-actions">
+                    <button type="button" class="btn btn-secondary" onClick={clearAvatarSelection} disabled={uploadingAvatar()}>Anulează</button>
+                    <button type="submit" class="btn btn-primary" disabled={uploadingAvatar()}>{uploadingAvatar() ? 'Se încarcă…' : 'Actualizează avatarul'}</button>
+                  </div>
                 </Show>
               </form>
             </div>
           </Show>
 
-          {/* Change Password Tab */}
           <Show when={activeTab() === 'password'}>
-            <div style={styles().section}>
-              <h3 style={styles().sectionTitle}>
-                Schimbă Parola
-              </h3>
-              <form style={styles().form} onSubmit={handlePasswordChange}>
-                <div style={styles().inputGroup}>
-                  <label style={styles().label}>Parola Veche</label>
-                  <input
-                    type="password"
-                    style={styles().input}
-                    value={oldPassword()}
-                    onInput={(e) => setOldPassword(e.target.value)}
-                    required
-                    placeholder="Introdu parola veche"
-                  />
+            <div class="settings-section">
+              <h3>Schimbă parola</h3>
+              <p class="settings-description">Alege o parolă unică, de 12–72 de caractere.</p>
+              <form class="settings-form" onSubmit={handlePasswordChange}>
+                <div>
+                  <label class="field-label" for="current-password">Parola actuală</label>
+                  <input id="current-password" class="input" type="password" value={oldPassword()} onInput={(event) => setOldPassword(event.currentTarget.value)} autocomplete="current-password" required />
                 </div>
-
-                <div style={styles().inputGroup}>
-                  <label style={styles().label}>Parola Nouă</label>
-                  <input
-                    type="password"
-                    style={styles().input}
-                    value={newPassword()}
-                    onInput={(e) => setNewPassword(e.target.value)}
-                    required
-                    minLength="12"
-                    maxLength="72"
-                    autocomplete="new-password"
-                    placeholder="Cel puțin 12 caractere"
-                  />
-                  <div style={styles().hint}>
-                    Între 12 și 72 de caractere
-                  </div>
+                <div>
+                  <label class="field-label" for="new-password">Parola nouă</label>
+                  <input id="new-password" class="input" type="password" value={newPassword()} onInput={(event) => setNewPassword(event.currentTarget.value)} autocomplete="new-password" minlength="12" maxlength="72" required />
                 </div>
-
-                <div style={styles().inputGroup}>
-                  <label style={styles().label}>Confirmă Parola Nouă</label>
-                  <input
-                    type="password"
-                    style={styles().input}
-                    value={confirmPassword()}
-                    onInput={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    minLength="12"
-                    maxLength="72"
-                    autocomplete="new-password"
-                    placeholder="Repetă parola nouă"
-                  />
+                <div>
+                  <label class="field-label" for="confirm-password">Confirmă parola nouă</label>
+                  <input id="confirm-password" class="input" type="password" value={confirmPassword()} onInput={(event) => setConfirmPassword(event.currentTarget.value)} autocomplete="new-password" minlength="12" maxlength="72" required />
                 </div>
-
-                <button
-                  type="submit"
-                  style={changingPassword() ? styles().buttonDisabled : styles().button}
-                  disabled={changingPassword()}
-                >
-                  {changingPassword() ? '⏳ Se actualizează...' : '✅ Schimbă Parola'}
-                </button>
+                <div class="settings-actions"><button type="submit" class="btn btn-primary" disabled={changingPassword()}>{changingPassword() ? 'Se actualizează…' : 'Schimbă parola'}</button></div>
               </form>
             </div>
           </Show>
 
-          {/* Change Email Tab */}
           <Show when={activeTab() === 'email'}>
-            <div style={styles().section}>
-              <h3 style={styles().sectionTitle}>
-                Schimbă Email-ul
-              </h3>
-              <form style={styles().form} onSubmit={handleEmailChange}>
-                <div style={styles().inputGroup}>
-                  <label style={styles().label}>Email Nou</label>
-                  <input
-                    type="email"
-                    style={styles().input}
-                    value={newEmail()}
-                    onInput={(e) => setNewEmail(e.target.value)}
-                    required
-                    placeholder="exemplu@email.com"
-                  />
-                  <div style={styles().hint}>
-                    Vei primi un email de confirmare la noua adresă
-                  </div>
+            <div class="settings-section">
+              <h3>Schimbă adresa de email</h3>
+              <p class="settings-description">Noua adresă devine activă numai după confirmarea linkului primit prin email.</p>
+              <form class="settings-form" onSubmit={handleEmailChange}>
+                <div>
+                  <label class="field-label" for="new-email">Noua adresă</label>
+                  <input id="new-email" class="input" type="email" value={newEmail()} onInput={(event) => setNewEmail(event.currentTarget.value)} autocomplete="email" maxlength="206" placeholder="nume@exemplu.ro" required />
                 </div>
-
-                <div style={styles().inputGroup}>
-                  <label style={styles().label}>Parola Ta</label>
-                  <input
-                    type="password"
-                    style={styles().input}
-                    value={emailPassword()}
-                    onInput={(e) => setEmailPassword(e.target.value)}
-                    required
-                    placeholder="Parola pentru confirmare"
-                  />
-                  <div style={styles().hint}>
-                    Pentru confirmare
-                  </div>
+                <div>
+                  <label class="field-label" for="email-password">Confirmă cu parola</label>
+                  <input id="email-password" class="input" type="password" value={emailPassword()} onInput={(event) => setEmailPassword(event.currentTarget.value)} autocomplete="current-password" required />
                 </div>
-
-                <button
-                  type="submit"
-                  style={changingEmail() ? styles().buttonDisabled : styles().button}
-                  disabled={changingEmail()}
-                >
-                  {changingEmail() ? '⏳ Se trimite...' : '📨 Trimite Email de Verificare'}
-                </button>
+                <div class="settings-actions"><button type="submit" class="btn btn-primary" disabled={changingEmail()}>{changingEmail() ? 'Se trimite…' : 'Trimite confirmarea'}</button></div>
               </form>
             </div>
           </Show>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

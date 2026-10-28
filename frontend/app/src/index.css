@@ -279,6 +279,12 @@ a {
   color: var(--danger);
 }
 
+.alert-success {
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border));
+  background: color-mix(in srgb, var(--success) 8%, var(--bg-elevated));
+  color: var(--success);
+}
+
 .site-header {
   position: sticky;
   z-index: 50;
@@ -1223,6 +1229,303 @@ a {
   padding: 0 20px 12px;
 }
 
+/* Profile and account settings */
+.profile-page {
+  min-height: calc(100vh - var(--nav-height));
+  padding-block: 28px 64px;
+}
+
+.profile-loading {
+  width: min(760px, 100%);
+  margin-inline: auto;
+}
+
+.profile-hero {
+  overflow: hidden;
+  width: min(860px, 100%);
+  margin-inline: auto;
+}
+
+.profile-cover {
+  height: clamp(120px, 22vw, 190px);
+  background:
+    radial-gradient(circle at 18% 15%, rgb(255 255 255 / 30%), transparent 24%),
+    radial-gradient(circle at 82% 75%, rgb(255 255 255 / 18%), transparent 24%),
+    linear-gradient(125deg, #2563eb, #4f46e5 52%, #7c3aed);
+}
+
+.profile-body {
+  position: relative;
+  padding: 0 clamp(18px, 5vw, 36px) 28px;
+}
+
+.profile-avatar-wrap {
+  position: absolute;
+  top: -58px;
+  left: clamp(18px, 5vw, 36px);
+}
+
+.profile-avatar {
+  width: 116px;
+  height: 116px;
+  border: 5px solid var(--bg-elevated);
+  font-size: 2.2rem;
+  box-shadow: var(--shadow-md);
+}
+
+.profile-action-row {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.profile-copy {
+  max-width: 660px;
+}
+
+.profile-copy h1 {
+  margin: 8px 0 8px;
+  font-size: clamp(1.7rem, 6vw, 2.35rem);
+  letter-spacing: -0.045em;
+}
+
+.profile-bio {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.96rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.profile-bio.is-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 17px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.profile-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-meta strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.profile-editor {
+  display: grid;
+  gap: 17px;
+  max-width: 620px;
+  padding-top: 12px;
+}
+
+.profile-editor-actions,
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.profile-alert {
+  margin-top: 18px;
+}
+
+.profile-tabs {
+  display: flex;
+  width: min(860px, 100%);
+  margin: 18px auto 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-tabs button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.profile-tabs button:hover,
+.profile-tabs button.is-active {
+  color: var(--brand);
+}
+
+.profile-tabs button.is-active {
+  border-bottom-color: var(--brand);
+}
+
+.profile-feed {
+  width: min(680px, 100%);
+  margin-inline: auto;
+}
+
+.profile-feed > h2 {
+  margin: 0 0 15px;
+  font-size: 1.15rem;
+  letter-spacing: -0.025em;
+}
+
+.settings-layout {
+  width: min(960px, 100%);
+  margin: 30px auto 0;
+}
+
+.settings-heading {
+  margin-bottom: 20px;
+}
+
+.settings-heading h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 5vw, 1.9rem);
+  letter-spacing: -0.035em;
+}
+
+.settings-heading > div > p:last-child {
+  margin: 7px 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-nav {
+  display: grid;
+  gap: 4px;
+  padding: 7px;
+}
+
+.settings-nav button {
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 13px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-nav button:hover,
+.settings-nav button.is-active {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+
+.settings-nav button.is-active {
+  color: var(--brand);
+}
+
+.settings-nav button > span {
+  display: grid;
+  gap: 2px;
+}
+
+.settings-nav strong {
+  font-size: 0.87rem;
+}
+
+.settings-nav small {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.settings-panel {
+  min-width: 0;
+  padding: clamp(20px, 5vw, 32px);
+}
+
+.settings-panel > .alert {
+  margin-bottom: 22px;
+}
+
+.settings-section h3 {
+  margin: 0;
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+}
+
+.settings-description {
+  margin: 7px 0 24px;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.settings-form {
+  display: grid;
+  gap: 18px;
+  max-width: 560px;
+}
+
+.avatar-editor {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 16px;
+  background: var(--bg-soft);
+}
+
+.settings-avatar {
+  width: 96px;
+  height: 96px;
+  flex: 0 0 96px;
+  font-size: 1.8rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.avatar-editor-copy {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+}
+
+.avatar-editor-copy p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+@media (min-width: 760px) {
+  .settings-grid {
+    grid-template-columns: 220px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-nav {
+    position: sticky;
+    top: calc(var(--nav-height) + 24px);
+  }
+}
+
 .spinner {
   width: 18px;
   height: 18px;
@@ -1388,6 +1691,63 @@ a {
 
   .comment-form .btn {
     padding-inline: 12px;
+  }
+
+  .profile-page {
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .profile-hero {
+    border-inline: 0;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+  }
+
+  .profile-avatar {
+    width: 92px;
+    height: 92px;
+    font-size: 1.7rem;
+  }
+
+  .profile-avatar-wrap {
+    top: -46px;
+  }
+
+  .profile-action-row {
+    min-height: 58px;
+  }
+
+  .profile-tabs,
+  .profile-feed,
+  .settings-layout {
+    width: calc(100% - 24px);
+  }
+
+  .profile-tabs button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .settings-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .settings-nav button {
+    justify-content: center;
+    min-height: 50px;
+  }
+
+  .settings-nav button > span small {
+    display: none;
+  }
+
+  .avatar-editor {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .avatar-editor-copy {
+    justify-items: center;
   }
 }
 

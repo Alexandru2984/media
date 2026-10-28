@@ -1,321 +1,214 @@
-import { createSignal, onMount, Show, For, createEffect } from 'solid-js';
-import { useParams, useNavigate } from '@solidjs/router';
-import { useAuth } from '../AuthContext';
-import { useTheme } from '../ThemeContext';
+import { useNavigate, useParams } from '@solidjs/router';
+import { createEffect, createSignal, For, Show } from 'solid-js';
 import { api } from '../api';
-import { getImageUrl } from '../utils/urls';
+import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import ProfileSettings from '../components/ProfileSettings';
+import { getImageUrl } from '../utils/urls';
+
+function joinedDate(dateString) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+}
 
 export default function Profile() {
   const params = useParams();
   const navigate = useNavigate();
   const auth = useAuth();
-  const { theme } = useTheme();
   const [profile, setProfile] = createSignal(null);
   const [posts, setPosts] = createSignal([]);
   const [loading, setLoading] = createSignal(true);
+  const [error, setError] = createSignal('');
   const [editing, setEditing] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
   const [username, setUsername] = createSignal('');
   const [bio, setBio] = createSignal('');
   const [activeTab, setActiveTab] = createSignal('posts');
+  const [loadedProfileId, setLoadedProfileId] = createSignal(null);
 
-  const loadProfile = async () => {
+  const isOwnProfile = () => auth.user()?.id === params.id;
+
+  const loadProfile = async (userId = params.id, showLoader = true) => {
     try {
-      setLoading(true);
-      const userId = params.id;
-      const profileData = await api.getProfile(userId);
+      if (showLoader) setLoading(true);
+      setError('');
+      const [profileData, userPosts] = await Promise.all([
+        api.getProfile(userId),
+        api.getUserPosts(userId),
+      ]);
       setProfile(profileData);
       setUsername(profileData.username);
       setBio(profileData.bio || '');
-
-      const userPosts = await api.getUserPosts(userId);
       setPosts(userPosts);
-    } catch (error) {
-      console.error('Failed to load profile:', error);
+    } catch (requestError) {
+      console.error('Failed to load profile:', requestError);
+      setError('Profilul nu a putut fi încărcat. Este posibil să nu mai existe.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = async () => {
-    try {
-      await api.updateProfile(username(), bio(), null);
-      await loadProfile();
-      setEditing(false);
+  const cancelEditing = () => {
+    setEditing(false);
+    setUsername(profile()?.username || '');
+    setBio(profile()?.bio || '');
+  };
 
-      // Refresh user data in AuthContext if it's own profile
-      if (isOwnProfile()) {
-        const userData = await api.getCurrentUser();
-        auth.setUser(userData);
-      }
-    } catch (error) {
-      console.error('Failed to update profile:', error);
-      alert('Nu s-a putut actualiza profilul');
+  const handleSave = async () => {
+    const cleanUsername = username().trim();
+    if (cleanUsername.length < 2 || saving()) return;
+
+    setSaving(true);
+    setError('');
+    try {
+      await api.updateProfile(cleanUsername, bio().trim(), null);
+      await loadProfile(params.id, false);
+      const userData = await api.getCurrentUser();
+      auth.setUser(userData);
+      setEditing(false);
+    } catch (requestError) {
+      console.error('Failed to update profile:', requestError);
+      setError('Profilul nu a putut fi actualizat. Numele poate fi deja folosit.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const isOwnProfile = () => {
-    return auth.user()?.id === params.id;
-  };
-
-  // Wait for auth to load, then check authentication
   createEffect(() => {
-    if (!auth.loading() && !auth.isAuthenticated()) {
+    const userId = params.id;
+    if (auth.loading()) return;
+    if (!auth.isAuthenticated()) {
       navigate('/login');
-    } else if (!auth.loading() && auth.isAuthenticated()) {
-      loadProfile();
+      return;
+    }
+    if (userId && loadedProfileId() !== userId) {
+      setLoadedProfileId(userId);
+      setProfile(null);
+      setPosts([]);
+      setActiveTab('posts');
+      setEditing(false);
+      loadProfile(userId);
     }
   });
 
   return (
     <>
       <Navbar />
-      <div style={{
-        'max-width': '800px',
-        margin: '0 auto',
-        padding: '0 1rem',
-      }}>
-        <Show when={!loading()} fallback={<div style={{ 'text-align': 'center', padding: '2rem', color: theme() === 'dark' ? '#f1f5f9' : '#1e293b' }}>Se încarcă...</div>}>
-          {/* Profile Header */}
-          <div style={{
-            background: theme() === 'dark' ? '#1e293b' : 'white',
-            'border-radius': '12px',
-            padding: '2rem',
-            'margin-bottom': '2rem',
-            'box-shadow': theme() === 'dark'
-              ? '0 1px 3px rgba(0,0,0,0.3)'
-              : '0 1px 3px rgba(0,0,0,0.1)',
-          }}>
-            <div style={{
-              display: 'flex',
-              'align-items': 'center',
-              gap: '2rem',
-              'margin-bottom': '1.5rem',
-            }}>
-              {/* Avatar */}
-              <Show
-                when={profile()?.avatar_url}
-                fallback={
-                  <div style={{
-                    width: '100px',
-                    height: '100px',
-                    'border-radius': '50%',
-                    background: '#1da1f2',
-                    display: 'flex',
-                    'align-items': 'center',
-                    'justify-content': 'center',
-                    color: 'white',
-                    'font-size': '2.5rem',
-                    'font-weight': 'bold',
-                  }}>
-                    {profile()?.username.charAt(0).toUpperCase()}
-                  </div>
-                }
-              >
-                <img
-                  src={getImageUrl(profile()?.avatar_url)}
-                  alt="Avatar"
-                  style={{
-                    width: '100px',
-                    height: '100px',
-                    'border-radius': '50%',
-                    'object-fit': 'cover',
-                    border: '3px solid #667eea',
-                  }}
-                />
-              </Show>
-
-              {/* Profile Info */}
-              <div style={{ flex: 1 }}>
-                <Show when={!editing()}>
-                  <h1 style={{
-                    'font-size': '1.75rem',
-                    'margin-bottom': '0.5rem',
-                    color: theme() === 'dark' ? '#f1f5f9' : '#1e293b',
-                  }}>
-                    {profile()?.username}
-                  </h1>
-                  <p style={{
-                    color: theme() === 'dark' ? '#94a3b8' : '#666',
-                    'margin-bottom': '0.5rem'
-                  }}>
-                    {profile()?.bio || 'Fără descriere'}
-                  </p>
-                  <p style={{
-                    color: theme() === 'dark' ? '#64748b' : '#999',
-                    'font-size': '0.875rem'
-                  }}>
-                    {profile()?.posts_count} postări
-                  </p>
-                </Show>
-
-                <Show when={editing()}>
-                  <input
-                    type="text"
-                    value={username()}
-                    onInput={(e) => setUsername(e.target.value)}
-                    placeholder="Username"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      'margin-bottom': '0.75rem',
-                      border: theme() === 'dark' ? '1px solid #334155' : '1px solid #ddd',
-                      'border-radius': '8px',
-                      'font-size': '1rem',
-                      background: theme() === 'dark' ? '#0f172a' : '#ffffff',
-                      color: theme() === 'dark' ? '#f1f5f9' : '#1e293b',
-                    }}
-                  />
-                  <textarea
-                    value={bio()}
-                    onInput={(e) => setBio(e.target.value)}
-                    placeholder="Bio"
-                    rows="3"
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      border: theme() === 'dark' ? '1px solid #334155' : '1px solid #ddd',
-                      'border-radius': '8px',
-                      'font-size': '1rem',
-                      'font-family': 'inherit',
-                      resize: 'vertical',
-                      background: theme() === 'dark' ? '#0f172a' : '#ffffff',
-                      color: theme() === 'dark' ? '#f1f5f9' : '#1e293b',
-                    }}
-                  />
-                </Show>
+      <main class="profile-page app-container">
+        <Show
+          when={!loading()}
+          fallback={
+            <div class="profile-loading" aria-busy="true">
+              <div class="surface skeleton"><div class="skeleton-lines"><div class="skeleton-line" /><div class="skeleton-line" /><div class="skeleton-line" /></div></div>
+            </div>
+          }
+        >
+          <Show
+            when={!error() || profile()}
+            fallback={
+              <div class="surface state-card" role="alert">
+                <div>
+                  <span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" /><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" /></svg></span>
+                  <h2>Profil indisponibil</h2>
+                  <p>{error()}</p>
+                  <button type="button" class="btn btn-primary" onClick={() => loadProfile()} style={{ 'margin-top': '20px' }}>Încearcă din nou</button>
+                </div>
               </div>
-
-              {/* Edit Button */}
-              <Show when={isOwnProfile()}>
-                <Show when={!editing()}>
-                  <button
-                    onClick={() => setEditing(true)}
-                    style={{
-                      padding: '0.75rem 1.5rem',
-                      background: '#1da1f2',
-                      color: 'white',
-                      border: 'none',
-                      'border-radius': '24px',
-                      cursor: 'pointer',
-                      'font-weight': 'bold',
-                    }}
+            }
+          >
+            <section class="surface profile-hero" aria-labelledby="profile-name">
+              <div class="profile-cover" />
+              <div class="profile-body">
+                <div class="profile-avatar-wrap">
+                  <Show
+                    when={profile()?.avatar_url}
+                    fallback={<span class="profile-avatar avatar-fallback">{profile()?.username?.charAt(0).toUpperCase()}</span>}
                   >
-                    ✏️ Editează
-                  </button>
-                </Show>
-                <Show when={editing()}>
-                  <div style={{ display: 'flex', gap: '0.5rem', 'flex-direction': 'column' }}>
-                    <button
-                      onClick={handleSave}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: '#1da1f2',
-                        color: 'white',
-                        border: 'none',
-                        'border-radius': '20px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Salvează
+                    <img class="profile-avatar avatar" src={getImageUrl(profile()?.avatar_url)} alt={`Avatarul lui ${profile()?.username}`} />
+                  </Show>
+                </div>
+
+                <div class="profile-action-row">
+                  <Show when={isOwnProfile() && !editing()}>
+                    <button type="button" class="btn btn-secondary" onClick={() => setEditing(true)}>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L20 6.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+                      Editează profilul
                     </button>
-                    <button
-                      onClick={() => {
-                        setEditing(false);
-                        setUsername(profile()?.username);
-                        setBio(profile()?.bio || '');
-                      }}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        background: '#ccc',
-                        color: '#333',
-                        border: 'none',
-                        'border-radius': '20px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Anulează
-                    </button>
+                  </Show>
+                </div>
+
+                <Show
+                  when={!editing()}
+                  fallback={
+                    <div class="profile-editor">
+                      <div>
+                        <label class="field-label" for="profile-username">Nume de utilizator</label>
+                        <input id="profile-username" class="input" value={username()} onInput={(event) => setUsername(event.currentTarget.value)} minlength="2" maxlength="32" />
+                      </div>
+                      <div>
+                        <label class="field-label" for="profile-bio">Descriere</label>
+                        <textarea id="profile-bio" class="textarea" value={bio()} onInput={(event) => setBio(event.currentTarget.value)} rows="3" maxlength="240" placeholder="Spune comunității câteva lucruri despre tine…" />
+                        <div class="character-count">{bio().length}/240</div>
+                      </div>
+                      <div class="profile-editor-actions">
+                        <button type="button" class="btn btn-secondary" onClick={cancelEditing} disabled={saving()}>Anulează</button>
+                        <button type="button" class="btn btn-primary" onClick={handleSave} disabled={saving() || username().trim().length < 2}>{saving() ? 'Se salvează…' : 'Salvează'}</button>
+                      </div>
+                    </div>
+                  }
+                >
+                  <div class="profile-copy">
+                    <h1 id="profile-name">{profile()?.username}</h1>
+                    <p class={`profile-bio ${profile()?.bio ? '' : 'is-empty'}`}>{profile()?.bio || 'Acest profil nu are încă o descriere.'}</p>
+                    <div class="profile-meta">
+                      <span><strong>{profile()?.posts_count ?? posts().length}</strong> {Number(profile()?.posts_count ?? posts().length) === 1 ? 'postare' : 'postări'}</span>
+                      <Show when={joinedDate(profile()?.created_at)}>
+                        <span>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 3v4m8-4v4M3 10h18" stroke="currentColor" stroke-width="1.8" /></svg>
+                          Membru din {joinedDate(profile()?.created_at)}
+                        </span>
+                      </Show>
+                    </div>
                   </div>
                 </Show>
-              </Show>
-            </div>
-          </div>
 
-          {/* Tab Navigation - Only show on own profile */}
-          <Show when={isOwnProfile()}>
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              'margin-bottom': '2rem',
-              'border-bottom': theme() === 'dark' ? '2px solid #334155' : '2px solid #e1e8ed',
-            }}>
-              <button
-                onClick={() => setActiveTab('posts')}
-                style={{
-                  padding: '1rem 2rem',
-                  background: 'transparent',
-                  border: 'none',
-                  'border-bottom': activeTab() === 'posts' ? '3px solid #667eea' : '3px solid transparent',
-                  color: activeTab() === 'posts' ? '#667eea' : (theme() === 'dark' ? '#94a3b8' : '#657786'),
-                  'font-weight': activeTab() === 'posts' ? '700' : '500',
-                  'font-size': '1rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                📝 Postări
-              </button>
-              <button
-                onClick={() => setActiveTab('settings')}
-                style={{
-                  padding: '1rem 2rem',
-                  background: 'transparent',
-                  border: 'none',
-                  'border-bottom': activeTab() === 'settings' ? '3px solid #667eea' : '3px solid transparent',
-                  color: activeTab() === 'settings' ? '#667eea' : (theme() === 'dark' ? '#94a3b8' : '#657786'),
-                  'font-weight': activeTab() === 'settings' ? '700' : '500',
-                  'font-size': '1rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                ⚙️ Setări
-              </button>
-            </div>
-          </Show>
+                <Show when={error()}><p class="alert alert-error profile-alert" role="alert">{error()}</p></Show>
+              </div>
+            </section>
 
-          {/* Posts Tab */}
-          <Show when={activeTab() === 'posts' || !isOwnProfile()}>
-            <h2 style={{
-              'margin-bottom': '1rem',
-              color: theme() === 'dark' ? '#f1f5f9' : '#333'
-            }}>Postări</h2>
-            <Show when={posts().length === 0}>
-              <div style={{
-                'text-align': 'center',
-                padding: '3rem',
-                background: theme() === 'dark' ? '#1e293b' : 'white',
-                'border-radius': '12px',
-                color: theme() === 'dark' ? '#94a3b8' : '#666',
-              }}>
-                Nu există postări încă
+            <Show when={isOwnProfile()}>
+              <div class="profile-tabs" role="tablist" aria-label="Secțiunile profilului">
+                <button type="button" role="tab" aria-selected={activeTab() === 'posts'} class={activeTab() === 'posts' ? 'is-active' : ''} onClick={() => setActiveTab('posts')}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8m-8 4h8m-8 4h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  Postări
+                </button>
+                <button type="button" role="tab" aria-selected={activeTab() === 'settings'} class={activeTab() === 'settings' ? 'is-active' : ''} onClick={() => setActiveTab('settings')}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
+                  Setări
+                </button>
               </div>
             </Show>
 
-            <For each={posts()}>
-              {(post) => <PostCard post={post} onDelete={loadProfile} />}
-            </For>
-          </Show>
+            <Show when={activeTab() === 'posts' || !isOwnProfile()}>
+              <section class="profile-feed" aria-labelledby="profile-posts-title">
+                <h2 id="profile-posts-title">Postări</h2>
+                <Show
+                  when={posts().length > 0}
+                  fallback={<div class="surface state-card"><div><span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg></span><h2>Nicio postare încă</h2><p>Postările publicate de acest utilizator vor apărea aici.</p></div></div>}
+                >
+                  <div class="feed-list"><For each={posts()}>{(post) => <PostCard post={post} onDelete={() => loadProfile(params.id, false)} onUpdate={() => loadProfile(params.id, false)} />}</For></div>
+                </Show>
+              </section>
+            </Show>
 
-          {/* Settings Tab */}
-          <Show when={activeTab() === 'settings' && isOwnProfile()}>
-            <ProfileSettings onUpdate={loadProfile} />
+            <Show when={activeTab() === 'settings' && isOwnProfile()}>
+              <ProfileSettings onUpdate={() => loadProfile(params.id, false)} />
+            </Show>
           </Show>
         </Show>
-      </div>
+      </main>
     </>
   );
 }
