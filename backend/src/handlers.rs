@@ -15,7 +15,7 @@ use crate::{
     email::EmailService,
     models::*,
     uploads::validated_image_extension,
-    validation::password_is_valid,
+    validation::{email_change_token_is_valid, email_is_valid, password_is_valid},
 };
 use rand::Rng;
 
@@ -557,6 +557,11 @@ pub async fn change_email(
     Json(payload): Json<ChangeEmail>,
 ) -> Result<Json<Value>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
+    let new_email = payload.new_email.trim();
+
+    if !email_is_valid(new_email) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     // Get current user
     let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
@@ -573,9 +578,13 @@ pub async fn change_email(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
+    if user.email.eq_ignore_ascii_case(new_email) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     // Check if new email already exists
     let existing = query_scalar::<_, i64>("SELECT COUNT(*) FROM users WHERE email = ? AND id != ?")
-        .bind(&payload.new_email)
+        .bind(new_email)
         .bind(&user_id)
         .fetch_one(&pool)
         .await
@@ -588,22 +597,20 @@ pub async fn change_email(
     // Generate verification token
     let token: String = rand::thread_rng()
         .sample_iter(&rand::distributions::Alphanumeric)
-        .take(32)
+        .take(48)
         .map(char::from)
         .collect();
 
     let token_id = Uuid::new_v4().to_string();
     let expires_at = Utc::now() + chrono::Duration::hours(24);
 
-    // Save token with new email in metadata (we'll store it in a new way)
-    // For now, let's just save to email_tokens with special type
     query(
         "INSERT INTO email_tokens (id, user_id, token, token_type, expires_at)
          VALUES (?, ?, ?, ?, ?)",
     )
     .bind(&token_id)
     .bind(&user_id)
-    .bind(format!("{}:{}", token, payload.new_email)) // Store email with token
+    .bind(format!("{}:{}", token, new_email))
     .bind("email_change")
     .bind(expires_at)
     .execute(&pool)
@@ -613,7 +620,7 @@ pub async fn change_email(
     // Send verification email to NEW email
     let email_service = EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     email_service
-        .send_verification_email(&payload.new_email, &user.username, &token)
+        .send_email_change_verification(new_email, &user.username, &token)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -629,43 +636,63 @@ pub async fn verify_email_change(
 ) -> Result<Json<Value>, StatusCode> {
     let token = params.get("token").ok_or(StatusCode::BAD_REQUEST)?;
 
-    // Find token with prefix search
-    let tokens: Vec<(String, String, chrono::DateTime<Utc>)> = query_as(
+    if !email_change_token_is_valid(token) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    // The strict alphanumeric token validation above prevents LIKE wildcard injection.
+    let token_record: Option<(String, String, String)> = query_as(
         "SELECT id, token, user_id FROM email_tokens
          WHERE token_type = 'email_change' AND expires_at > ? AND token LIKE ?",
     )
     .bind(Utc::now())
     .bind(format!("{}:%", token))
-    .fetch_all(&pool)
+    .fetch_optional(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    if tokens.is_empty() {
-        return Err(StatusCode::NOT_FOUND);
-    }
-
-    let (token_id, stored_token, user_id) = &tokens[0];
+    let (_token_id, stored_token, user_id) = token_record.ok_or(StatusCode::NOT_FOUND)?;
 
     // Extract new email from token
-    let parts: Vec<&str> = stored_token.split(':').collect();
-    if parts.len() != 2 {
+    let (_, new_email) = stored_token
+        .split_once(':')
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !email_is_valid(new_email) {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
-    let new_email = parts[1];
 
-    // Update user email
-    query("UPDATE users SET email = ?, updated_at = ? WHERE id = ?")
-        .bind(new_email)
-        .bind(Utc::now())
-        .bind(user_id)
-        .execute(&pool)
+    let mut transaction = pool
+        .begin()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Delete token
-    query("DELETE FROM email_tokens WHERE id = ?")
-        .bind(token_id)
-        .execute(&pool)
+    // Update user email
+    query("UPDATE users SET email = ?, email_verified = 1, updated_at = ? WHERE id = ?")
+        .bind(new_email)
+        .bind(Utc::now())
+        .bind(&user_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| {
+            if error
+                .as_database_error()
+                .is_some_and(|database_error| database_error.code().as_deref() == Some("23000"))
+            {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
+
+    // Consume every outstanding email-change token for this account atomically.
+    query("DELETE FROM email_tokens WHERE user_id = ? AND token_type = 'email_change'")
+        .bind(&user_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

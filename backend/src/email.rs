@@ -64,7 +64,51 @@ impl EmailService {
         username: &str,
         token: &str,
     ) -> Result<()> {
-        let verification_url = format!("{}/verify-email?token={}", self.app_url, token);
+        self.send_verification_message(
+            to_email,
+            username,
+            token,
+            "verify-email",
+            "Bun venit pe Media",
+            "Pentru a activa contul, confirmă adresa de email folosind butonul de mai jos.",
+            "Verifică adresa",
+            "Verifică-ți contul",
+        )
+        .await
+    }
+
+    pub async fn send_email_change_verification(
+        &self,
+        to_email: &str,
+        username: &str,
+        token: &str,
+    ) -> Result<()> {
+        self.send_verification_message(
+            to_email,
+            username,
+            token,
+            "verify-email-change",
+            "Confirmă noua adresă",
+            "Am primit o solicitare de schimbare a adresei de email. Confirm-o folosind butonul de mai jos.",
+            "Confirmă adresa nouă",
+            "Confirmă schimbarea adresei de email",
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn send_verification_message(
+        &self,
+        to_email: &str,
+        username: &str,
+        token: &str,
+        route: &str,
+        heading: &str,
+        introduction: &str,
+        button_label: &str,
+        subject: &str,
+    ) -> Result<()> {
+        let verification_url = format!("{}/{}?token={}", self.app_url, route, token);
 
         let html_body = format!(
             r#"
@@ -83,31 +127,32 @@ impl EmailService {
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🎉 Bun venit pe Social Media!</h1>
+                        <h1>{}</h1>
                     </div>
                     <div class="content">
                         <h2>Salut, {}!</h2>
-                        <p>Mulțumim că te-ai înscris pe platforma noastră. Pentru a-ți activa contul, te rugăm să verifici adresa de email.</p>
-                        <p>Apasă pe butonul de mai jos pentru a verifica contul:</p>
-                        <a href="{}" class="button">Verifică Email-ul</a>
+                        <p>{}</p>
+                        <a href="{}" class="button">{}</a>
                         <p>Sau copiază și lipește acest link în browser:</p>
                         <p style="word-break: break-all; color: #667eea;">{}</p>
-                        <p>Dacă nu te-ai înregistrat pe platforma noastră, te rugăm să ignori acest email.</p>
+                        <p>Dacă nu ai făcut această solicitare, ignoră mesajul.</p>
                     </div>
                     <div class="footer">
-                        <p>© 2025 Social Media App. Toate drepturile rezervate.</p>
+                        <p>© 2026 Media. Toate drepturile rezervate.</p>
                     </div>
                 </div>
             </body>
             </html>
             "#,
+            heading,
             escape_html(username),
+            introduction,
             verification_url,
+            button_label,
             verification_url
         );
 
-        self.send_email(to_email, "Verifică-ți contul", &html_body)
-            .await
+        self.send_email(to_email, subject, &html_body).await
     }
 
     pub async fn send_password_reset_email(
@@ -150,7 +195,7 @@ impl EmailService {
                         </div>
                     </div>
                     <div class="footer">
-                        <p>© 2025 Social Media App. Toate drepturile rezervate.</p>
+                        <p>© 2026 Media. Toate drepturile rezervate.</p>
                     </div>
                 </div>
             </body>
