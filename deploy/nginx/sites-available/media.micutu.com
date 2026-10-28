@@ -121,7 +121,8 @@ server {
     }
 
     location = /api/users/me/avatar {
-        client_max_body_size 5m;
+        # Multipart framing must fit in addition to the 5 MiB file itself.
+        client_max_body_size 6m;
         limit_req zone=media_upload burst=2 nodelay;
         include snippets/media-api-proxy.conf;
     }

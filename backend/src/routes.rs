@@ -1,4 +1,5 @@
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{delete, get, post, put},
     Router,
 };
@@ -27,7 +28,10 @@ pub fn create_routes(pool: MySqlPool) -> Router {
         // User routes
         .route("/users/:id", get(handlers::get_profile))
         .route("/users/me/profile", put(handlers::update_profile))
-        .route("/users/me/avatar", post(handlers::upload_avatar))
+        .route(
+            "/users/me/avatar",
+            post(handlers::upload_avatar).layer(DefaultBodyLimit::max(6 * 1024 * 1024)),
+        )
         .route("/users/me/change-password", post(handlers::change_password))
         .route("/users/me/change-email", post(handlers::change_email))
         .route(
@@ -38,7 +42,10 @@ pub fn create_routes(pool: MySqlPool) -> Router {
         // Post routes
         .route("/posts", get(handlers::get_posts))
         .route("/posts", post(handlers::create_post))
-        .route("/posts/upload-image", post(handlers::upload_post_image))
+        .route(
+            "/posts/upload-image",
+            post(handlers::upload_post_image).layer(DefaultBodyLimit::max(11 * 1024 * 1024)),
+        )
         .route("/posts/:id", put(handlers::update_post))
         .route("/posts/:id", delete(handlers::delete_post))
         .route("/posts/:id/like", post(handlers::like_post))

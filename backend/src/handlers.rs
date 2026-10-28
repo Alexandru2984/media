@@ -7,7 +7,7 @@ use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use sqlx::{query, query_as, query_scalar, MySql, MySqlPool, QueryBuilder};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path as FileSystemPath};
 use uuid::Uuid;
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
     validation::{
         bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
         one_time_token_is_valid, password_is_safe_to_verify, password_is_valid,
-        stored_image_path_is_valid, username_is_valid, MAXIMUM_BIO_CHARACTERS,
+        stored_image_path_belongs_to_user, username_is_valid, MAXIMUM_BIO_CHARACTERS,
         MAXIMUM_COMMENT_CHARACTERS, MAXIMUM_MESSAGE_CHARACTERS, MAXIMUM_POST_CHARACTERS,
     },
 };
@@ -68,6 +68,50 @@ fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
             created_at: row.user_created_at,
         },
         is_liked: row.is_liked,
+    }
+}
+
+async fn remove_managed_upload(url: Option<&str>, expected_prefix: &str, filename_prefix: &str) {
+    let Some(url) = url else {
+        return;
+    };
+    if !stored_image_path_belongs_to_user(url, expected_prefix, filename_prefix) {
+        return;
+    }
+
+    let Some(filename) = url.strip_prefix(expected_prefix) else {
+        return;
+    };
+    if filename.is_empty() || filename.contains('/') {
+        return;
+    }
+
+    let directory = expected_prefix.trim_matches('/');
+    let upload_path = FileSystemPath::new(directory).join(filename);
+    if let Err(error) = tokio::fs::remove_file(&upload_path).await {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            eprintln!("Failed to remove superseded upload: {}", error);
+        }
+    }
+}
+
+async fn remove_unreferenced_post_upload(pool: &MySqlPool, url: Option<&str>, user_id: &str) {
+    let Some(url) = url else {
+        return;
+    };
+    let filename_prefix = format!("post_{}_", user_id);
+    if !stored_image_path_belongs_to_user(url, "/uploads/posts/", &filename_prefix) {
+        return;
+    }
+
+    let references = query_scalar::<_, i64>("SELECT COUNT(*) FROM posts WHERE image_url = ?")
+        .bind(url)
+        .fetch_one(pool)
+        .await;
+    match references {
+        Ok(0) => remove_managed_upload(Some(url), "/uploads/posts/", &filename_prefix).await,
+        Ok(_) => {}
+        Err(error) => eprintln!("Failed to check upload references: {}", error),
     }
 }
 
@@ -327,11 +371,11 @@ pub async fn create_post(
 ) -> Result<Json<Post>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
     let content = payload.content.trim();
+    let image_filename_prefix = format!("post_{}_", user_id);
     if !bounded_text_is_valid(content, 1, MAXIMUM_POST_CHARACTERS)
-        || payload
-            .image_url
-            .as_deref()
-            .is_some_and(|path| !stored_image_path_is_valid(path, "/uploads/posts/"))
+        || payload.image_url.as_deref().is_some_and(|path| {
+            !stored_image_path_belongs_to_user(path, "/uploads/posts/", &image_filename_prefix)
+        })
     {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -615,6 +659,7 @@ pub async fn update_profile(
     let avatar_url = payload
         .avatar_url
         .map(|avatar_url| avatar_url.trim().to_owned());
+    let avatar_filename_prefix = format!("{}_", user_id);
 
     if username
         .as_deref()
@@ -622,9 +667,9 @@ pub async fn update_profile(
         || bio
             .as_deref()
             .is_some_and(|bio| !bounded_text_is_valid(bio, 0, MAXIMUM_BIO_CHARACTERS))
-        || avatar_url
-            .as_deref()
-            .is_some_and(|path| !stored_image_path_is_valid(path, "/uploads/avatars/"))
+        || avatar_url.as_deref().is_some_and(|path| {
+            !stored_image_path_belongs_to_user(path, "/uploads/avatars/", &avatar_filename_prefix)
+        })
     {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -882,7 +927,6 @@ pub async fn upload_avatar(
     headers: HeaderMap,
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<Value>, StatusCode> {
-    use std::fs;
     let user_id = get_current_user(&headers).await?;
 
     // Get the file from multipart
@@ -917,22 +961,54 @@ pub async fn upload_avatar(
             // Generate a server-controlled filename after validation.
             let new_filename = format!("{}_{}.{}", user_id, Uuid::new_v4(), extension);
             let upload_path = format!("uploads/avatars/{}", new_filename);
+            let avatar_filename_prefix = format!("{}_", user_id);
+            let previous_avatar: Option<String> =
+                query_scalar("SELECT avatar_url FROM users WHERE id = ?")
+                    .bind(&user_id)
+                    .fetch_one(&pool)
+                    .await
+                    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-            // Save file
-            fs::write(&upload_path, &data).map_err(|e| {
-                eprintln!("Failed to save file: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            tokio::fs::create_dir_all("uploads/avatars")
+                .await
+                .map_err(|error| {
+                    eprintln!("Failed to create avatar upload directory: {}", error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+            tokio::fs::write(&upload_path, &data)
+                .await
+                .map_err(|error| {
+                    eprintln!("Failed to save avatar: {}", error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
 
             // Update user avatar_url in database
             let avatar_url = format!("/uploads/avatars/{}", new_filename);
-            query("UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?")
-                .bind(&avatar_url)
-                .bind(Utc::now())
-                .bind(&user_id)
-                .execute(&pool)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let update_result =
+                query("UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?")
+                    .bind(&avatar_url)
+                    .bind(Utc::now())
+                    .bind(&user_id)
+                    .execute(&pool)
+                    .await;
+            if !update_result.is_ok_and(|result| result.rows_affected() == 1) {
+                remove_managed_upload(
+                    Some(&avatar_url),
+                    "/uploads/avatars/",
+                    &avatar_filename_prefix,
+                )
+                .await;
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+
+            if previous_avatar.as_deref() != Some(avatar_url.as_str()) {
+                remove_managed_upload(
+                    previous_avatar.as_deref(),
+                    "/uploads/avatars/",
+                    &avatar_filename_prefix,
+                )
+                .await;
+            }
 
             return Ok(Json(json!({
                 "avatar_url": avatar_url,
@@ -949,7 +1025,6 @@ pub async fn upload_post_image(
     headers: HeaderMap,
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<Value>, StatusCode> {
-    use std::fs;
     let user_id = get_current_user(&headers).await?;
 
     // Get the file from multipart
@@ -986,16 +1061,19 @@ pub async fn upload_post_image(
             let upload_path = format!("uploads/posts/{}", new_filename);
 
             // Create directory if it doesn't exist
-            fs::create_dir_all("uploads/posts").map_err(|e| {
-                eprintln!("Failed to create directory: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            tokio::fs::create_dir_all("uploads/posts")
+                .await
+                .map_err(|error| {
+                    eprintln!("Failed to create post upload directory: {}", error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
 
-            // Save file
-            fs::write(&upload_path, &data).map_err(|e| {
-                eprintln!("Failed to save file: {}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+            tokio::fs::write(&upload_path, &data)
+                .await
+                .map_err(|error| {
+                    eprintln!("Failed to save post image: {}", error);
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
 
             let image_url = format!("/uploads/posts/{}", new_filename);
 
@@ -1018,11 +1096,11 @@ pub async fn update_post(
 ) -> Result<Json<Post>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
     let content = payload.content.trim();
+    let image_filename_prefix = format!("post_{}_", user_id);
     if !bounded_text_is_valid(content, 1, MAXIMUM_POST_CHARACTERS)
-        || payload
-            .image_url
-            .as_deref()
-            .is_some_and(|path| !stored_image_path_is_valid(path, "/uploads/posts/"))
+        || payload.image_url.as_deref().is_some_and(|path| {
+            !stored_image_path_belongs_to_user(path, "/uploads/posts/", &image_filename_prefix)
+        })
     {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -1040,6 +1118,7 @@ pub async fn update_post(
     if post.user_id != user_id {
         return Err(StatusCode::FORBIDDEN);
     }
+    let previous_image_url = post.image_url.clone();
 
     query("UPDATE posts SET content = ?, image_url = ?, updated_at = ? WHERE id = ?")
         .bind(content)
@@ -1055,6 +1134,10 @@ pub async fn update_post(
         .fetch_one(&pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if previous_image_url != payload.image_url {
+        remove_unreferenced_post_upload(&pool, previous_image_url.as_deref(), &user_id).await;
+    }
 
     Ok(Json(updated_post))
 }
@@ -1078,12 +1161,15 @@ pub async fn delete_post(
     if post.user_id != user_id {
         return Err(StatusCode::FORBIDDEN);
     }
+    let image_url = post.image_url.clone();
 
     query("DELETE FROM posts WHERE id = ?")
         .bind(&post_id)
         .execute(&pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    remove_unreferenced_post_upload(&pool, image_url.as_deref(), &user_id).await;
 
     Ok(Json(json!({"success": true})))
 }

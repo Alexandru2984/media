@@ -54,6 +54,17 @@ pub fn stored_image_path_is_valid(path: &str, expected_prefix: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'_' | b'-' | b'.'))
 }
 
+pub fn stored_image_path_belongs_to_user(
+    path: &str,
+    expected_prefix: &str,
+    filename_prefix: &str,
+) -> bool {
+    stored_image_path_is_valid(path, expected_prefix)
+        && path.strip_prefix(expected_prefix).is_some_and(|filename| {
+            !filename.contains('/') && filename.starts_with(filename_prefix)
+        })
+}
+
 pub fn one_time_token_is_valid(token: &str) -> bool {
     matches!(token.len(), 32 | 48) && token.bytes().all(|byte| byte.is_ascii_alphanumeric())
 }
@@ -63,8 +74,8 @@ mod tests {
     use super::{
         bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
         one_time_token_is_valid, password_is_safe_to_verify, password_is_valid,
-        stored_image_path_is_valid, username_is_valid, MAXIMUM_PASSWORD_BYTES,
-        MINIMUM_PASSWORD_CHARACTERS,
+        stored_image_path_belongs_to_user, stored_image_path_is_valid, username_is_valid,
+        MAXIMUM_PASSWORD_BYTES, MINIMUM_PASSWORD_CHARACTERS,
     };
 
     #[test]
@@ -136,6 +147,16 @@ mod tests {
         assert!(!stored_image_path_is_valid(
             "/uploads/posts/../avatars/file.png",
             "/uploads/posts/"
+        ));
+        assert!(stored_image_path_belongs_to_user(
+            "/uploads/posts/post_user-1_uuid.webp",
+            "/uploads/posts/",
+            "post_user-1_"
+        ));
+        assert!(!stored_image_path_belongs_to_user(
+            "/uploads/posts/post_user-2_uuid.webp",
+            "/uploads/posts/",
+            "post_user-1_"
         ));
     }
 }
