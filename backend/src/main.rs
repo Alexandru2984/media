@@ -14,11 +14,20 @@ use axum::http::{header, HeaderValue, Method};
 use std::net::{IpAddr, SocketAddr};
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    tracing_subscriber::fmt::init();
+    let log_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("social_media_backend=info"));
+    tracing_subscriber::fmt()
+        .with_env_filter(log_filter)
+        .json()
+        .flatten_event(true)
+        .with_ansi(false)
+        .with_target(false)
+        .init();
 
     auth::validate_configuration().expect("Invalid JWT configuration");
     email::validate_configuration().expect("Invalid email configuration");
@@ -59,7 +68,7 @@ async fn main() {
 
     // Run our app with hyper
     let addr = SocketAddr::new(server_host, server_port);
-    println!("Server running on http://{}", addr);
+    tracing::info!(listen_address = %addr, "server listening");
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();

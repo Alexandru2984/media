@@ -133,7 +133,7 @@ pub async fn init_db() -> Result<DbPool> {
     .execute(&pool)
     .await?;
 
-    println!("✅ Database initialized successfully");
+    tracing::info!("database initialized");
 
     Ok(pool)
 }

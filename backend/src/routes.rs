@@ -66,7 +66,8 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
             expected_origin,
             security::enforce_same_origin,
         ))
-        .layer(middleware::from_fn(security::api_response_policy));
+        .layer(middleware::from_fn(security::api_response_policy))
+        .layer(middleware::from_fn(security::request_observability));
 
     Router::new().nest("/api", api_routes)
 }

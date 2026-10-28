@@ -227,11 +227,11 @@ impl EmailService {
 
         match mailer.send(&email) {
             Ok(_) => {
-                println!("Email sent successfully");
+                tracing::info!("email sent");
                 Ok(())
             }
             Err(e) => {
-                eprintln!("Failed to send email: {}", e);
+                tracing::error!(error = %e, "email delivery failed");
                 Err(e.into())
             }
         }

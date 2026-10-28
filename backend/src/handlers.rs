@@ -91,7 +91,7 @@ async fn remove_managed_upload(url: Option<&str>, expected_prefix: &str, filenam
     let upload_path = FileSystemPath::new(directory).join(filename);
     if let Err(error) = tokio::fs::remove_file(&upload_path).await {
         if error.kind() != std::io::ErrorKind::NotFound {
-            eprintln!("Failed to remove superseded upload: {}", error);
+            tracing::error!(error = %error, "failed to remove superseded upload");
         }
     }
 }
@@ -112,7 +112,7 @@ async fn remove_unreferenced_post_upload(pool: &MySqlPool, url: Option<&str>, us
     match references {
         Ok(0) => remove_managed_upload(Some(url), "/uploads/posts/", &filename_prefix).await,
         Ok(_) => {}
-        Err(error) => eprintln!("Failed to check upload references: {}", error),
+        Err(error) => tracing::error!(error = %error, "failed to check upload references"),
     }
 }
 
@@ -203,7 +203,7 @@ pub async fn register(
                     .await;
 
                 if let Err(e) = result {
-                    eprintln!("❌ Failed to send verification email: {}", e);
+                    tracing::error!(error = %e, "verification email delivery failed");
                 }
             });
 
@@ -395,7 +395,7 @@ pub async fn create_post(
     .execute(&pool)
     .await
     .map_err(|e| {
-        eprintln!("Error creating post: {}", e);
+        tracing::error!(error = %e, "failed to create post");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -404,7 +404,7 @@ pub async fn create_post(
         .fetch_one(&pool)
         .await
         .map_err(|e| {
-            eprintln!("Error fetching created post: {}", e);
+            tracing::error!(error = %e, "failed to fetch newly created post");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -971,13 +971,13 @@ pub async fn upload_avatar(
             tokio::fs::create_dir_all("uploads/avatars")
                 .await
                 .map_err(|error| {
-                    eprintln!("Failed to create avatar upload directory: {}", error);
+                    tracing::error!(error = %error, "failed to create avatar upload directory");
                     StatusCode::INTERNAL_SERVER_ERROR
                 })?;
             tokio::fs::write(&upload_path, &data)
                 .await
                 .map_err(|error| {
-                    eprintln!("Failed to save avatar: {}", error);
+                    tracing::error!(error = %error, "failed to save avatar");
                     StatusCode::INTERNAL_SERVER_ERROR
                 })?;
 
@@ -1063,14 +1063,14 @@ pub async fn upload_post_image(
             tokio::fs::create_dir_all("uploads/posts")
                 .await
                 .map_err(|error| {
-                    eprintln!("Failed to create post upload directory: {}", error);
+                    tracing::error!(error = %error, "failed to create post upload directory");
                     StatusCode::INTERNAL_SERVER_ERROR
                 })?;
 
             tokio::fs::write(&upload_path, &data)
                 .await
                 .map_err(|error| {
-                    eprintln!("Failed to save post image: {}", error);
+                    tracing::error!(error = %error, "failed to save post image");
                     StatusCode::INTERNAL_SERVER_ERROR
                 })?;
 
@@ -1617,7 +1617,7 @@ pub async fn forgot_password(
                 .send_password_reset_email(&user_email, &username, &token)
                 .await
             {
-                eprintln!("Failed to send password reset email: {}", error);
+                tracing::error!(error = %error, "password reset email delivery failed");
             }
         });
     }

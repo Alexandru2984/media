@@ -1,11 +1,12 @@
 use axum::{
     body::Body,
-    extract::{Request, State},
+    extract::{OriginalUri, Request, State},
     http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     middleware::Next,
     response::Response,
 };
 use serde_json::json;
+use std::time::Instant;
 use uuid::Uuid;
 
 const REQUEST_ID_HEADER: HeaderName = HeaderName::from_static("x-request-id");
@@ -87,6 +88,58 @@ pub async fn api_response_policy(request: Request, next: Next) -> Response {
         } else {
             Body::from(payload)
         };
+    }
+
+    response
+}
+
+pub async fn request_observability(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    // Deliberately log only the path. Query strings can contain search terms,
+    // identifiers, or secrets from legacy clients.
+    let path = request
+        .extensions()
+        .get::<OriginalUri>()
+        .map(|original_uri| original_uri.0.path())
+        .unwrap_or_else(|| request.uri().path())
+        .to_owned();
+    let started_at = Instant::now();
+    let response = next.run(request).await;
+    let status = response.status();
+    let duration_ms = started_at.elapsed().as_millis() as u64;
+    let response_request_id = response
+        .headers()
+        .get(&REQUEST_ID_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("missing");
+
+    if status.is_server_error() {
+        tracing::error!(
+            request_id = response_request_id,
+            http_method = %method,
+            url_path = path,
+            status_code = status.as_u16(),
+            duration_ms,
+            "API request completed"
+        );
+    } else if status.is_client_error() {
+        tracing::warn!(
+            request_id = response_request_id,
+            http_method = %method,
+            url_path = path,
+            status_code = status.as_u16(),
+            duration_ms,
+            "API request completed"
+        );
+    } else {
+        tracing::info!(
+            request_id = response_request_id,
+            http_method = %method,
+            url_path = path,
+            status_code = status.as_u16(),
+            duration_ms,
+            "API request completed"
+        );
     }
 
     response
