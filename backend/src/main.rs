@@ -10,10 +10,7 @@ mod tokens;
 mod uploads;
 mod validation;
 
-use axum::{
-    http::{header, HeaderValue, Method},
-    middleware,
-};
+use axum::http::{header, HeaderValue, Method};
 use std::net::{IpAddr, SocketAddr};
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
@@ -56,12 +53,8 @@ async fn main() {
         ])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
-    let app = routes::create_routes(db_pool)
+    let app = routes::create_routes(db_pool, cors_origin)
         .nest_service("/uploads", ServeDir::new("uploads"))
-        .layer(middleware::from_fn_with_state(
-            cors_origin.clone(),
-            security::enforce_same_origin,
-        ))
         .layer(cors);
 
     // Run our app with hyper

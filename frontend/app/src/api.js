@@ -1,5 +1,20 @@
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+async function apiError(response) {
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  const requestId = payload?.request_id || response.headers.get('x-request-id');
+  const error = new Error(payload?.title || `HTTP error! status: ${response.status}`);
+  error.status = response.status;
+  error.requestId = requestId;
+  return error;
+}
+
 class ApiService {
   constructor() {
     this.token = localStorage.getItem('token');
@@ -32,7 +47,7 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw await apiError(response);
     }
 
     return response.json();
@@ -221,7 +236,7 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw await apiError(response);
     }
 
     return response.json();
@@ -244,7 +259,7 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      throw await apiError(response);
     }
 
     return response.json();

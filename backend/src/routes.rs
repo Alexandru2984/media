@@ -1,13 +1,15 @@
 use axum::{
     extract::DefaultBodyLimit,
+    http::HeaderValue,
+    middleware,
     routing::{delete, get, post, put},
     Router,
 };
 use sqlx::MySqlPool;
 
-use crate::{handlers, health};
+use crate::{handlers, health, security};
 
-pub fn create_routes(pool: MySqlPool) -> Router {
+pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
     let api_routes = Router::new()
         // Operational health routes expose no dependency detail.
         .route("/health/live", get(health::live))
@@ -57,7 +59,12 @@ pub fn create_routes(pool: MySqlPool) -> Router {
         // Message routes
         .route("/messages", post(handlers::send_message))
         .route("/messages", get(handlers::get_messages))
-        .with_state(pool);
+        .with_state(pool)
+        .layer(middleware::from_fn_with_state(
+            expected_origin,
+            security::enforce_same_origin,
+        ))
+        .layer(middleware::from_fn(security::api_response_policy));
 
     Router::new().nest("/api", api_routes)
 }
