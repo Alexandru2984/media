@@ -14,10 +14,10 @@ use crate::{
     auth::{create_jwt, get_user_id_from_headers, verify_jwt},
     email::EmailService,
     models::*,
+    tokens::{generate_one_time_token, hash_one_time_token},
     uploads::validated_image_extension,
-    validation::{email_change_token_is_valid, email_is_valid, password_is_valid},
+    validation::{email_is_valid, one_time_token_is_valid, password_is_valid},
 };
-use rand::Rng;
 
 // Auth handlers
 pub async fn register(
@@ -51,11 +51,8 @@ pub async fn register(
     match result {
         Ok(_) => {
             // Generate verification token
-            let verification_token: String = rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
-                .take(32)
-                .map(char::from)
-                .collect();
+            let verification_token = generate_one_time_token();
+            let stored_verification_token = hash_one_time_token(&verification_token);
 
             let token_id = Uuid::new_v4().to_string();
             let expires_at = Utc::now() + chrono::Duration::hours(24);
@@ -67,7 +64,7 @@ pub async fn register(
             )
             .bind(&token_id)
             .bind(&user_id)
-            .bind(&verification_token)
+            .bind(&stored_verification_token)
             .bind(expires_at)
             .execute(&pool)
             .await;
@@ -595,11 +592,7 @@ pub async fn change_email(
     }
 
     // Generate verification token
-    let token: String = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(48)
-        .map(char::from)
-        .collect();
+    let token = generate_one_time_token();
 
     let token_id = Uuid::new_v4().to_string();
     let expires_at = Utc::now() + chrono::Duration::hours(24);
@@ -610,7 +603,7 @@ pub async fn change_email(
     )
     .bind(&token_id)
     .bind(&user_id)
-    .bind(format!("{}:{}", token, new_email))
+    .bind(format!("{}:{}", hash_one_time_token(&token), new_email))
     .bind("email_change")
     .bind(expires_at)
     .execute(&pool)
@@ -636,22 +629,25 @@ pub async fn verify_email_change(
 ) -> Result<Json<Value>, StatusCode> {
     let token = params.get("token").ok_or(StatusCode::BAD_REQUEST)?;
 
-    if !email_change_token_is_valid(token) {
+    if !one_time_token_is_valid(token) {
         return Err(StatusCode::BAD_REQUEST);
     }
+    let token_hash = hash_one_time_token(token);
 
     // The strict alphanumeric token validation above prevents LIKE wildcard injection.
     let token_record: Option<(String, String, String)> = query_as(
         "SELECT id, token, user_id FROM email_tokens
-         WHERE token_type = 'email_change' AND expires_at > ? AND token LIKE ?",
+         WHERE token_type = 'email_change' AND expires_at > ?
+           AND (token LIKE ? OR token LIKE ?)",
     )
     .bind(Utc::now())
+    .bind(format!("{}:%", token_hash))
     .bind(format!("{}:%", token))
     .fetch_optional(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let (_token_id, stored_token, user_id) = token_record.ok_or(StatusCode::NOT_FOUND)?;
+    let (token_id, stored_token, user_id) = token_record.ok_or(StatusCode::NOT_FOUND)?;
 
     // Extract new email from token
     let (_, new_email) = stored_token
@@ -665,6 +661,15 @@ pub async fn verify_email_change(
         .begin()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let consumed = query("DELETE FROM email_tokens WHERE id = ?")
+        .bind(&token_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if consumed.rows_affected() != 1 {
+        return Err(StatusCode::NOT_FOUND);
+    }
 
     // Update user email
     query("UPDATE users SET email = ?, email_verified = 1, updated_at = ? WHERE id = ?")
@@ -1149,12 +1154,8 @@ pub async fn send_verification_email(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Generate random token
-    let token: String = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(32)
-        .map(char::from)
-        .collect();
+    let token = generate_one_time_token();
+    let stored_token = hash_one_time_token(&token);
 
     let token_id = Uuid::new_v4().to_string();
     let expires_at = Utc::now() + chrono::Duration::hours(24);
@@ -1166,7 +1167,7 @@ pub async fn send_verification_email(
     )
     .bind(&token_id)
     .bind(&user_id)
-    .bind(&token)
+    .bind(&stored_token)
     .bind(expires_at)
     .execute(&pool)
     .await
@@ -1190,11 +1191,17 @@ pub async fn verify_email(
 ) -> Result<Json<Value>, StatusCode> {
     let token = params.get("token").ok_or(StatusCode::BAD_REQUEST)?;
 
+    if !one_time_token_is_valid(token) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let token_hash = hash_one_time_token(token);
+
     // Find token
     let token_record: (String, String, chrono::DateTime<Utc>) = query_as(
         "SELECT id, user_id, expires_at FROM email_tokens
-         WHERE token = ? AND token_type = 'verification'",
+         WHERE token_type = 'verification' AND (token = ? OR token = ?)",
     )
+    .bind(&token_hash)
     .bind(token)
     .fetch_one(&pool)
     .await
@@ -1205,19 +1212,30 @@ pub async fn verify_email(
         return Err(StatusCode::GONE);
     }
 
-    // Update user as verified
-    query("UPDATE users SET email_verified = 1 WHERE id = ?")
-        .bind(&token_record.1)
-        .execute(&pool)
+    let mut transaction = pool
+        .begin()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Delete token
-    query("DELETE FROM email_tokens WHERE id = ?")
+    let consumed = query("DELETE FROM email_tokens WHERE id = ?")
         .bind(&token_record.0)
-        .execute(&pool)
+        .execute(&mut *transaction)
         .await
-        .ok();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if consumed.rows_affected() != 1 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    query("UPDATE users SET email_verified = 1 WHERE id = ?")
+        .bind(&token_record.1)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(json!({
         "message": "Email verificat cu succes"
@@ -1245,11 +1263,8 @@ pub async fn forgot_password(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if let Some((user_id, user_email, username)) = user {
-        let token: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(48)
-            .map(char::from)
-            .collect();
+        let token = generate_one_time_token();
+        let stored_token = hash_one_time_token(&token);
         let token_id = Uuid::new_v4().to_string();
         let expires_at = Utc::now() + chrono::Duration::hours(1);
 
@@ -1259,7 +1274,7 @@ pub async fn forgot_password(
         )
         .bind(&token_id)
         .bind(&user_id)
-        .bind(&token)
+        .bind(&stored_token)
         .bind(expires_at)
         .execute(&pool)
         .await
@@ -1287,15 +1302,17 @@ pub async fn reset_password(
     let token = payload.get("token").ok_or(StatusCode::BAD_REQUEST)?;
     let new_password = payload.get("password").ok_or(StatusCode::BAD_REQUEST)?;
 
-    if !password_is_valid(new_password) {
+    if !password_is_valid(new_password) || !one_time_token_is_valid(token) {
         return Err(StatusCode::BAD_REQUEST);
     }
+    let token_hash = hash_one_time_token(token);
 
     // Find token
     let token_record: (String, String, chrono::DateTime<Utc>) = query_as(
         "SELECT id, user_id, expires_at FROM email_tokens
-         WHERE token = ? AND token_type = 'password_reset'",
+         WHERE token_type = 'password_reset' AND (token = ? OR token = ?)",
     )
+    .bind(&token_hash)
     .bind(token)
     .fetch_one(&pool)
     .await
@@ -1310,20 +1327,32 @@ pub async fn reset_password(
     let password_hash =
         hash(new_password, DEFAULT_COST).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Update password
-    query("UPDATE users SET password_hash = ? WHERE id = ?")
-        .bind(&password_hash)
-        .bind(&token_record.1)
-        .execute(&pool)
+    let mut transaction = pool
+        .begin()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Delete token
-    query("DELETE FROM email_tokens WHERE id = ?")
+    let consumed = query("DELETE FROM email_tokens WHERE id = ?")
         .bind(&token_record.0)
-        .execute(&pool)
+        .execute(&mut *transaction)
         .await
-        .ok();
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if consumed.rows_affected() != 1 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    query("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
+        .bind(&password_hash)
+        .bind(Utc::now())
+        .bind(&token_record.1)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(Json(json!({
         "message": "Parola a fost resetată cu succes"

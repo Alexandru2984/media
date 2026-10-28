@@ -5,6 +5,7 @@ mod handlers;
 mod health;
 mod models;
 mod routes;
+mod tokens;
 mod uploads;
 mod validation;
 

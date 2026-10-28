@@ -214,7 +214,7 @@ export default function ProfileSettings(props) {
               <form class="settings-form" onSubmit={handleEmailChange}>
                 <div>
                   <label class="field-label" for="new-email">Noua adresă</label>
-                  <input id="new-email" class="input" type="email" value={newEmail()} onInput={(event) => setNewEmail(event.currentTarget.value)} autocomplete="email" maxlength="206" placeholder="nume@exemplu.ro" required />
+                  <input id="new-email" class="input" type="email" value={newEmail()} onInput={(event) => setNewEmail(event.currentTarget.value)} autocomplete="email" maxlength="190" placeholder="nume@exemplu.ro" required />
                 </div>
                 <div>
                   <label class="field-label" for="email-password">Confirmă cu parola</label>
