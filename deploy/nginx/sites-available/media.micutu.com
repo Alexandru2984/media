@@ -120,6 +120,13 @@ server {
         include snippets/media-api-proxy.conf;
     }
 
+    # Text search is intentionally stricter than ordinary read endpoints because
+    # partial matches cannot always use a conventional database index.
+    location = /api/search {
+        limit_req zone=media_search burst=10 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
     location = /api/users/me/avatar {
         # Multipart framing must fit in addition to the 5 MiB file itself.
         client_max_body_size 6m;
