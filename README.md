@@ -69,8 +69,8 @@ The next project goals are:
    reauthentication for high-risk account changes.
 2. Add database integration tests, browser CI, migration checks, and automated
    release/rollback workflows around the deployed versioned migrations.
-3. Complete upload decode/re-encode, metadata stripping, quotas, and scheduled
-   cleanup for abandoned uploads.
+3. Add upload quotas, responsive derivatives, and scheduled cleanup for
+   abandoned uploads on top of the deployed decode/re-encode pipeline.
 4. Add metrics, alerts, retention policy, and restore drills around the deployed
    health endpoints and privacy-redacted JSON request logs.
 5. Expand the responsive product with relationships, notifications, moderation,

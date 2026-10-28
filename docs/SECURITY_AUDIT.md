@@ -217,32 +217,36 @@ tests.
 
 #### SEC-007 — Upload validation is insufficient
 
-**Status (2026-10-28): content, ownership, and lifecycle controls improved; re-encoding remains open.** The upload tree is
+**Status (2026-10-28): content decoding, metadata removal, ownership, and
+lifecycle controls deployed; quotas and abandoned-file cleanup remain open.** The upload tree is
 now owned by `www-data:www-data` with `0750` directories and `0640` files, is the
 service's only writable application path, and remains readable through Nginx.
 Nginx enforces route-specific body limits and serves only selected image media
 types. The backend now checks filename extension, declared MIME, magic bytes,
-basic JPEG/PNG/WebP structure, and decoded dimensions before creating a
-server-controlled filename. GIF, SVG, mismatches, excessive dimensions, and
-malformed headers are rejected. Axum and Nginx multipart limits are aligned,
-filesystem writes no longer block async workers, image paths are bound to the
-authenticated owner's UUID, failed avatar writes are rolled back, and replaced
-or deleted referenced images are removed safely. Abandoned pre-attachment
-uploads, full decoder validation, metadata stripping, re-encoding, and quotas
-remain open.
+basic JPEG/PNG/WebP structure, and decoded dimensions before fully decoding and
+re-encoding pixels into the same controlled format. EXIF orientation is applied,
+then EXIF/comments/XMP/ICC data are discarded. GIF, SVG, mismatches, excessive
+dimensions, malformed streams, and oversized encoded results are rejected.
+Decoder work has per-file memory/pixel/dimension limits, a global two-job budget,
+blocking-pool isolation, and a systemd memory ceiling. Avatars are capped at 1024
+px. Axum and Nginx multipart limits are aligned, filesystem writes no longer
+block async workers, image paths are bound to the authenticated owner's UUID,
+failed avatar writes are rolled back, and replaced or deleted referenced images
+are removed safely. Abandoned pre-attachment uploads, per-account quotas,
+responsive post derivatives, and scheduled orphan cleanup remain open.
 
 - The UI permits files up to 10 MB; the initial vhost had no explicit body limit.
-- Upload handling still does not fully decode/re-encode images or cap processing
-  time and decompression cost beyond header-derived pixel limits.
+- Processing is now bounded by encoded bytes, decoded bytes, dimensions, pixels,
+  concurrency, endpoint rate limits, and the service memory cgroup. A hard
+  per-job CPU timeout is not available because blocking decoders cannot be safely
+  cancelled mid-operation; concurrency remains the primary CPU containment.
 - Uploads are served from the primary origin, increasing active-content risk.
 - At initial review, upload directories were `755 micu:micu` while the service
   ran as `www-data`, preventing backend writes.
 
-**Remediation:** use a dedicated writable directory owned by the service, outside
-the release tree; accept a minimal image allowlist; inspect magic bytes; decode
-and re-encode; strip metadata; cap bytes, pixels, frames, and processing time;
-generate names; reject SVG/HTML; scan when appropriate; and serve from a separate
-cookieless media origin with strict content headers.
+**Follow-up:** add account/storage quotas, scheduled orphan cleanup, responsive
+derivatives, decoder performance telemetry, and a separate cookieless media
+origin. Reassess the locked image stack promptly when decoder advisories appear.
 
 #### SEC-008 — Authentication controls are below a safe baseline
 

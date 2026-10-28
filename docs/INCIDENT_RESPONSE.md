@@ -114,7 +114,9 @@ locked dependency and RustSec review.
   automated MTTD remains unknown because alerts are not yet deployed.
 - Response: this runbook is documented; the scenario walkthrough confirmed the
   stop, binary rollback, readiness, evidence, and credential-rotation decisions.
-  A live restore drill and multi-person tabletop remain open.
+  The first canary exercised and verified the automatic live binary rollback
+  path before a second canary passed. A backup restore drill and multi-person
+  tabletop remain open.
 - Regulatory window: GDPR assessment starts immediately; the applicable
   supervisory-authority notification window may be 72 hours after awareness.
 - Supply chain: no new vendor or processor; one locked pure-Rust image stack with

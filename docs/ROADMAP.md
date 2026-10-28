@@ -43,7 +43,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-28: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 32 unit
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 33 unit
 tests, embedded versioned MySQL migrations, a validated canary flow, and deployed
 rollback artifacts. The frontend has
 a locked dependency graph with zero npm audit findings and builds from a source
@@ -119,12 +119,18 @@ end-to-end IDOR/concurrency tests remain open.
 
 **Progress (2026-10-28):** JPEG/PNG/WebP signatures, MIME, extension, structure,
 dimensions, byte limits, generated names, owner-bound paths, async writes, and
-replacement/deletion cleanup are deployed. Re-encoding, metadata removal,
-quotas, thumbnails, and scheduled cleanup for abandoned uploads remain open.
+replacement/deletion cleanup are deployed. New files are fully decoded and
+re-encoded from pixels, which removes EXIF/comments/XMP/ICC data; EXIF orientation
+is applied first. Decoder work runs outside the async executor with a two-job
+limit, 16 MP/8192 px input ceilings, a 96 MiB per-job decode budget, strict
+encoded-output caps, and the existing 512 MiB systemd ceiling. Avatars are reduced
+to at most 1024 px. Quotas, responsive post derivatives, and scheduled cleanup
+for abandoned uploads remain open.
 
-- JPEG/PNG/WebP allowlist; magic-byte and decoder validation; re-encoding.
+- JPEG/PNG/WebP allowlist; magic-byte and decoder validation; re-encoding. ✅
 - Byte, pixel, frame, compression-ratio, CPU, memory, and quota limits.
-- EXIF/metadata removal, generated filenames, deduplication, and orphan cleanup.
+- EXIF/metadata removal and generated filenames. ✅ Add deduplication, quotas,
+  and scheduled orphan cleanup.
 - Thumbnail/responsive-image pipeline and separate cookieless media origin.
 - Malware scanning where useful; quarantine and moderation workflow.
 - Strict CSP without `unsafe-inline`, Trusted Types where supported, and no
