@@ -6,6 +6,7 @@ import CreatePost from '../components/CreatePost';
 import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import PageMeta from '../components/PageMeta';
+import SiteFooter from '../components/SiteFooter';
 import { getImageUrl } from '../utils/urls';
 
 const FEED_PAGE_SIZE = 10;
@@ -30,8 +31,9 @@ function LoadingFeed() {
 
 function Landing() {
   return (
-    <main class="landing">
-      <section class="landing-hero app-container" aria-labelledby="landing-title">
+    <>
+      <main class="landing">
+        <section class="landing-hero app-container" aria-labelledby="landing-title">
         <div class="hero-copy">
           <div class="eyebrow">
             <span aria-hidden="true">●</span>
@@ -93,8 +95,45 @@ function Landing() {
             <p class="preview-copy">Bun venit într-un feed mai calm.</p>
           </div>
         </div>
-      </section>
-    </main>
+        </section>
+
+        <section class="landing-features app-container" aria-labelledby="landing-features-title">
+          <div class="section-heading">
+            <p class="sidebar-eyebrow">Tot ce ai nevoie</p>
+            <h2 id="landing-features-title">O experiență socială simplă, pe orice ecran.</h2>
+          </div>
+          <div class="principles-grid">
+            <article class="surface feature-card">
+              <span class="feature-icon" aria-hidden="true">✦</span>
+              <h3>Publică fără fricțiune</h3>
+              <p>Împărtășește texte și imagini într-un composer rapid, cu validări clare și stări utile.</p>
+            </article>
+            <article class="surface feature-card">
+              <span class="feature-icon" aria-hidden="true">⌕</span>
+              <h3>Descoperă comunitatea</h3>
+              <p>Caută oameni și conversații, urmărește profiluri și continuă discuția prin comentarii.</p>
+            </article>
+            <article class="surface feature-card">
+              <span class="feature-icon" aria-hidden="true">◎</span>
+              <h3>Conceput pentru mobil</h3>
+              <p>Navigația, feedul și setările rămân clare de la 320 px până la ecrane desktop.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="landing-cta app-container">
+          <div class="surface public-callout">
+            <div>
+              <p class="sidebar-eyebrow">Începe acum</p>
+              <h2>Primul mesaj bun poate porni o comunitate.</h2>
+              <p>Contul este gratuit, iar profilul tău poate fi gata în mai puțin de un minut.</p>
+            </div>
+            <A href="/register" class="btn btn-primary">Creează profilul</A>
+          </div>
+        </section>
+      </main>
+      <SiteFooter />
+    </>
   );
 }
 

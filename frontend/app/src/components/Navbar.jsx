@@ -77,6 +77,13 @@ export default function Navbar() {
           </div>
         </Show>
 
+        <Show when={!auth.isAuthenticated() && !auth.loading()}>
+          <div class="nav-links public-nav-links">
+            <A href="/despre" class={`nav-link ${location.pathname === '/despre' ? 'is-active' : ''}`}>Despre</A>
+            <A href="/reguli" class={`nav-link ${location.pathname === '/reguli' ? 'is-active' : ''}`}>Reguli</A>
+          </div>
+        </Show>
+
         <div class="nav-actions">
           <button
             type="button"

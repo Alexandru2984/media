@@ -93,10 +93,47 @@ server {
         add_header Cache-Control "public, max-age=3600" always;
     }
 
-    location / {
-        try_files $uri $uri/ /index.html;
+    location = / {
+        try_files /index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    location ~ ^/(despre|reguli)/?$ {
+        try_files /index.html =404;
+        include snippets/media-security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    # Unknown paths still boot the SPA so client-side navigation can render the
+    # branded not-found page, but the HTTP status remains a real 404 for SEO.
+    location / {
+        try_files $uri $uri/ @spa_not_found;
+        include snippets/media-security-headers.conf;
+        add_header Cache-Control "no-cache" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    location @spa_not_found {
+        internal;
+        error_page 418 =404 /_spa_not_found;
+        return 418;
+    }
+
+    location = /_spa_not_found {
+        internal;
+        try_files /index.html =404;
+        include snippets/media-security-headers.conf;
+        add_header Cache-Control "no-store" always;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
         add_header Cross-Origin-Opener-Policy "same-origin" always;
         add_header Cross-Origin-Resource-Policy "same-origin" always;
         add_header X-Permitted-Cross-Domain-Policies "none" always;

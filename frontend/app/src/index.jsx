@@ -12,6 +12,9 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmailChange from './pages/VerifyEmailChange';
 import Search from './pages/Search';
+import About from './pages/About';
+import CommunityGuidelines from './pages/CommunityGuidelines';
+import NotFound from './pages/NotFound';
 import './index.css';
 
 const root = document.getElementById('root');
@@ -26,10 +29,13 @@ render(
           <Route path="/register" component={Register} />
           <Route path="/profile/:id" component={Profile} />
           <Route path="/search" component={Search} />
+          <Route path="/despre" component={About} />
+          <Route path="/reguli" component={CommunityGuidelines} />
           <Route path="/verify-email" component={VerifyEmail} />
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/verify-email-change" component={VerifyEmailChange} />
+          <Route path="*404" component={NotFound} />
         </Router>
       </AuthProvider>
     </ThemeProvider>
