@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import ProfileSettings from '../components/ProfileSettings';
+import PageMeta from '../components/PageMeta';
 import { getImageUrl } from '../utils/urls';
 
 function joinedDate(dateString) {
@@ -95,6 +96,12 @@ export default function Profile() {
 
   return (
     <>
+      <PageMeta
+        title={profile()?.username ? `${profile().username} — Media` : 'Profil — Media'}
+        description="Profil de utilizator pe Media."
+        canonicalPath={`/profile/${params.id}`}
+        noIndex
+      />
       <Navbar />
       <main class="profile-page app-container">
         <Show

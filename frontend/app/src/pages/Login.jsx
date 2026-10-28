@@ -2,6 +2,7 @@ import { A, useNavigate } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
+import PageMeta from '../components/PageMeta';
 
 function SubmitSpinner() {
   return (
@@ -38,6 +39,7 @@ export default function Login() {
 
   return (
     <>
+      <PageMeta title="Conectare — Media" description="Conectează-te în contul tău Media." canonicalPath="/login" noIndex />
       <Navbar />
       <main class="auth-page">
         <div class="auth-layout app-container">

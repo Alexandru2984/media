@@ -3,6 +3,7 @@ import { createSignal, onCleanup, Show } from 'solid-js';
 import { api } from '../api';
 import AccountFlow, { StatusMark } from '../components/AccountFlow';
 import { getPasswordPolicyError } from '../utils/passwords';
+import PageMeta from '../components/PageMeta';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -48,6 +49,7 @@ export default function ResetPassword() {
 
   return (
     <AccountFlow>
+      <PageMeta title="Alege o parolă nouă — Media" description="Setează o parolă nouă pentru contul Media." canonicalPath="/reset-password" noIndex />
       <Show
         when={!success()}
         fallback={

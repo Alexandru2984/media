@@ -5,6 +5,7 @@ import { api } from '../api';
 import CreatePost from '../components/CreatePost';
 import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
+import PageMeta from '../components/PageMeta';
 import { getImageUrl } from '../utils/urls';
 
 function LoadingFeed() {
@@ -126,6 +127,11 @@ export default function Home() {
 
   return (
     <>
+      <PageMeta
+        title={auth.isAuthenticated() ? 'Feedul tău — Media' : 'Media — conversații care contează'}
+        description="Descoperă o comunitate online pentru idei, imagini și conversații autentice. Creează gratuit un profil pe Media."
+        canonicalPath="/"
+      />
       <Navbar />
       <Show
         when={!auth.loading()}

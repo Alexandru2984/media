@@ -2,6 +2,7 @@ import { A, useNavigate } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
+import PageMeta from '../components/PageMeta';
 import { getPasswordPolicyError } from '../utils/passwords';
 
 export default function Register() {
@@ -38,6 +39,7 @@ export default function Register() {
 
   return (
     <>
+      <PageMeta title="Creează un cont — Media" description="Creează gratuit un profil Media și intră în comunitate." canonicalPath="/register" noIndex />
       <Navbar />
       <main class="auth-page">
         <div class="auth-layout app-container">

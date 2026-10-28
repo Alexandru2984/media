@@ -2,6 +2,7 @@ import { A, useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { api } from '../api';
 import AccountFlow, { StatusMark } from '../components/AccountFlow';
+import PageMeta from '../components/PageMeta';
 
 export default function VerifyEmailChange() {
   const [searchParams] = useSearchParams();
@@ -33,6 +34,7 @@ export default function VerifyEmailChange() {
 
   return (
     <AccountFlow>
+      <PageMeta title="Confirmă noua adresă — Media" description="Confirmă schimbarea adresei de email pentru contul Media." canonicalPath="/verify-email-change" noIndex />
       <div class="account-status">
         <Show when={status() === 'loading'}>
           <StatusMark tone="info"><svg class="spinner" width="28" height="28" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".25" stroke-width="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg></StatusMark>

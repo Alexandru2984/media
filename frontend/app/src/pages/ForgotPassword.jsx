@@ -2,6 +2,7 @@ import { A } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import { api } from '../api';
 import AccountFlow, { StatusMark } from '../components/AccountFlow';
+import PageMeta from '../components/PageMeta';
 
 export default function ForgotPassword() {
   const [email, setEmail] = createSignal('');
@@ -26,6 +27,7 @@ export default function ForgotPassword() {
 
   return (
     <AccountFlow>
+      <PageMeta title="Recuperează parola — Media" description="Solicită un link securizat pentru resetarea parolei Media." canonicalPath="/forgot-password" noIndex />
       <Show
         when={!sent()}
         fallback={
