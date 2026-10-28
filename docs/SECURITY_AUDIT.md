@@ -88,7 +88,9 @@ key `your-secret-key-here-change-in-production`. A non-destructive token for an
 inexistent UUID proved that the live backend accepted that key. An intermediate
 release corrected secret handling and rotated the key. The final remediation
 removed JWT creation, validation, bearer-token routes, the dependency, and
-frontend `localStorage` credentials. The retired migration endpoint returns `404`.
+frontend `localStorage` credentials. The retired migration endpoint returns
+`404`, and the obsolete `JWT_SECRET` entry has been removed from the production
+environment after a restricted local backup.
 
 **Follow-up:** add session anomaly alerts and review logs and account activity for
 evidence of forged-session use before the retirement.
