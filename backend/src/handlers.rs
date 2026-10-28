@@ -408,50 +408,78 @@ pub async fn like_post(
     let user_id = get_current_user(&headers).await?;
     let like_id = Uuid::new_v4().to_string();
     let now = Utc::now();
-
-    // Check if already liked
-    let count: i64 = query_scalar("SELECT COUNT(*) FROM likes WHERE post_id = ? AND user_id = ?")
-        .bind(&post_id)
-        .bind(&user_id)
-        .fetch_one(&pool)
+    let mut transaction = pool
+        .begin()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    if count > 0 {
-        // Unlike
+    // Lock the post so concurrent toggles cannot race the denormalized counter.
+    let post_exists: Option<String> = query_scalar("SELECT id FROM posts WHERE id = ? FOR UPDATE")
+        .bind(&post_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if post_exists.is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    let existing_like: Option<String> =
+        query_scalar("SELECT id FROM likes WHERE post_id = ? AND user_id = ? FOR UPDATE")
+            .bind(&post_id)
+            .bind(&user_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let liked = if existing_like.is_some() {
         query("DELETE FROM likes WHERE post_id = ? AND user_id = ?")
             .bind(&post_id)
             .bind(&user_id)
-            .execute(&pool)
+            .execute(&mut *transaction)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        query("UPDATE posts SET likes_count = likes_count - 1 WHERE id = ?")
+        query("UPDATE posts SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = ?")
             .bind(&post_id)
-            .execute(&pool)
+            .execute(&mut *transaction)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        Ok(Json(json!({"liked": false})))
+        false
     } else {
-        // Like
         query("INSERT INTO likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)")
             .bind(&like_id)
             .bind(&post_id)
             .bind(&user_id)
             .bind(now)
-            .execute(&pool)
+            .execute(&mut *transaction)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         query("UPDATE posts SET likes_count = likes_count + 1 WHERE id = ?")
             .bind(&post_id)
-            .execute(&pool)
+            .execute(&mut *transaction)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-        Ok(Json(json!({"liked": true})))
-    }
+        true
+    };
+
+    let likes_count: i64 = query_scalar("SELECT likes_count FROM posts WHERE id = ?")
+        .bind(&post_id)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(json!({
+        "liked": liked,
+        "likes_count": likes_count
+    })))
 }
 
 // Comment handlers
@@ -469,6 +497,19 @@ pub async fn create_comment(
 
     let comment_id = Uuid::new_v4().to_string();
     let now = Utc::now();
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let post_exists: Option<String> = query_scalar("SELECT id FROM posts WHERE id = ? FOR UPDATE")
+        .bind(&post_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if post_exists.is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
 
     query(
         "INSERT INTO comments (id, post_id, user_id, content, created_at, updated_at)
@@ -480,20 +521,25 @@ pub async fn create_comment(
     .bind(content)
     .bind(now)
     .bind(now)
-    .execute(&pool)
+    .execute(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let comment = query_as::<_, Comment>("SELECT * FROM comments WHERE id = ?")
         .bind(&comment_id)
-        .fetch_one(&pool)
+        .fetch_one(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Update comments count
     query("UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?")
         .bind(&post_id)
-        .execute(&pool)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -1077,11 +1123,14 @@ pub async fn delete_comment(
     headers: HeaderMap,
 ) -> Result<Json<Value>, StatusCode> {
     let user_id = get_current_user(&headers).await?;
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // Check ownership
-    let comment = query_as::<_, Comment>("SELECT * FROM comments WHERE id = ?")
+    let comment = query_as::<_, Comment>("SELECT * FROM comments WHERE id = ? FOR UPDATE")
         .bind(&comment_id)
-        .fetch_optional(&pool)
+        .fetch_optional(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
@@ -1094,14 +1143,19 @@ pub async fn delete_comment(
 
     query("DELETE FROM comments WHERE id = ?")
         .bind(&comment_id)
-        .execute(&pool)
+        .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Update comments count
-    query("UPDATE posts SET comments_count = comments_count - 1 WHERE id = ?")
+    query("UPDATE posts SET comments_count = GREATEST(comments_count - 1, 0) WHERE id = ?")
         .bind(&post_id)
-        .execute(&pool)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
