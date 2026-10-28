@@ -17,6 +17,7 @@ export default function CommunityGuidelines() {
         title="Regulile comunității — Media"
         description="Regulile simple care păstrează comunitatea Media sigură, autentică și primitoare pentru toată lumea."
         canonicalPath="/reguli"
+        schemaType="WebPage"
       />
       <Navbar />
       <main class="public-page">

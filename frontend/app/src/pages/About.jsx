@@ -28,6 +28,7 @@ export default function About() {
         title="Despre Media — o comunitate pentru conversații autentice"
         description="Află cum este construită Media: o platformă socială românească, simplă, responsive și orientată către conversații autentice."
         canonicalPath="/despre"
+        schemaType="AboutPage"
       />
       <Navbar />
       <main class="public-page">

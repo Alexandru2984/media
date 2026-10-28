@@ -93,6 +93,15 @@ server {
         add_header Cache-Control "public, max-age=3600" always;
     }
 
+    location = /og/media-social-preview.png {
+        try_files $uri =404;
+        default_type image/png;
+        include snippets/media-security-headers.conf;
+        add_header Cache-Control "public, max-age=86400" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
     location = / {
         try_files /index.html =404;
         include snippets/media-security-headers.conf;
@@ -103,7 +112,7 @@ server {
     }
 
     location ~ ^/(despre|reguli)/?$ {
-        try_files /index.html =404;
+        try_files /$1/index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
         add_header Cross-Origin-Opener-Policy "same-origin" always;

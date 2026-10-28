@@ -198,6 +198,7 @@ export default function Home() {
         title={auth.isAuthenticated() ? 'Feedul tău — Media' : 'Media — conversații care contează'}
         description="Descoperă o comunitate online pentru idei, imagini și conversații autentice. Creează gratuit un profil pe Media."
         canonicalPath="/"
+        schemaType="WebSite"
       />
       <Navbar />
       <Show
