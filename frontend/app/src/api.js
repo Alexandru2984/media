@@ -104,6 +104,18 @@ class ApiService {
     return this.request(`/users/${userId}/block`, { method: 'DELETE' });
   }
 
+  async muteUser(userId) {
+    return this.request(`/users/${encodeURIComponent(userId)}/mute`, { method: 'PUT' });
+  }
+
+  async unmuteUser(userId) {
+    return this.request(`/users/${encodeURIComponent(userId)}/mute`, { method: 'DELETE' });
+  }
+
+  async getMutedUsers(limit = 20, offset = 0) {
+    return this.request(`/users/me/mutes?limit=${limit}&offset=${offset}`);
+  }
+
   async getFollowers(userId, limit = 20, offset = 0) {
     return this.request(`/users/${userId}/followers?limit=${limit}&offset=${offset}`);
   }
@@ -161,6 +173,39 @@ class ApiService {
 
   async getSavedPosts(limit = 10, offset = 0) {
     return this.request(`/saved-posts?limit=${limit}&offset=${offset}`);
+  }
+
+  async hidePost(postId) {
+    return this.request(`/posts/${encodeURIComponent(postId)}/hide`, { method: 'PUT' });
+  }
+
+  async unhidePost(postId) {
+    return this.request(`/posts/${encodeURIComponent(postId)}/hide`, { method: 'DELETE' });
+  }
+
+  async getHiddenPosts(limit = 20, offset = 0) {
+    return this.request(`/hidden-posts?limit=${limit}&offset=${offset}`);
+  }
+
+  // Reporter-private trust and safety records
+  async createReport(targetType, targetId, reason, details = '') {
+    return this.request('/reports', {
+      method: 'POST',
+      body: JSON.stringify({
+        target_type: targetType,
+        target_id: targetId,
+        reason,
+        details,
+      }),
+    });
+  }
+
+  async getReports(limit = 20, offset = 0) {
+    return this.request(`/reports?limit=${limit}&offset=${offset}`);
+  }
+
+  async withdrawReport(reportId) {
+    return this.request(`/reports/${encodeURIComponent(reportId)}`, { method: 'DELETE' });
   }
 
   // Notifications

@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import ProfileSettings from '../components/ProfileSettings';
 import PageMeta from '../components/PageMeta';
+import ReportDialog from '../components/ReportDialog';
 import { getImageUrl } from '../utils/urls';
 
 function joinedDate(dateString) {
@@ -122,6 +123,7 @@ export default function Profile() {
         setProfile((current) => ({
           ...current,
           is_blocked: true,
+          is_muted: false,
           is_following: false,
           follow_request_pending: false,
           can_view_content: false,
@@ -132,6 +134,23 @@ export default function Profile() {
     } catch (requestError) {
       console.error('Failed to update block relationship:', requestError);
       setError('Blocarea nu a putut fi actualizată. Încearcă din nou.');
+    } finally {
+      setRelationshipPending(false);
+    }
+  };
+
+  const handleMute = async () => {
+    if (!profile() || relationshipPending()) return;
+    setRelationshipPending(true);
+    setError('');
+    const wasMuted = Boolean(profile().is_muted);
+    try {
+      if (wasMuted) await api.unmuteUser(profile().id);
+      else await api.muteUser(profile().id);
+      setProfile((current) => ({ ...current, is_muted: !wasMuted }));
+    } catch (requestError) {
+      console.error('Failed to update mute relationship:', requestError);
+      setError('Silențierea nu a putut fi actualizată. Încearcă din nou.');
     } finally {
       setRelationshipPending(false);
     }
@@ -205,6 +224,10 @@ export default function Profile() {
                           Cereri <span class="button-count">{profile()?.pending_follow_requests_count}</span>
                         </A>
                       </Show>
+                      <A href="/siguranta" class="btn btn-secondary">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.8 3 7.9 7.5 9.5 4.5-1.6 7.5-4.7 7.5-9.5V6L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+                        Siguranță
+                      </A>
                       <button type="button" class="btn btn-secondary" onClick={() => setEditing(true)}>
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L20 6.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
                         Editează profilul
@@ -224,6 +247,15 @@ export default function Profile() {
                             ? 'Se actualizează…'
                             : (profile()?.is_following ? 'Urmărești' : (profile()?.follow_request_pending ? 'Cerere trimisă' : 'Urmărește'))}
                         </button>
+                        <button
+                          type="button"
+                          class="btn btn-secondary"
+                          onClick={handleMute}
+                          disabled={relationshipPending()}
+                          aria-pressed={Boolean(profile()?.is_muted)}
+                        >
+                          {profile()?.is_muted ? 'Reactivează' : 'Silențiază'}
+                        </button>
                       </Show>
                       <button
                         type="button"
@@ -233,6 +265,12 @@ export default function Profile() {
                       >
                         {profile()?.is_blocked ? 'Deblochează' : 'Blochează'}
                       </button>
+                      <ReportDialog
+                        targetType="user"
+                        targetId={profile()?.id}
+                        subjectLabel={`contul ${profile()?.username}`}
+                        class="btn btn-danger-ghost"
+                      />
                     </div>
                   </Show>
                 </div>

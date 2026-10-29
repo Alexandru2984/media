@@ -3,6 +3,7 @@ import { useNavigate } from '@solidjs/router';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import { getImageUrl } from '../utils/urls';
+import ReportDialog from './ReportDialog';
 
 const MAX_CONTENT_LENGTH = 500;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -50,6 +51,7 @@ export default function PostCard(props) {
   const [editImagePreview, setEditImagePreview] = createSignal(null);
   const [removeImage, setRemoveImage] = createSignal(false);
   const [error, setError] = createSignal('');
+  const [hidden, setHidden] = createSignal(false);
   let editFileInput;
 
   const isOwn = () => auth.user()?.id === props.post.user.id;
@@ -209,6 +211,19 @@ export default function PostCard(props) {
     }
   };
 
+  const handleHidePost = async () => {
+    if (hidden()) return;
+    setError('');
+    try {
+      await api.hidePost(props.post.id);
+      setHidden(true);
+      await props.onHiddenChange?.(props.post.id);
+    } catch (requestError) {
+      console.error('Failed to hide post:', requestError);
+      setError('Postarea nu a putut fi ascunsă.');
+    }
+  };
+
   const handleEditComment = async (commentId) => {
     const content = editCommentText().trim();
     if (!content) return;
@@ -237,6 +252,7 @@ export default function PostCard(props) {
   };
 
   return (
+    <Show when={!hidden()}>
     <article class="surface post-card">
       <header class="post-header">
         <button type="button" class="post-author" onClick={() => openProfile(props.post.user.id)}>
@@ -261,6 +277,21 @@ export default function PostCard(props) {
             </button>
             <button type="button" class="icon-button danger" onClick={handleDeletePost} aria-label="Șterge postarea" title="Șterge">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16m-10 4v6m4-6v6M9 7l1-3h4l1 3m3 0-1 14H7L6 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+          </div>
+        </Show>
+        <Show when={!isOwn() && !editing()}>
+          <div class="post-owner-actions" aria-label="Acțiuni de siguranță">
+            <ReportDialog
+              targetType="post"
+              targetId={props.post.id}
+              subjectLabel="această postare"
+              class="icon-button"
+              compact
+              ariaLabel="Raportează postarea"
+            />
+            <button type="button" class="icon-button" onClick={handleHidePost} aria-label="Ascunde postarea" title="Ascunde">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.8 5.2A10.7 10.7 0 0 1 12 5c5.5 0 9 7 9 7a15.8 15.8 0 0 1-2.3 3.2M6.2 6.2C4.1 7.7 3 12 3 12s3.5 7 9 7a9.3 9.3 0 0 0 3-.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
             </button>
           </div>
         </Show>
@@ -436,6 +467,17 @@ export default function PostCard(props) {
                               <button type="button" class="comment-link danger" onClick={() => handleDeleteComment(comment.id)}>Șterge</button>
                             </div>
                           </Show>
+                          <Show when={auth.user()?.id !== comment.user.id}>
+                            <div class="comment-actions">
+                              <ReportDialog
+                                targetType="comment"
+                                targetId={comment.id}
+                                subjectLabel="acest comentariu"
+                                class="comment-link danger"
+                                label="Raportează"
+                              />
+                            </div>
+                          </Show>
                         </div>
                         <p class="comment-copy">{comment.content}</p>
                       </Show>
@@ -448,5 +490,6 @@ export default function PostCard(props) {
         </section>
       </Show>
     </article>
+    </Show>
   );
 }

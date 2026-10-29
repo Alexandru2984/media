@@ -18,6 +18,7 @@ import SavedPosts from './pages/SavedPosts';
 import Connections from './pages/Connections';
 import FollowRequests from './pages/FollowRequests';
 import Notifications from './pages/Notifications';
+import SafetyCenter from './pages/SafetyCenter';
 import NotFound from './pages/NotFound';
 import './index.css';
 
@@ -36,6 +37,7 @@ render(
           <Route path="/profile/:id/urmariri" component={Connections} />
           <Route path="/cereri" component={FollowRequests} />
           <Route path="/notificari" component={Notifications} />
+          <Route path="/siguranta" component={SafetyCenter} />
           <Route path="/search" component={Search} />
           <Route path="/salvate" component={SavedPosts} />
           <Route path="/despre" component={About} />
