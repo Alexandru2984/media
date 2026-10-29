@@ -18,6 +18,7 @@ const SECURITY_EVENT_COPY = Object.freeze({
   email_changed: ['Adresă de email schimbată', 'Noua adresă a fost confirmată și sesiunile vechi au fost închise.'],
   email_verified: ['Adresă de email verificată', 'Adresa contului a fost confirmată.'],
   account_data_exported: ['Date exportate', 'A fost generată o copie a datelor contului.'],
+  privacy_changed: ['Confidențialitate schimbată', 'Vizibilitatea profilului și a postărilor a fost actualizată.'],
 });
 
 function formatDate(value) {
@@ -35,7 +36,8 @@ function securityEventCopy(eventType) {
 
 export default function ProfileSettings(props) {
   const auth = useAuth();
-  const [activeTab, setActiveTab] = createSignal('avatar');
+  const [activeTab, setActiveTab] = createSignal('privacy');
+  const [updatingPrivacy, setUpdatingPrivacy] = createSignal(false);
   const [avatarFile, setAvatarFile] = createSignal(null);
   const [avatarPreview, setAvatarPreview] = createSignal(null);
   const [uploadingAvatar, setUploadingAvatar] = createSignal(false);
@@ -162,6 +164,34 @@ export default function ProfileSettings(props) {
     reader.onload = () => setAvatarPreview(reader.result);
     reader.onerror = () => showMessage('error', 'Imaginea nu a putut fi citită.');
     reader.readAsDataURL(file);
+  };
+
+  const handlePrivacyChange = async () => {
+    if (updatingPrivacy()) return;
+    const nextPrivate = !Boolean(props.profile?.is_private);
+    const pendingCount = Number(props.profile?.pending_follow_requests_count || 0);
+    if (!nextPrivate && pendingCount > 0
+      && !window.confirm(`Treci profilul pe public? Cele ${pendingCount} cereri în așteptare vor fi acceptate automat.`)) return;
+
+    setUpdatingPrivacy(true);
+    try {
+      const result = await api.updatePrivacy(nextPrivate);
+      auth.setUser((current) => current ? { ...current, is_private: Boolean(result.is_private) } : current);
+      await props.onUpdate?.();
+      setSecurityEventsLoaded(false);
+      const accepted = Number(result.accepted_requests || 0);
+      showMessage(
+        'success',
+        nextPrivate
+          ? 'Contul este acum privat. Numai urmăritorii acceptați îți pot vedea postările.'
+          : `Contul este acum public.${accepted > 0 ? ` ${accepted} cereri au fost acceptate.` : ''}`,
+      );
+    } catch (requestError) {
+      console.error('Failed to update privacy:', requestError);
+      showMessage('error', 'Confidențialitatea contului nu a putut fi actualizată.');
+    } finally {
+      setUpdatingPrivacy(false);
+    }
   };
 
   const clearAvatarSelection = () => {
@@ -307,6 +337,10 @@ export default function ProfileSettings(props) {
 
       <div class="settings-grid">
         <div class="settings-nav surface" role="tablist" aria-label="Categorii de setări">
+          <button type="button" role="tab" aria-selected={activeTab() === 'privacy'} class={activeTab() === 'privacy' ? 'is-active' : ''} onClick={() => selectTab('privacy')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" /></svg>
+            <span><strong>Confidențialitate</strong><small>Cont public sau privat</small></span>
+          </button>
           <button type="button" role="tab" aria-selected={activeTab() === 'avatar'} class={activeTab() === 'avatar' ? 'is-active' : ''} onClick={() => selectTab('avatar')}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" /><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" /></svg>
             <span><strong>Avatar</strong><small>Poza profilului</small></span>
@@ -336,6 +370,46 @@ export default function ProfileSettings(props) {
         <div class="surface settings-panel">
           <Show when={message().text}>
             <div class={`alert ${message().type === 'error' ? 'alert-error' : 'alert-success'}`} role="status">{message().text}</div>
+          </Show>
+
+          <Show when={activeTab() === 'privacy'}>
+            <div class="settings-section">
+              <h3>Confidențialitatea profilului</h3>
+              <p class="settings-description">Numele, avatarul și descrierea rămân vizibile pentru descoperirea profilului. Postările, imaginile, comentariile lor și listele de conexiuni respectă audiența aleasă.</p>
+
+              <div class="privacy-control">
+                <div class="privacy-control-copy">
+                  <span class="privacy-control-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" /></svg>
+                  </span>
+                  <div>
+                    <strong>Cont privat</strong>
+                    <p>{props.profile?.is_private ? 'Cererile noi trebuie aprobate de tine.' : 'Oricine îți poate vedea postările și te poate urmări direct.'}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class={`privacy-switch ${props.profile?.is_private ? 'is-active' : ''}`}
+                  role="switch"
+                  aria-checked={Boolean(props.profile?.is_private)}
+                  aria-label="Activează contul privat"
+                  onClick={handlePrivacyChange}
+                  disabled={updatingPrivacy()}
+                >
+                  <span />
+                </button>
+              </div>
+
+              <Show when={props.profile?.is_private}>
+                <div class="privacy-note">
+                  <strong>{Number(props.profile?.pending_follow_requests_count || 0)} cereri în așteptare</strong>
+                  <p>Urmăritorii existenți păstrează accesul. Blocarea unui cont îi elimină imediat și accesul, și cererea.</p>
+                  <Show when={Number(props.profile?.pending_follow_requests_count || 0) > 0}>
+                    <a href="/cereri" class="btn btn-secondary">Administrează cererile</a>
+                  </Show>
+                </div>
+              </Show>
+            </div>
           </Show>
 
           <Show when={activeTab() === 'avatar'}>

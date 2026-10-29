@@ -63,11 +63,17 @@ export default function Connections() {
     setPendingUserId(user.id);
     setError('');
     try {
-      const result = user.is_following
+      const result = (user.is_following || user.follow_request_pending)
         ? await api.unfollowUser(user.id)
         : await api.followUser(user.id);
       setUsers((current) => current.map((item) => (
-        item.id === user.id ? { ...item, is_following: Boolean(result.following) } : item
+        item.id === user.id
+          ? {
+            ...item,
+            is_following: Boolean(result.following),
+            follow_request_pending: Boolean(result.request_pending),
+          }
+          : item
       )));
     } catch (requestError) {
       console.error('Failed to update connection:', requestError);
@@ -156,11 +162,13 @@ export default function Connections() {
                     <Show when={user.id !== auth.user()?.id}>
                       <button
                         type="button"
-                        class={`btn ${user.is_following ? 'btn-secondary' : 'btn-primary'}`}
+                        class={`btn ${(user.is_following || user.follow_request_pending) ? 'btn-secondary' : 'btn-primary'}`}
                         onClick={() => toggleFollow(user)}
                         disabled={pendingUserId() === user.id}
                       >
-                        {pendingUserId() === user.id ? 'Se actualizează…' : (user.is_following ? 'Urmărești' : 'Urmărește')}
+                        {pendingUserId() === user.id
+                          ? 'Se actualizează…'
+                          : (user.is_following ? 'Urmărești' : (user.follow_request_pending ? 'Cerere trimisă' : 'Urmărește'))}
                       </button>
                     </Show>
                   </article>

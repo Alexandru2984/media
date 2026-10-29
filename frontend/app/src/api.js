@@ -112,6 +112,25 @@ class ApiService {
     return this.request(`/users/${userId}/following?limit=${limit}&offset=${offset}`);
   }
 
+  async updatePrivacy(isPrivate) {
+    return this.request('/users/me/privacy', {
+      method: 'PUT',
+      body: JSON.stringify({ is_private: isPrivate }),
+    });
+  }
+
+  async getFollowRequests(limit = 20, offset = 0) {
+    return this.request(`/users/me/follow-requests?limit=${limit}&offset=${offset}`);
+  }
+
+  async acceptFollowRequest(userId) {
+    return this.request(`/users/me/follow-requests/${userId}`, { method: 'PUT' });
+  }
+
+  async rejectFollowRequest(userId) {
+    return this.request(`/users/me/follow-requests/${userId}`, { method: 'DELETE' });
+  }
+
   // Posts
   async getPosts(limit = 10, offset = 0) {
     return this.request(`/posts?limit=${limit}&offset=${offset}`);

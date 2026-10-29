@@ -36,14 +36,11 @@ export default function Profile() {
     try {
       if (showLoader) setLoading(true);
       setError('');
-      const [profileData, userPosts] = await Promise.all([
-        api.getProfile(userId),
-        api.getUserPosts(userId),
-      ]);
+      const profileData = await api.getProfile(userId);
       setProfile(profileData);
       setUsername(profileData.username);
       setBio(profileData.bio || '');
-      setPosts(userPosts);
+      setPosts(profileData.can_view_content ? await api.getUserPosts(userId) : []);
     } catch (requestError) {
       console.error('Failed to load profile:', requestError);
       setError('Profilul nu a putut fi încărcat. Este posibil să nu mai existe.');
@@ -83,14 +80,17 @@ export default function Profile() {
     setRelationshipPending(true);
     setError('');
     const wasFollowing = Boolean(profile().is_following);
+    const wasPending = Boolean(profile().follow_request_pending);
     try {
-      const result = wasFollowing
+      const result = (wasFollowing || wasPending)
         ? await api.unfollowUser(profile().id)
         : await api.followUser(profile().id);
       const isFollowing = Boolean(result.following);
       setProfile((current) => ({
         ...current,
         is_following: isFollowing,
+        follow_request_pending: Boolean(result.request_pending),
+        can_view_content: isFollowing || !current.is_private,
         followers_count: Math.max(
           0,
           Number(current.followers_count || 0) + (isFollowing === wasFollowing ? 0 : (isFollowing ? 1 : -1)),
@@ -123,6 +123,8 @@ export default function Profile() {
           ...current,
           is_blocked: true,
           is_following: false,
+          follow_request_pending: false,
+          can_view_content: false,
           followers_count: Math.max(0, Number(current.followers_count || 0) - (current.is_following ? 1 : 0)),
         }));
         setPosts([]);
@@ -197,21 +199,30 @@ export default function Profile() {
 
                 <div class="profile-action-row">
                   <Show when={isOwnProfile() && !editing()}>
-                    <button type="button" class="btn btn-secondary" onClick={() => setEditing(true)}>
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L20 6.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
-                      Editează profilul
-                    </button>
+                    <div class="profile-owner-actions">
+                      <Show when={Number(profile()?.pending_follow_requests_count || 0) > 0}>
+                        <A href="/cereri" class="btn btn-primary">
+                          Cereri <span class="button-count">{profile()?.pending_follow_requests_count}</span>
+                        </A>
+                      </Show>
+                      <button type="button" class="btn btn-secondary" onClick={() => setEditing(true)}>
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L20 6.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+                        Editează profilul
+                      </button>
+                    </div>
                   </Show>
                   <Show when={!isOwnProfile() && profile()}>
                     <div class="profile-relationship-actions">
                       <Show when={!profile()?.is_blocked}>
                         <button
                           type="button"
-                          class={`btn ${profile()?.is_following ? 'btn-secondary' : 'btn-primary'}`}
+                          class={`btn ${(profile()?.is_following || profile()?.follow_request_pending) ? 'btn-secondary' : 'btn-primary'}`}
                           onClick={handleFollow}
                           disabled={relationshipPending()}
                         >
-                          {relationshipPending() ? 'Se actualizează…' : (profile()?.is_following ? 'Urmărești' : 'Urmărește')}
+                          {relationshipPending()
+                            ? 'Se actualizează…'
+                            : (profile()?.is_following ? 'Urmărești' : (profile()?.follow_request_pending ? 'Cerere trimisă' : 'Urmărește'))}
                         </button>
                       </Show>
                       <button
@@ -247,11 +258,19 @@ export default function Profile() {
                   }
                 >
                   <div class="profile-copy">
-                    <h1 id="profile-name">{profile()?.username}</h1>
+                    <div class="profile-title-row">
+                      <h1 id="profile-name">{profile()?.username}</h1>
+                      <Show when={profile()?.is_private}>
+                        <span class="privacy-badge" title="Cont privat">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" /></svg>
+                          Privat
+                        </span>
+                      </Show>
+                    </div>
                     <p class={`profile-bio ${profile()?.bio ? '' : 'is-empty'}`}>{profile()?.bio || 'Acest profil nu are încă o descriere.'}</p>
                     <div class="profile-meta">
                       <span><strong>{profile()?.posts_count ?? posts().length}</strong> {Number(profile()?.posts_count ?? posts().length) === 1 ? 'postare' : 'postări'}</span>
-                      <Show when={!profile()?.is_blocked}>
+                      <Show when={!profile()?.is_blocked && profile()?.can_view_content}>
                         <A href={`/profile/${params.id}/urmaritori`} class="profile-meta-link">
                           <strong>{profile()?.followers_count ?? 0}</strong> urmăritori
                         </A>
@@ -291,7 +310,7 @@ export default function Profile() {
                 <h2 id="profile-posts-title">Postări</h2>
                 <Show
                   when={posts().length > 0}
-                  fallback={<div class="surface state-card"><div><span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg></span><h2>{profile()?.is_blocked ? 'Cont blocat' : 'Nicio postare încă'}</h2><p>{profile()?.is_blocked ? 'Deblochează acest cont pentru a-i vedea din nou postările.' : 'Postările publicate de acest utilizator vor apărea aici.'}</p></div></div>}
+                  fallback={<div class="surface state-card"><div><span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg></span><h2>{profile()?.is_blocked ? 'Cont blocat' : (!profile()?.can_view_content ? 'Acest cont este privat' : 'Nicio postare încă')}</h2><p>{profile()?.is_blocked ? 'Deblochează acest cont pentru a-i vedea din nou postările.' : (!profile()?.can_view_content ? (profile()?.follow_request_pending ? 'Cererea ta a fost trimisă. Postările devin vizibile după acceptare.' : 'Trimite o cerere de urmărire pentru a vedea postările și conexiunile acestui profil.') : 'Postările publicate de acest utilizator vor apărea aici.')}</p></div></div>}
                 >
                   <div class="feed-list"><For each={posts()}>{(post) => <PostCard post={post} onDelete={() => loadProfile(params.id, false)} onUpdate={() => loadProfile(params.id, false)} />}</For></div>
                 </Show>
@@ -299,7 +318,7 @@ export default function Profile() {
             </Show>
 
             <Show when={activeTab() === 'settings' && isOwnProfile()}>
-              <ProfileSettings onUpdate={() => loadProfile(params.id, false)} />
+              <ProfileSettings profile={profile()} onUpdate={() => loadProfile(params.id, false)} />
             </Show>
           </Show>
         </Show>
