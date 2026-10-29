@@ -148,9 +148,52 @@ remain mandatory follow-up work.
   claim, transactional create/replace/delete, physical cleanup, avatar
   replacement, five-image pending enforcement, and cleanup of a 25-hour stale
   pending file. Canary accounts, rows, and files were removed afterward.
-- Residual risk: historical files are outside the registry, alerts remain
-  manual, and any future account-deletion feature must mark its registered files
-  for deletion before cascading the account row.
+- Residual risk at this checkpoint: historical files are outside the registry,
+  alerts remain manual, and account deletion still needs durable pre-cascade
+  file queueing.
 
 **Verdict:** ship with monitoring. Responsive derivatives, deduplication,
-telemetry/alerts, and account-deletion integration remain tracked follow-ups.
+telemetry/alerts, and the then-pending account-deletion integration remain
+tracked follow-ups. The following review records that later integration.
+
+## CISO review record — account export and deletion rollout
+
+**Date:** 2026-10-29
+
+- Top threats: information disclosure through an over-broad export
+  (medium/high), incomplete or cross-account media deletion (medium/high), and
+  denial of service through large synchronous exports or cleanup work
+  (medium/medium).
+- Blast radius: ordinary endpoint compromise is scoped to the authenticated
+  account and requires the current password; an API/database compromise could
+  still expose all application data and service credentials. Production held no
+  persistent users at the release checkpoint, and financial inputs remain
+  unavailable, so a defensible FAIR ALE cannot be calculated.
+- Detection: exports create a private security event, privacy endpoints retain
+  request-ID/status/latency logs without bodies, and blocked cleanup paths emit
+  errors. Automated mass-export, queue-age, and deletion-failure alerts do not
+  yet exist, so current MTTD remains unknown.
+- Response: the main runbook covers privacy incidents, evidence preservation,
+  account/session scope, and GDPR escalation. The release canary exercised bad
+  credentials, secret-free export, session invalidation, FK cascades, surviving
+  post counters, file removal, and queue drain; a multi-person tabletop and
+  backup restore drill remain open.
+- Regulatory window: a suspected personal-data breach requires immediate GDPR
+  assessment and may require supervisory-authority notification within 72 hours
+  after awareness. Export/deletion functionality alone does not establish
+  compliance or decide lawful retention and backup/legal-hold obligations.
+- Vendors/supply chain: no new vendor or processor was added. Existing VPS,
+  Cloudflare, SMTP, GitHub, and certificate-provider governance remains open.
+- Rollback: root-only artifacts are
+  `media-binary-pre-account-controls-20261029T020440Z-61eef8b`,
+  `media-nginx-pre-account-controls-20261029T020440Z-61eef8b`, and
+  `media-db-pre-account-controls-20261029T020440Z-61eef8b.sql` under
+  `/var/backups`; the previous frontend release remains available.
+
+**Verdict:** mitigate then ship. Release gates were password reauthentication,
+exact destructive confirmation, strict origin/rate controls, explicit export
+DTOs, a 10,000-record memory bound, transactional queueing/counter repair,
+reference-checked retryable cleanup, clean dependency audits, rollback artifacts,
+and a zero-residue production canary. Asynchronous large-account export,
+retention/legal-hold policy, privacy documentation, queue alerts, and restore
+testing remain mandatory follow-up work.

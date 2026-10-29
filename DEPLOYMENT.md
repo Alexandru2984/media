@@ -89,6 +89,15 @@ trebuie să treacă cel puțin:
 - endpointurile JWT/Bearer retrase -> `404`/`401`;
 - contul canary și toate rândurile sale eliminate la final.
 
+Pentru export/ștergere, canarul trebuie să includă două conturi și să verifice:
+
+- parola greșită și fraza de confirmare greșită sunt respinse;
+- exportul nu conține `password_hash`, `token_hash` sau valori de token;
+- like-urile și comentariile șterse corectează contoarele postărilor rămase;
+- sesiunile și toate FK-urile utilizatorului dispar după ștergere;
+- fișierele owner-bound și rândurile din `upload_deletion_queue` dispar;
+- contul martor rămâne intact până la cleanupul explicit al canarului.
+
 Nu afișa cookie-uri, parole, hashuri, environmentul sau URL-ul bazei în outputul
 CI/jurnal.
 
@@ -139,6 +148,11 @@ Cloudflare Tunnel.
 - Bază de date: migrațiile sunt forward-only. Nu șterge tabele sau coloane pentru
   rollback fără un plan testat; restaurează dumpul pre-migrare dacă schimbarea nu
   este backward-compatible.
+
+Migrarea `upload_deletion_queue` este aditivă și poate rămâne în schemă la un
+rollback de binar. Nu șterge manual rândurile `pending`: conțin cleanup fizic
+încă datorat. Rândurile `blocked` trebuie investigate individual; workerul nu
+execută o cale pe care nu o poate valida.
 
 O migrare backward-compatible poate rămâne în DB când binarul anterior o ignoră.
 Documentează explicit această decizie în incident/release notes.

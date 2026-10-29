@@ -7,7 +7,9 @@ comments. It also includes a paginated feed, community search, responsive mobile
 navigation, active-session controls, a private security-activity timeline,
 public project/community pages, real HTTP 404 handling, and account-bound upload
 quotas with automatic cleanup of abandoned images. Authenticated members can
-also keep a private, paginated collection of saved posts.
+also keep a private, paginated collection of saved posts, download a
+password-confirmed JSON copy of their account data, and permanently delete their
+account through a double-confirmed flow with retryable media cleanup.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -78,8 +80,11 @@ The next project goals are:
    health endpoints and privacy-redacted JSON request logs.
 5. Expand the responsive product with relationships, notifications, moderation,
    privacy controls, cursor pagination, and richer discovery.
-6. Add server-rendered or pre-rendered public profiles/posts, privacy/terms/help
-   pages, Search Console integration, and real-user Core Web Vitals monitoring.
+6. Complete the privacy program with a data inventory, retention schedule,
+   asynchronous large-account exports, DPIA screening, processor records, and
+   privacy/terms/help content.
+7. Add server-rendered or pre-rendered public profiles/posts, Search Console
+   integration, and real-user Core Web Vitals monitoring.
 
 See the [security audit](docs/SECURITY_AUDIT.md) and the
 [implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,

@@ -102,11 +102,17 @@ and protected against attacker-sized stored parameters.
 
 ### Authorization and data protection
 
-**Progress (2026-10-28):** user response DTOs exclude password hashes, content
+**Progress (2026-10-29):** user response DTOs exclude password hashes, content
 and identity inputs have server-side limits, image paths are owner-bound,
 like/comment counters are transactional and nonnegative, pagination is bounded,
-and major N+1 query paths were replaced with indexed joins. Central policy and
-end-to-end IDOR/concurrency tests remain open.
+and major N+1 query paths were replaced with indexed joins. A password-confirmed
+JSON export now covers profile data, content, interactions, messages, session
+metadata, security events, pending-action metadata, and upload metadata without
+credential or token material. Double-confirmed account deletion cascades private
+records, reconciles engagement counters on surviving posts, and queues owned
+media before the account FK cascade. Central policy, broad IDOR/concurrency
+tests, asynchronous large-account exports, retention, and legal-hold policy
+remain open.
 
 - Central authorization policy for every object and action.
 - IDOR/BOLA tests for profiles, posts, comments, messages, uploads, and admin APIs.
@@ -115,7 +121,9 @@ end-to-end IDOR/concurrency tests remain open.
 - Input schemas with Unicode normalization, length caps, safe rendering, and
   consistent RFC 9457-style errors.
 - Field-level response DTOs so hashes, internal flags, and tokens cannot leak.
-- Data export, account deletion, retention, legal hold, and privacy audit trails.
+- Data export and account deletion. ✅ Add asynchronous large-account exports,
+  retention enforcement, legal holds, consent/lawful-basis records, and a
+  separately protected privacy audit trail.
 
 ### Uploads and content
 
@@ -138,7 +146,7 @@ origin remain open.
 - JPEG/PNG/WebP allowlist; magic-byte and decoder validation; re-encoding. ✅
 - Byte, pixel, frame, compression-ratio, CPU, memory, and account quota limits. ✅
 - EXIF/metadata removal, generated filenames, and bounded abandoned-upload
-  cleanup. ✅ Add deduplication and lifecycle handling to future account deletion.
+  cleanup and retryable account-deletion integration. ✅ Add deduplication.
 - Thumbnail/responsive-image pipeline and separate cookieless media origin.
 - Malware scanning where useful; quarantine and moderation workflow.
 - Strict CSP without `unsafe-inline`, Trusted Types where supported, and no

@@ -2,20 +2,21 @@
 
 **System:** Media (`media.micutu.com`)
 
-**Audit date:** 2026-10-28
+**Audit date:** 2026-10-29
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
-**Verdict:** 🟠 Core containment, revocable sessions, versioned migrations, and
-bounded image re-encoding are deployed; broader authorization coverage,
-alerting, and recovery work remain
+**Verdict:** 🟠 Core containment, revocable sessions, versioned migrations,
+bounded image re-encoding, and user-facing export/deletion controls are deployed;
+broader authorization, privacy governance, alerting, and recovery work remain
 
 ## Scope and limitations
 
 The review covered the deployed frontend bundle, the compiled Rust backend,
 public HTTP behavior, Nginx virtual-host configuration, the systemd service,
 filesystem permissions, TLS behavior, and recoverable Rust dependency metadata.
-Only low-volume, non-destructive public requests were made.
+The initial review used only low-volume, non-destructive public requests; later
+releases used isolated disposable accounts for scoped destructive canaries.
 
 The legacy source and history were recovered on 2026-10-28, sanitized to remove
 real user uploads, and merged with the hardened deployment repository. A Rust
@@ -23,12 +24,15 @@ lockfile and minimal unit tests now exist, and the backend was rebuilt and
 deployed from the tracked source. Disposable accounts exercised login, session
 lookup, individual/bulk remote logout, cross-account IDOR rejection, the
 20-session cap, idle expiry, revoked-cookie rejection, private saved-post
-isolation, and cleanup against canary processes; the production database returned
-to zero users, sessions, posts, and saved rows afterward.
+isolation, export credential exclusion, password/confirmation rejection,
+engagement-counter reconciliation, account cascades, and physical media cleanup
+against canary processes; the production database returned to zero users,
+sessions, posts, saved rows, managed uploads, and queued deletions afterward.
 A staging environment remains absent, so IDOR for other objects, privilege
-boundaries, message privacy, and destructive actions are not yet safely covered
-end to end. No evidence of compromise was found, but absence of evidence is not
-evidence of absence.
+boundaries, and message privacy are not yet broadly covered end to end. The new
+destructive account flow received a focused two-account production canary, but
+general staging coverage remains absent. No evidence of compromise was found,
+but absence of evidence is not evidence of absence.
 
 ## Executive summary
 
@@ -57,7 +61,10 @@ with per-user isolation and bounded retention. Image re-encoding, upload quotas,
 and abandoned-file cleanup are deployed. Private saved posts use session-scoped
 state, transactional toggles, bounded pagination, and foreign-key cleanup; a
 two-account production canary verified that saved state does not cross account
-boundaries. Centralized authorization tests, metrics/alerting, and tested
+boundaries. Password-confirmed JSON export and double-confirmed account deletion
+are deployed with strict-origin enforcement, edge throttling, secret-free export
+DTOs, transactional counter repair, and a durable upload-deletion queue.
+Centralized authorization tests, privacy governance, metrics/alerting, and tested
 recovery remain open. One-time links now
 keep secrets in URL fragments, scrub them from browser history, and exchange them
 through POST bodies. API requests emit redacted JSON events with request IDs,
@@ -257,9 +264,8 @@ both file and row. Historical unregistered files are not deleted automatically.
   ran as `www-data`, preventing backend writes.
 
 **Follow-up:** add responsive derivatives, deduplication, decoder performance
-telemetry, lifecycle handling for future account deletion, and a separate
-cookieless media origin. Reassess the locked image stack promptly when decoder
-advisories appear.
+telemetry, queue alerts, and a separate cookieless media origin. Reassess the
+locked image stack promptly when decoder advisories appear.
 
 #### SEC-008 — Authentication controls are below a safe baseline
 
@@ -314,16 +320,40 @@ add a separately protected audit pipeline before relying on it for investigation
 **Remediation:** define SLOs, metrics, actionable alerts, log retention,
 backup/restore tests, a rollback command, and tabletop-tested incident runbooks.
 
-#### SEC-010 — Privacy and data lifecycle controls are not demonstrated
+#### SEC-010 — Privacy and data lifecycle controls are incomplete
 
-The database can hold emails, password hashes, private messages, posts, profile
-data, recovery tokens, and user media. No retention schedule, consent record,
-export/delete workflow, processor inventory, privacy policy implementation, or
-breach communication template was found.
+**Status (2026-10-29): export and account deletion partially mitigate the
+finding; governance and retention remain open.** The database can hold emails,
+password hashes, private messages, posts, profile data, recovery tokens, and user
+media.
+
+- An authenticated export requires the current password, takes one consistent
+  database snapshot, and returns only explicit DTOs. Password hashes, session
+  token hashes, and one-time token values are excluded. Export generation is
+  recorded in the private security timeline and responses are `no-store`.
+- Synchronous export is bounded at 10,000 related records to protect the API;
+  an asynchronous, encrypted delivery flow is still required for larger accounts.
+- Deletion requires the current password, the exact `STERGE CONTUL` phrase, the
+  configured origin, and a second browser confirmation. The edge applies the
+  stricter auth rate budget to both privacy endpoints.
+- Owned media URLs are copied transactionally into an FK-independent deletion
+  queue before the user cascade. A bounded worker rechecks live references,
+  removes only flat owner-bound paths, retries I/O failures, and refuses unsafe
+  paths. Likes/comments removed from other users' posts decrement their cached
+  counters in the same transaction.
+- A two-account production canary verified wrong-password/confirmation rejection,
+  export coverage and credential exclusion, session invalidation, database
+  cascades, counter reconciliation, physical file deletion, and an empty queue.
+
+No complete data inventory, retention schedule, consent/lawful-basis record,
+legal-hold procedure, processor inventory, privacy policy implementation, or
+breach communication template was found. This feature is not by itself a claim
+of GDPR compliance.
 
 **Remediation:** perform a data inventory and DPIA screening, minimize retained
-data, implement export/delete and retention jobs, document lawful bases and
-processors, and test the GDPR incident workflow.
+data, add asynchronous export and retention jobs, define deletion behavior for
+backups/legal holds, document lawful bases and processors, publish the privacy
+policy, and test the GDPR incident workflow.
 
 ### Medium
 
