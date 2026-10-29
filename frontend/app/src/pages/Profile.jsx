@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from '@solidjs/router';
+import { A, useNavigate, useParams } from '@solidjs/router';
 import { createEffect, createSignal, For, Show } from 'solid-js';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
@@ -28,6 +28,7 @@ export default function Profile() {
   const [bio, setBio] = createSignal('');
   const [activeTab, setActiveTab] = createSignal('posts');
   const [loadedProfileId, setLoadedProfileId] = createSignal(null);
+  const [relationshipPending, setRelationshipPending] = createSignal(false);
 
   const isOwnProfile = () => auth.user()?.id === params.id;
 
@@ -74,6 +75,63 @@ export default function Profile() {
       setError('Profilul nu a putut fi actualizat. Numele poate fi deja folosit.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleFollow = async () => {
+    if (!profile() || relationshipPending()) return;
+    setRelationshipPending(true);
+    setError('');
+    const wasFollowing = Boolean(profile().is_following);
+    try {
+      const result = wasFollowing
+        ? await api.unfollowUser(profile().id)
+        : await api.followUser(profile().id);
+      const isFollowing = Boolean(result.following);
+      setProfile((current) => ({
+        ...current,
+        is_following: isFollowing,
+        followers_count: Math.max(
+          0,
+          Number(current.followers_count || 0) + (isFollowing === wasFollowing ? 0 : (isFollowing ? 1 : -1)),
+        ),
+      }));
+    } catch (requestError) {
+      console.error('Failed to update follow relationship:', requestError);
+      setError(requestError.status === 403
+        ? 'Relația nu poate fi modificată deoarece unul dintre conturi l-a blocat pe celălalt.'
+        : 'Relația nu a putut fi actualizată. Încearcă din nou.');
+    } finally {
+      setRelationshipPending(false);
+    }
+  };
+
+  const handleBlock = async () => {
+    if (!profile() || relationshipPending()) return;
+    const wasBlocked = Boolean(profile().is_blocked);
+    if (!wasBlocked && !window.confirm(`Blochezi contul ${profile().username}? Nu vă veți mai putea urmări sau contacta.`)) return;
+
+    setRelationshipPending(true);
+    setError('');
+    try {
+      if (wasBlocked) {
+        await api.unblockUser(profile().id);
+        await loadProfile(profile().id, false);
+      } else {
+        await api.blockUser(profile().id);
+        setProfile((current) => ({
+          ...current,
+          is_blocked: true,
+          is_following: false,
+          followers_count: Math.max(0, Number(current.followers_count || 0) - (current.is_following ? 1 : 0)),
+        }));
+        setPosts([]);
+      }
+    } catch (requestError) {
+      console.error('Failed to update block relationship:', requestError);
+      setError('Blocarea nu a putut fi actualizată. Încearcă din nou.');
+    } finally {
+      setRelationshipPending(false);
     }
   };
 
@@ -144,6 +202,28 @@ export default function Profile() {
                       Editează profilul
                     </button>
                   </Show>
+                  <Show when={!isOwnProfile() && profile()}>
+                    <div class="profile-relationship-actions">
+                      <Show when={!profile()?.is_blocked}>
+                        <button
+                          type="button"
+                          class={`btn ${profile()?.is_following ? 'btn-secondary' : 'btn-primary'}`}
+                          onClick={handleFollow}
+                          disabled={relationshipPending()}
+                        >
+                          {relationshipPending() ? 'Se actualizează…' : (profile()?.is_following ? 'Urmărești' : 'Urmărește')}
+                        </button>
+                      </Show>
+                      <button
+                        type="button"
+                        class="btn btn-danger-ghost"
+                        onClick={handleBlock}
+                        disabled={relationshipPending()}
+                      >
+                        {profile()?.is_blocked ? 'Deblochează' : 'Blochează'}
+                      </button>
+                    </div>
+                  </Show>
                 </div>
 
                 <Show
@@ -171,6 +251,14 @@ export default function Profile() {
                     <p class={`profile-bio ${profile()?.bio ? '' : 'is-empty'}`}>{profile()?.bio || 'Acest profil nu are încă o descriere.'}</p>
                     <div class="profile-meta">
                       <span><strong>{profile()?.posts_count ?? posts().length}</strong> {Number(profile()?.posts_count ?? posts().length) === 1 ? 'postare' : 'postări'}</span>
+                      <Show when={!profile()?.is_blocked}>
+                        <A href={`/profile/${params.id}/urmaritori`} class="profile-meta-link">
+                          <strong>{profile()?.followers_count ?? 0}</strong> urmăritori
+                        </A>
+                        <A href={`/profile/${params.id}/urmariri`} class="profile-meta-link">
+                          <strong>{profile()?.following_count ?? 0}</strong> urmăriri
+                        </A>
+                      </Show>
                       <Show when={joinedDate(profile()?.created_at)}>
                         <span>
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 3v4m8-4v4M3 10h18" stroke="currentColor" stroke-width="1.8" /></svg>
@@ -203,7 +291,7 @@ export default function Profile() {
                 <h2 id="profile-posts-title">Postări</h2>
                 <Show
                   when={posts().length > 0}
-                  fallback={<div class="surface state-card"><div><span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg></span><h2>Nicio postare încă</h2><p>Postările publicate de acest utilizator vor apărea aici.</p></div></div>}
+                  fallback={<div class="surface state-card"><div><span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg></span><h2>{profile()?.is_blocked ? 'Cont blocat' : 'Nicio postare încă'}</h2><p>{profile()?.is_blocked ? 'Deblochează acest cont pentru a-i vedea din nou postările.' : 'Postările publicate de acest utilizator vor apărea aici.'}</p></div></div>}
                 >
                   <div class="feed-list"><For each={posts()}>{(post) => <PostCard post={post} onDelete={() => loadProfile(params.id, false)} onUpdate={() => loadProfile(params.id, false)} />}</For></div>
                 </Show>

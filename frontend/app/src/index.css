@@ -492,6 +492,40 @@ a {
   font-size: 0.9rem;
 }
 
+.feed-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+
+.feed-tabs button {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.feed-tabs button:hover,
+.feed-tabs button.is-active {
+  color: var(--text);
+}
+
+.feed-tabs button.is-active {
+  background: var(--bg-elevated);
+  box-shadow: 0 4px 14px rgb(15 23 42 / 8%);
+}
+
 .feed-list {
   display: grid;
   gap: 16px;
@@ -1980,6 +2014,13 @@ a {
   justify-content: flex-end;
 }
 
+.profile-relationship-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
 .profile-copy {
   max-width: 660px;
 }
@@ -2012,15 +2053,26 @@ a {
   font-size: 0.82rem;
 }
 
-.profile-meta span {
+.profile-meta span,
+.profile-meta-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.profile-meta strong {
+.profile-meta strong,
+.profile-meta-link strong {
   color: var(--text);
   font-size: 0.9rem;
+}
+
+.profile-meta-link {
+  color: var(--text-muted);
+  transition: color 150ms ease;
+}
+
+.profile-meta-link:hover {
+  color: var(--brand);
 }
 
 .profile-editor {
@@ -2082,6 +2134,88 @@ a {
   margin: 0 0 15px;
   font-size: 1.15rem;
   letter-spacing: -0.025em;
+}
+
+.connections-page {
+  width: min(100% - 32px, 760px);
+  min-height: calc(100vh - var(--nav-height));
+  padding-block: 38px 72px;
+}
+
+.connections-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.connections-header h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 5vw, 2.15rem);
+  letter-spacing: -0.04em;
+}
+
+.connections-header p:last-child {
+  margin: 7px 0 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.connections-alert {
+  margin-bottom: 16px;
+}
+
+.connections-list {
+  display: grid;
+  gap: 12px;
+}
+
+.connection-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+}
+
+.connection-person {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+}
+
+.connection-avatar {
+  width: 50px;
+  height: 50px;
+}
+
+.connection-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.connection-copy > strong,
+.connection-copy > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-copy > span,
+.connection-copy > small {
+  color: var(--text-muted);
+}
+
+.connection-copy > span {
+  font-size: 0.84rem;
+}
+
+.connection-copy > small {
+  font-size: 0.73rem;
 }
 
 .settings-layout {
@@ -2628,6 +2762,11 @@ a {
     padding-block: 28px calc(104px + env(safe-area-inset-bottom));
   }
 
+  .connections-page {
+    width: min(100% - 24px, 760px);
+    padding-block: 28px calc(104px + env(safe-area-inset-bottom));
+  }
+
   .saved-hero {
     align-items: flex-start;
     gap: 13px;
@@ -2863,6 +3002,16 @@ a {
     min-height: 58px;
   }
 
+  .profile-relationship-actions {
+    gap: 7px;
+  }
+
+  .profile-relationship-actions .btn {
+    min-height: 40px;
+    padding-inline: 12px;
+    font-size: 0.82rem;
+  }
+
   .profile-tabs,
   .profile-feed,
   .settings-layout {
@@ -2872,6 +3021,14 @@ a {
   .profile-tabs button {
     flex: 1;
     justify-content: center;
+  }
+
+  .connection-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .connection-card > .btn {
+    width: 100%;
   }
 
   .settings-nav {

@@ -226,9 +226,10 @@ export default function Home() {
   const [loadMoreError, setLoadMoreError] = createSignal('');
   const [error, setError] = createSignal('');
   const [loadedForUser, setLoadedForUser] = createSignal(null);
+  const [feedMode, setFeedMode] = createSignal('discover');
   const auth = useAuth();
 
-  const loadPosts = async ({ append = false } = {}) => {
+  const loadPosts = async ({ append = false, mode = feedMode() } = {}) => {
     if (append && (loadingMore() || !hasMore())) return;
 
     try {
@@ -242,7 +243,9 @@ export default function Home() {
       }
 
       const offset = append ? posts().length : 0;
-      const data = await api.getPosts(FEED_PAGE_SIZE, offset);
+      const data = mode === 'following'
+        ? await api.getFollowingFeed(FEED_PAGE_SIZE, offset)
+        : await api.getPosts(FEED_PAGE_SIZE, offset);
       if (append) {
         setPosts((currentPosts) => {
           const knownIds = new Set(currentPosts.map((post) => post.id));
@@ -263,6 +266,19 @@ export default function Home() {
       if (append) setLoadingMore(false);
       else setLoading(false);
     }
+  };
+
+  const selectFeed = (mode) => {
+    if (mode === feedMode() || loading()) return;
+    setFeedMode(mode);
+    setPosts([]);
+    setHasMore(true);
+    void loadPosts({ mode });
+  };
+
+  const handlePostCreated = () => {
+    setFeedMode('discover');
+    void loadPosts({ mode: 'discover' });
   };
 
   createEffect(() => {
@@ -318,8 +334,8 @@ export default function Home() {
               <section class="feed-column" aria-labelledby="feed-title">
                 <div class="feed-heading">
                   <div>
-                    <h1 id="feed-title">Pentru tine</h1>
-                    <p>Idei și momente din comunitate</p>
+                    <h1 id="feed-title">{feedMode() === 'following' ? 'Urmărești' : 'Pentru tine'}</h1>
+                    <p>{feedMode() === 'following' ? 'Noutăți de la oamenii pe care îi urmărești' : 'Idei și momente din comunitate'}</p>
                   </div>
                   <button type="button" class="icon-button" onClick={loadPosts} aria-label="Reîncarcă feedul" title="Reîncarcă">
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -328,7 +344,28 @@ export default function Home() {
                   </button>
                 </div>
 
-                <CreatePost onPostCreated={loadPosts} />
+                <div class="feed-tabs" role="tablist" aria-label="Alege feedul">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={feedMode() === 'discover'}
+                    class={feedMode() === 'discover' ? 'is-active' : ''}
+                    onClick={() => selectFeed('discover')}
+                  >
+                    Pentru tine
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={feedMode() === 'following'}
+                    class={feedMode() === 'following' ? 'is-active' : ''}
+                    onClick={() => selectFeed('following')}
+                  >
+                    Urmărești
+                  </button>
+                </div>
+
+                <CreatePost onPostCreated={handlePostCreated} />
 
                 <Show when={loading()}><LoadingFeed /></Show>
 
@@ -351,8 +388,15 @@ export default function Home() {
                       <span class="state-icon">
                         <svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
                       </span>
-                      <h2>Începe conversația</h2>
-                      <p>Feedul este liber. Publică primul gând și dă tonul comunității.</p>
+                      <h2>{feedMode() === 'following' ? 'Feedul urmărit este gol' : 'Începe conversația'}</h2>
+                      <p>
+                        {feedMode() === 'following'
+                          ? 'Urmărește câțiva oameni din comunitate, iar postările lor vor apărea aici.'
+                          : 'Feedul este liber. Publică primul gând și dă tonul comunității.'}
+                      </p>
+                      <Show when={feedMode() === 'following'}>
+                        <A href="/search" class="btn btn-primary" style={{ 'margin-top': '20px' }}>Descoperă oameni</A>
+                      </Show>
                     </div>
                   </div>
                 </Show>

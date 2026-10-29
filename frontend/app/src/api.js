@@ -88,9 +88,37 @@ class ApiService {
     return this.request(`/users/${userId}`);
   }
 
+  async followUser(userId) {
+    return this.request(`/users/${userId}/follow`, { method: 'PUT' });
+  }
+
+  async unfollowUser(userId) {
+    return this.request(`/users/${userId}/follow`, { method: 'DELETE' });
+  }
+
+  async blockUser(userId) {
+    return this.request(`/users/${userId}/block`, { method: 'PUT' });
+  }
+
+  async unblockUser(userId) {
+    return this.request(`/users/${userId}/block`, { method: 'DELETE' });
+  }
+
+  async getFollowers(userId, limit = 20, offset = 0) {
+    return this.request(`/users/${userId}/followers?limit=${limit}&offset=${offset}`);
+  }
+
+  async getFollowing(userId, limit = 20, offset = 0) {
+    return this.request(`/users/${userId}/following?limit=${limit}&offset=${offset}`);
+  }
+
   // Posts
   async getPosts(limit = 10, offset = 0) {
     return this.request(`/posts?limit=${limit}&offset=${offset}`);
+  }
+
+  async getFollowingFeed(limit = 10, offset = 0) {
+    return this.request(`/feed/following?limit=${limit}&offset=${offset}`);
   }
 
   async createPost(content, imageUrl = null) {

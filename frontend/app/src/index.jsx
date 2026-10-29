@@ -15,6 +15,7 @@ import Search from './pages/Search';
 import About from './pages/About';
 import CommunityGuidelines from './pages/CommunityGuidelines';
 import SavedPosts from './pages/SavedPosts';
+import Connections from './pages/Connections';
 import NotFound from './pages/NotFound';
 import './index.css';
 
@@ -29,6 +30,8 @@ render(
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/profile/:id" component={Profile} />
+          <Route path="/profile/:id/urmaritori" component={Connections} />
+          <Route path="/profile/:id/urmariri" component={Connections} />
           <Route path="/search" component={Search} />
           <Route path="/salvate" component={SavedPosts} />
           <Route path="/despre" component={About} />
