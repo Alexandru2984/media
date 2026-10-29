@@ -8,9 +8,9 @@
 
 **Verdict:** 🟠 Core containment, revocable sessions, versioned migrations,
 bounded image re-encoding, user-facing export/deletion controls, private-account
-audiences, and block-aware social relationships are deployed; SMTP delivery is
-currently broken, while broader authorization, privacy governance, alerting, and
-recovery work remain
+audiences, block-aware social relationships, and bounded in-app notifications
+are deployed; SMTP delivery is currently broken, while broader authorization,
+privacy governance, alerting, and recovery work remain
 
 ## Scope and limitations
 
@@ -30,15 +30,16 @@ isolation, export credential exclusion, password/confirmation rejection,
 engagement-counter reconciliation, account cascades, physical media cleanup,
 follow idempotency, private follow requests, audience revocation, relationship
 lists, following-feed isolation, private search/saved filtering, protected media,
-bidirectional block filtering, and blocked-message rejection against canary
-processes. Both a
+bidirectional block filtering, blocked-message rejection, notification IDOR,
+deduplication, read state, 500-row retention, source-action cleanup, and export
+v4 against canary processes. Both a
 separate-port production-database canary and a Cloudflare Tunnel canary removed
 their disposable accounts; the database returned to zero users, sessions, posts,
-relationships, pending requests, blocks, messages, saved rows, managed uploads, and queued
-deletions afterward. A staging environment remains absent, so IDOR for every
-object and future privilege boundary is not yet broadly covered end to end. No
-evidence of compromise was found, but absence of evidence is not evidence of
-absence.
+relationships, pending requests, blocks, messages, saved rows, managed uploads,
+queued deletions, and notifications afterward. A staging environment remains
+absent, so IDOR for every object and future privilege boundary is not yet broadly
+covered end to end. No evidence of compromise was found, but absence of evidence
+is not evidence of absence.
 
 ## Executive summary
 
@@ -482,6 +483,14 @@ made inaccessible between blocked accounts rather than erased. Retention choices
 centralized policy tests, granular audiences, mute/restrict/report, and abuse
 telemetry remain required.
 
+In-app notifications now store only event metadata, never copied post/comment
+text. A unique recipient/event key groups repeated interactions, recipient row
+locks serialize writes, and the oldest rows are pruned to a hard 500-record
+maximum. Source actions remove stale like/follow/comment events, post/account
+foreign keys cascade, and blocking deletes both directions atomically. List,
+count, read, read-all, and delete operations authorize the recipient server-side;
+the two-account canary confirmed cross-account mutation returns `404`.
+
 **Remediation:** add authorization matrix tests, transactions, nonnegative counter
 guards or derived counts, content length constraints, normalized email/username
 keys, and query-plan tests for feeds, messages, and moderation.
@@ -515,8 +524,9 @@ messages; keep detailed causes only in redacted server logs.
 2. **Spoofing / elevation of privilege — medium likelihood, high impact:**
    credential stuffing, stolen opaque-session replay, or a future untested IDOR.
 3. **Abuse / denial of service — medium likelihood, medium impact:** follow-request
-   spam and relationship growth are bounded per account and edge-limited, while
-   recovery email, upload, and database endpoints still need account-aware budgets.
+   spam, relationship growth, and notifications are bounded per account and
+   edge-limited, while recovery email, upload, and database endpoints still need
+   account-aware budgets.
 
 **Private-account review verdict:** mitigate then ship. Release gates were
 transactional request/block races, 5,000 outgoing and 1,000 incoming pending
@@ -524,6 +534,13 @@ limits, server-side audience checks, non-cacheable protected media, export and
 deletion coverage, isolated three-account tests, a Tunnel canary, rollback
 artifacts, and zero application-row residue. SMTP recovery remains a separate
 open P1 and is not accepted by this verdict.
+
+**Notification review verdict:** ship with monitoring. Release gates were a
+foreign-key schema, unique event grouping, transactional source-action updates,
+the 500-record cap, bidirectional block cleanup, recipient-only mutations,
+export-v4 coverage, isolated and Tunnel canaries, rollback artifacts, and zero
+residual application rows. Automated notification-velocity/cap alerts and
+granular preferences remain required.
 
 ### Blast radius
 
@@ -540,9 +557,10 @@ revenue, incident cost, and control frequency before assigning an ALE.
   export, or upload abuse; 5 minutes for outage/resource exhaustion.
 - **Current MTTD:** unknown and potentially unbounded.
 - **Required detections:** auth failure velocity, session anomalies, recovery
-  bursts, follow/block velocity, blocked-action denials, upload rejects, 4xx/5xx
-  shifts, DB error/latency, process restarts, privilege changes, high egress, and
-  integrity changes to release/config files.
+  bursts, follow/block/notification velocity, frequent notification-cap pruning,
+  blocked-action denials, upload rejects, 4xx/5xx shifts, DB error/latency,
+  process restarts, privilege changes, high egress, and integrity changes to
+  release/config files.
 
 ### Response
 

@@ -11,6 +11,8 @@ Declare an incident when any of these occurs:
 
 - repeated `social-media.service` OOM kills, crashes, or unexpected restarts;
 - a sustained rise in upload `5xx`, latency, memory, CPU, or rejected files;
+- sustained notification writes, repeated cap pruning, or notifications visible
+  between accounts after either account blocks the other;
 - an uploaded file is served with an unexpected type or retains private metadata;
 - evidence suggests unauthorized access, data export, secret exposure, or code
   execution in the API process.
@@ -74,6 +76,27 @@ Rollback changes code behavior only; it does not require a schema rollback and
 does not mutate previously stored images. The additive `managed_uploads` table is
 compatible with the prior binary. Do not drop it during an emergency rollback;
 pending rows can be reconciled after service recovery.
+
+## Notification abuse and privacy containment
+
+Notification rows contain event metadata but no copied post/comment body. If
+spam, unexpected growth, cross-account access, or block leakage is suspected:
+
+1. Preserve request IDs, endpoint/status velocity, affected account IDs, counts
+   by `kind`, oldest/newest timestamps, and the deployed binary/schema hashes.
+   Do not export cookies, email addresses, event keys, or unrelated user rows.
+2. Apply a temporary exact deny or stricter limit to `/api/notifications` and/or
+   the source social write route, validate with `nginx -t`, then reload Nginx.
+   Stop the API if authorization bypass remains credible.
+3. Confirm no recipient exceeds 500 rows and query for notifications whose actor
+   and recipient have a block edge. Treat any such result as a privacy defect;
+   preserve evidence before scoped deletion.
+4. Restore the pre-release binary if the defect is code-level. Leave the
+   additive `notifications` table in place during ordinary binary rollback;
+   the prior binary ignores it and account/post foreign keys still cascade.
+5. Recovery requires recipient-only mutation checks, unlike/unfollow/comment
+   cleanup, block cleanup in both directions, cap enforcement, and a zero-residue
+   disposable-account canary through the public Tunnel path.
 
 ## Scope, recovery, and closure
 
@@ -228,3 +251,52 @@ testing remain mandatory follow-up work.
 **Verdict:** mitigate then ship for private-account authorization. SMTP remains
 an independent P1 incident; centralized policy tests, abuse alerts, granular
 audiences, and a restore drill remain required.
+
+## CISO review record — bounded in-app notifications
+
+**Date:** 2026-10-29
+
+- Top threats: notification spam/storage or query exhaustion (medium/high),
+  cross-account IDOR or block leakage (medium/high), and duplicate/stale events
+  created by interaction races (medium/medium).
+- Blast radius: an endpoint authorization defect could expose actors and social
+  event metadata for the authenticated victim; a full API/database compromise
+  retains the broader all-application-data blast radius. Production returned to
+  zero persistent users at the checkpoint. User/revenue inputs remain
+  unavailable, so a defensible FAIR ALE cannot be calculated.
+- Controls: FK cascades, check constraints, unique server-derived event keys,
+  transactional source actions, recipient row locks, a hard 500-row cap, bounded
+  pagination, edge write throttling, recipient-only mutations, defense-in-depth
+  block filtering, and atomic two-direction cleanup on block.
+- Detection: request-ID/status/latency logs exist and the target MTTD is 15
+  minutes, but no alert currently detects notification velocity, repeated cap
+  pruning, or blocked-pair anomalies; current automated MTTD is therefore
+  unknown.
+- Response: the runbook above covers route containment, evidence, scoped block
+  checks, binary rollback, and recovery canaries. The scenario was exercised by
+  isolated and production/Tunnel canaries; a multi-person tabletop and database
+  restore drill remain open.
+- Regulatory: notification metadata is personal data; a suspected breach needs
+  immediate GDPR assessment and may require supervisory-authority notification
+  within 72 hours after awareness.
+- Vendors/supply chain: no dependency, secret, vendor, processor, email, or push
+  service was added. Existing Cloudflare/VPS/MySQL governance remains in scope.
+- Validation: 40 backend tests plus five seed tests, strict Clippy, release build,
+  RustSec scan of 265 locked crates, npm build/audit, repeat migration starts,
+  a 500-row production cap test, IDOR rejection, export v4, source cleanup,
+  block cleanup, direct Nginx checks, and a Cloudflare Tunnel canary all passed.
+  Application rows returned to zero and all services retained zero unexpected
+  restarts.
+- Rollback: root-only artifacts are
+  `media-binary-pre-notifications-20261029T183232Z-9c43be6`,
+  `media-nginx-pre-notifications-20261029T183232Z-9c43be6/`, and
+  `media-db-pre-notifications-20261029T183232Z-9c43be6.sql` under
+  `/var/backups`; the prior frontend release remains available. The deployed
+  frontend is `20261029T183232Z-9c43be6` and the migration is additive.
+- Open incident: Brevo still rejects SMTP authentication with `535`; in-app
+  notifications reduce dependence on email for social activity but do not
+  restore verification or password-recovery delivery.
+
+**Verdict:** ship with monitoring. Automated abuse/privacy alerts, notification
+preferences, a multi-person tabletop, and a tested restore remain follow-ups;
+the independent SMTP P1 is not accepted by this verdict.
