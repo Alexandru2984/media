@@ -956,6 +956,46 @@ pub async fn delete_account(
                 StatusCode::INTERNAL_SERVER_ERROR
             })?;
 
+    query(
+        "UPDATE posts AS post
+         INNER JOIN (
+             SELECT post_id, COUNT(*) AS removed_count
+             FROM likes WHERE user_id = ? GROUP BY post_id
+         ) AS removed_likes ON removed_likes.post_id = post.id
+         SET post.likes_count = GREATEST(
+             post.likes_count - CAST(removed_likes.removed_count AS SIGNED), 0
+         )
+         WHERE post.user_id <> ?",
+    )
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to reconcile likes during account deletion");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    query(
+        "UPDATE posts AS post
+         INNER JOIN (
+             SELECT post_id, COUNT(*) AS removed_count
+             FROM comments WHERE user_id = ? GROUP BY post_id
+         ) AS removed_comments ON removed_comments.post_id = post.id
+         SET post.comments_count = GREATEST(
+             post.comments_count - CAST(removed_comments.removed_count AS SIGNED), 0
+         )
+         WHERE post.user_id <> ?",
+    )
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to reconcile comments during account deletion");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     let deleted = query("DELETE FROM users WHERE id = ? AND password_hash = ?")
         .bind(&authenticated_session.user_id)
         .bind(&user.password_hash)
