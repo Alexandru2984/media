@@ -67,6 +67,23 @@ pub(crate) async fn upsert_notification(
         return Ok(());
     }
 
+    let actor_is_muted: bool = query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM user_mutes WHERE muter_id = ? AND muted_id = ?
+         )",
+    )
+    .bind(recipient_id)
+    .bind(actor_id)
+    .fetch_one(&mut **transaction)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to evaluate notification mute policy");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    if actor_is_muted {
+        return Ok(());
+    }
+
     let event_key = notification_event_key(kind, actor_id, post_id)?;
     query(
         "INSERT INTO notifications
@@ -199,6 +216,10 @@ pub async fn list_notifications(
                WHERE (block_pair.blocker_id = n.recipient_id AND block_pair.blocked_id = n.actor_id)
                   OR (block_pair.blocker_id = n.actor_id AND block_pair.blocked_id = n.recipient_id)
            )
+           AND NOT EXISTS (
+               SELECT 1 FROM user_mutes mute_pair
+               WHERE mute_pair.muter_id = n.recipient_id AND mute_pair.muted_id = n.actor_id
+           )
          ORDER BY n.created_at DESC, n.id DESC
          LIMIT ? OFFSET ?",
     )
@@ -243,6 +264,10 @@ pub async fn unread_notification_count(
                SELECT 1 FROM user_blocks block_pair
                WHERE (block_pair.blocker_id = n.recipient_id AND block_pair.blocked_id = n.actor_id)
                   OR (block_pair.blocker_id = n.actor_id AND block_pair.blocked_id = n.recipient_id)
+           )
+           AND NOT EXISTS (
+               SELECT 1 FROM user_mutes mute_pair
+               WHERE mute_pair.muter_id = n.recipient_id AND mute_pair.muted_id = n.actor_id
            )",
     )
     .bind(&user_id)

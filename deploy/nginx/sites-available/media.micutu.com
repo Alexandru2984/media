@@ -61,7 +61,7 @@ server {
 
     # Private application routes must not enter a search index. Serve the SPA
     # directly so the route keeps this response policy.
-    location ~ ^/(login|register|forgot-password|search|salvate|cereri|notificari|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
+    location ~ ^/(login|register|forgot-password|search|salvate|cereri|notificari|siguranta|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
         try_files /index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
@@ -180,13 +180,13 @@ server {
 
     # Relationship mutations are cheap individually but can be abused for spam,
     # harassment, or high-cardinality database growth.
-    location ~ ^/api/users/[^/]+/(follow|block)$ {
+    location ~ ^/api/users/[^/]+/(follow|block|mute)$ {
         limit_req zone=media_api burst=60 nodelay;
         limit_req zone=media_social_write burst=8 nodelay;
         include snippets/media-api-proxy.conf;
     }
 
-    location ~ ^/api/users/me/(privacy|follow-requests(?:/[^/]+)?)$ {
+    location ~ ^/api/users/me/(privacy|mutes|follow-requests(?:/[^/]+)?)$ {
         limit_req zone=media_api burst=60 nodelay;
         limit_req zone=media_social_write burst=8 nodelay;
         include snippets/media-api-proxy.conf;
@@ -195,6 +195,14 @@ server {
     # Notification state is private and bounded, but write actions still share
     # the stricter social mutation budget to limit polling/write amplification.
     location ~ ^/api/notifications(?:/.*)?$ {
+        limit_req zone=media_api burst=60 nodelay;
+        limit_req zone=media_social_write burst=8 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    # Reporter-private safety controls. The application also applies durable
+    # per-account cardinality and rolling report-submission limits.
+    location ~ ^/api/(reports(?:/[^/]+)?|hidden-posts|posts/[^/]+/hide)$ {
         limit_req zone=media_api burst=60 nodelay;
         limit_req zone=media_social_write burst=8 nodelay;
         include snippets/media-api-proxy.conf;

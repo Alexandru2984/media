@@ -7,7 +7,7 @@ use axum::{
 };
 use sqlx::MySqlPool;
 
-use crate::{handlers, health, notifications, security};
+use crate::{handlers, health, notifications, safety, security};
 
 pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
     let api_routes = Router::new()
@@ -42,9 +42,14 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
             "/users/:id/block",
             put(handlers::block_user).delete(handlers::unblock_user),
         )
+        .route(
+            "/users/:id/mute",
+            put(safety::mute_user).delete(safety::unmute_user),
+        )
         .route("/users/:id/followers", get(handlers::get_followers))
         .route("/users/:id/following", get(handlers::get_following))
         .route("/users/me/privacy", put(handlers::update_privacy))
+        .route("/users/me/mutes", get(safety::list_muted_users))
         .route(
             "/users/me/follow-requests",
             get(handlers::get_follow_requests),
@@ -72,6 +77,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/posts", post(handlers::create_post))
         .route("/feed/following", get(handlers::get_following_feed))
         .route("/saved-posts", get(handlers::get_saved_posts))
+        .route("/hidden-posts", get(safety::list_hidden_posts))
         .route(
             "/posts/upload-image",
             post(handlers::upload_post_image).layer(DefaultBodyLimit::max(11 * 1024 * 1024)),
@@ -80,6 +86,17 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/posts/:id", delete(handlers::delete_post))
         .route("/posts/:id/like", post(handlers::like_post))
         .route("/posts/:id/save", post(handlers::save_post))
+        .route(
+            "/posts/:id/hide",
+            put(safety::hide_post).delete(safety::unhide_post),
+        )
+        // Reporter-private trust and safety controls. No moderation data is
+        // exposed until a real privileged role model exists.
+        .route(
+            "/reports",
+            get(safety::list_reports).post(safety::create_report),
+        )
+        .route("/reports/:id", delete(safety::withdraw_report))
         // Private in-app notifications
         .route("/notifications", get(notifications::list_notifications))
         .route(

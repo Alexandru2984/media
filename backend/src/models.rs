@@ -163,6 +163,7 @@ pub struct ProfileDetail {
     pub is_following: bool,
     pub follow_request_pending: bool,
     pub is_blocked: bool,
+    pub is_muted: bool,
     pub is_private: bool,
     pub can_view_content: bool,
     pub pending_follow_requests_count: i64,

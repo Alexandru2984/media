@@ -148,6 +148,10 @@ struct ExportCounts {
     followers: i64,
     following: i64,
     blocked_users: i64,
+    muted_users: i64,
+    hidden_posts: i64,
+    content_reports: i64,
+    report_submission_events: i64,
     incoming_follow_requests: i64,
     outgoing_follow_requests: i64,
     notifications: i64,
@@ -168,6 +172,10 @@ impl ExportCounts {
             self.followers,
             self.following,
             self.blocked_users,
+            self.muted_users,
+            self.hidden_posts,
+            self.content_reports,
+            self.report_submission_events,
             self.incoming_follow_requests,
             self.outgoing_follow_requests,
             self.notifications,
@@ -215,6 +223,21 @@ struct ExportNotification {
     kind: String,
     post_id: Option<String>,
     read_at: Option<DateTime<Utc>>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportReport {
+    id: String,
+    target_type: String,
+    target_id: String,
+    reason: String,
+    details: Option<String>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportReportSubmission {
     created_at: DateTime<Utc>,
 }
 
@@ -280,6 +303,10 @@ pub(crate) struct AccountDataExport {
     followers: Vec<ExportRelationship>,
     following: Vec<ExportRelationship>,
     blocked_users: Vec<ExportRelationship>,
+    muted_users: Vec<ExportRelationship>,
+    hidden_posts: Vec<ExportSavedPost>,
+    content_reports: Vec<ExportReport>,
+    report_submission_events: Vec<ExportReportSubmission>,
     incoming_follow_requests: Vec<ExportRelationship>,
     outgoing_follow_requests: Vec<ExportRelationship>,
     notifications: Vec<ExportNotification>,
@@ -898,6 +925,10 @@ pub async fn get_profile(
                     SELECT 1 FROM user_blocks
                     WHERE blocker_id = ? AND blocked_id = u.id
                 ) AS is_blocked,
+                EXISTS(
+                    SELECT 1 FROM user_mutes
+                    WHERE muter_id = ? AND muted_id = u.id
+                ) AS is_muted,
                 (u.is_private <> 0) AS is_private,
                 COALESCE(
                     (u.is_private = 0
@@ -922,6 +953,7 @@ pub async fn get_profile(
          FROM users u
          WHERE u.id = ?",
     )
+    .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
@@ -1568,6 +1600,18 @@ pub async fn block_user(
     .execute(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    query(
+        "DELETE FROM user_mutes
+         WHERE (muter_id = ? AND muted_id = ?)
+            OR (muter_id = ? AND muted_id = ?)",
+    )
+    .bind(&current_user_id)
+    .bind(&target_user_id)
+    .bind(&target_user_id)
+    .bind(&current_user_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     transaction
         .commit()
@@ -1776,10 +1820,18 @@ pub async fn export_account_data(
             (SELECT COUNT(*) FROM follows WHERE followed_id = ?) AS followers,
             (SELECT COUNT(*) FROM follows WHERE follower_id = ?) AS following,
             (SELECT COUNT(*) FROM user_blocks WHERE blocker_id = ?) AS blocked_users,
+            (SELECT COUNT(*) FROM user_mutes WHERE muter_id = ?) AS muted_users,
+            (SELECT COUNT(*) FROM hidden_posts WHERE user_id = ?) AS hidden_posts,
+            (SELECT COUNT(*) FROM content_reports WHERE reporter_id = ?) AS content_reports,
+            (SELECT COUNT(*) FROM report_submission_events WHERE reporter_id = ?) AS report_submission_events,
             (SELECT COUNT(*) FROM follow_requests WHERE target_id = ?) AS incoming_follow_requests,
             (SELECT COUNT(*) FROM follow_requests WHERE requester_id = ?) AS outgoing_follow_requests,
             (SELECT COUNT(*) FROM notifications WHERE recipient_id = ?) AS notifications",
     )
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
@@ -1938,6 +1990,41 @@ pub async fn export_account_data(
     .fetch_all(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let muted_users = query_as::<_, ExportRelationship>(
+        "SELECT muted_id AS user_id, created_at FROM user_mutes
+         WHERE muter_id = ? ORDER BY created_at ASC, muted_id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let hidden_posts = query_as::<_, ExportSavedPost>(
+        "SELECT post_id, created_at FROM hidden_posts
+         WHERE user_id = ? ORDER BY created_at ASC, post_id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let content_reports = query_as::<_, ExportReport>(
+        "SELECT id, target_type,
+                COALESCE(target_user_id, target_post_id, target_comment_id) AS target_id,
+                reason, details, created_at
+         FROM content_reports WHERE reporter_id = ?
+         ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let report_submission_events = query_as::<_, ExportReportSubmission>(
+        "SELECT created_at FROM report_submission_events
+         WHERE reporter_id = ? ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let incoming_follow_requests = query_as::<_, ExportRelationship>(
         "SELECT requester_id AS user_id, created_at FROM follow_requests
          WHERE target_id = ? ORDER BY created_at ASC, requester_id ASC",
@@ -1992,7 +2079,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 4,
+            format_version: 5,
             exported_at,
             profile,
             counts,
@@ -2008,6 +2095,10 @@ pub async fn export_account_data(
             followers,
             following,
             blocked_users,
+            muted_users,
+            hidden_posts,
+            content_reports,
+            report_submission_events,
             incoming_follow_requests,
             outgoing_follow_requests,
             notifications,
@@ -2250,6 +2341,14 @@ pub async fn get_posts(
              WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
                 OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
          )
+           AND NOT EXISTS(
+               SELECT 1 FROM user_mutes mute_pair
+               WHERE mute_pair.muter_id = ? AND mute_pair.muted_id = p.user_id
+           )
+           AND NOT EXISTS(
+               SELECT 1 FROM hidden_posts hidden
+               WHERE hidden.user_id = ? AND hidden.post_id = p.id
+           )
            AND (
                u.is_private = 0
                OR p.user_id = ?
@@ -2262,6 +2361,8 @@ pub async fn get_posts(
          ORDER BY p.created_at DESC
          LIMIT ? OFFSET ?",
     )
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
@@ -2321,9 +2422,19 @@ pub async fn get_following_feed(
                WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
                   OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
            )
+           AND NOT EXISTS(
+               SELECT 1 FROM user_mutes mute_pair
+               WHERE mute_pair.muter_id = ? AND mute_pair.muted_id = p.user_id
+           )
+           AND NOT EXISTS(
+               SELECT 1 FROM hidden_posts hidden
+               WHERE hidden.user_id = ? AND hidden.post_id = p.id
+           )
          ORDER BY p.created_at DESC
          LIMIT ? OFFSET ?",
     )
+    .bind(&current_user_id)
+    .bind(&current_user_id)
     .bind(&current_user_id)
     .bind(&current_user_id)
     .bind(&current_user_id)
@@ -2553,6 +2664,14 @@ pub async fn get_saved_posts(
                WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
                   OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
            )
+           AND NOT EXISTS(
+               SELECT 1 FROM user_mutes mute_pair
+               WHERE mute_pair.muter_id = ? AND mute_pair.muted_id = p.user_id
+           )
+           AND NOT EXISTS(
+               SELECT 1 FROM hidden_posts hidden
+               WHERE hidden.user_id = ? AND hidden.post_id = p.id
+           )
            AND (
                u.is_private = 0
                OR p.user_id = ?
@@ -2565,6 +2684,8 @@ pub async fn get_saved_posts(
          ORDER BY saved.created_at DESC
          LIMIT ? OFFSET ?",
     )
+    .bind(&user_id)
+    .bind(&user_id)
     .bind(&user_id)
     .bind(&user_id)
     .bind(&user_id)
@@ -2694,9 +2815,14 @@ pub async fn get_comments(
                WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = c.user_id)
                   OR (block_pair.blocker_id = c.user_id AND block_pair.blocked_id = ?)
            )
+           AND NOT EXISTS(
+               SELECT 1 FROM user_mutes mute_pair
+               WHERE mute_pair.muter_id = ? AND mute_pair.muted_id = c.user_id
+           )
          ORDER BY c.created_at ASC",
     )
     .bind(&post_id)
+    .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .fetch_all(&pool)
@@ -3660,12 +3786,17 @@ pub async fn get_user_posts(
          LEFT JOIN saved_posts current_save
            ON current_save.post_id = p.id AND current_save.user_id = ?
          WHERE p.user_id = ?
+           AND NOT EXISTS(
+               SELECT 1 FROM hidden_posts hidden
+               WHERE hidden.user_id = ? AND hidden.post_id = p.id
+           )
          ORDER BY p.created_at DESC
          LIMIT ? OFFSET ?",
     )
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(&user_id)
+    .bind(current_user_id.as_deref())
     .bind(limit)
     .bind(offset)
     .fetch_all(&pool)
@@ -3705,10 +3836,15 @@ pub async fn search(
                WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = u.id)
                   OR (block_pair.blocker_id = u.id AND block_pair.blocked_id = ?)
            )
+           AND NOT EXISTS(
+               SELECT 1 FROM user_mutes mute_pair
+               WHERE mute_pair.muter_id = ? AND mute_pair.muted_id = u.id
+           )
          ORDER BY u.username ASC
          LIMIT 12",
     )
     .bind(search_term)
+    .bind(&current_user_id)
     .bind(&current_user_id)
     .bind(&current_user_id)
     .fetch_all(&pool)
@@ -3739,6 +3875,14 @@ pub async fn search(
                WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
                   OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
            )
+           AND NOT EXISTS(
+               SELECT 1 FROM user_mutes mute_pair
+               WHERE mute_pair.muter_id = ? AND mute_pair.muted_id = p.user_id
+           )
+           AND NOT EXISTS(
+               SELECT 1 FROM hidden_posts hidden
+               WHERE hidden.user_id = ? AND hidden.post_id = p.id
+           )
            AND (
                u.is_private = 0
                OR p.user_id = ?
@@ -3754,6 +3898,8 @@ pub async fn search(
     .bind(&current_user_id)
     .bind(&current_user_id)
     .bind(search_term)
+    .bind(&current_user_id)
+    .bind(&current_user_id)
     .bind(&current_user_id)
     .bind(&current_user_id)
     .bind(&current_user_id)
@@ -4080,7 +4226,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 4,
+            format_version: 5,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),
@@ -4106,6 +4252,10 @@ mod tests {
                 followers: 0,
                 following: 0,
                 blocked_users: 0,
+                muted_users: 0,
+                hidden_posts: 0,
+                content_reports: 0,
+                report_submission_events: 0,
                 incoming_follow_requests: 0,
                 outgoing_follow_requests: 0,
                 notifications: 0,
@@ -4122,6 +4272,10 @@ mod tests {
             followers: vec![],
             following: vec![],
             blocked_users: vec![],
+            muted_users: vec![],
+            hidden_posts: vec![],
+            content_reports: vec![],
+            report_submission_events: vec![],
             incoming_follow_requests: vec![],
             outgoing_follow_requests: vec![],
             notifications: vec![],

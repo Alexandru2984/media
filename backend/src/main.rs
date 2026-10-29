@@ -7,6 +7,7 @@ mod models;
 mod notifications;
 mod passwords;
 mod routes;
+mod safety;
 mod security;
 mod security_events;
 mod tokens;
