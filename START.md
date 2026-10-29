@@ -4,7 +4,8 @@
 
 - Backend: Rust, Axum 0.7, SQLx 0.9 și MySQL
 - Frontend: Solid.js, Vite și routerul Solid
-- Autentificare: sesiuni opace revocabile, cookie HttpOnly și parole bcrypt
+- Autentificare: sesiuni opace revocabile, cookie HttpOnly și parole Argon2id
+  (hashurile bcrypt vechi se actualizează după autentificare validă)
 - Producție: Cloudflare Tunnel, Nginx și serviciu systemd izolat
 
 ## Configurare locală
@@ -79,6 +80,9 @@ Vite sau să trimită originea locală configurată.
 - `GET /api/notifications`, `GET /api/notifications/unread-count`
 - `PUT /api/notifications/:id/read`, `PUT /api/notifications/read-all`
 - `DELETE /api/notifications/:id`
+- `PUT|DELETE /api/users/:id/mute`, `GET /api/users/me/mutes`
+- `PUT|DELETE /api/posts/:id/hide`, `GET /api/hidden-posts`
+- `GET|POST /api/reports`, `DELETE /api/reports/:id`
 - `POST /api/users/me/avatar`, `POST /api/posts/upload-image`
 - `GET|POST /api/messages`
 - `GET /api/health/live`, `GET /api/health/ready`

@@ -8,9 +8,10 @@
 
 **Verdict:** 🟠 Core containment, revocable sessions, versioned migrations,
 bounded image re-encoding, user-facing export/deletion controls, private-account
-audiences, block-aware social relationships, and bounded in-app notifications
-are deployed; SMTP delivery is currently broken, while broader authorization,
-privacy governance, alerting, and recovery work remain
+audiences, block-aware social relationships, bounded in-app notifications, and
+bounded private trust-and-safety controls are deployed; SMTP delivery is
+currently broken, while privileged moderation, broader authorization, privacy
+governance, alerting, and recovery work remain
 
 ## Scope and limitations
 
@@ -31,12 +32,14 @@ engagement-counter reconciliation, account cascades, physical media cleanup,
 follow idempotency, private follow requests, audience revocation, relationship
 lists, following-feed isolation, private search/saved filtering, protected media,
 bidirectional block filtering, blocked-message rejection, notification IDOR,
-deduplication, read state, 500-row retention, source-action cleanup, and export
-v4 against canary processes. Both a
+deduplication, read state, 500-row retention, source-action cleanup, account
+mute, post hide, reporter-only access, duplicate-report rejection, and export v5
+against canary processes. Both a
 separate-port production-database canary and a Cloudflare Tunnel canary removed
 their disposable accounts; the database returned to zero users, sessions, posts,
-relationships, pending requests, blocks, messages, saved rows, managed uploads,
-queued deletions, and notifications afterward. A staging environment remains
+relationships, pending requests, blocks, mutes, hidden posts, reports, report
+rate events, messages, saved rows, managed uploads, queued deletions, and
+notifications afterward. A staging environment remains
 absent, so IDOR for every object and future privilege boundary is not yet broadly
 covered end to end. No evidence of compromise was found, but absence of evidence
 is not evidence of absence.
@@ -85,6 +88,12 @@ existence oracle, and prevents browser/CDN storage with `private, no-store`.
 An isolated three-account matrix and a Cloudflare Tunnel canary verified pending,
 accepted, revoked, blocked, public-transition, export-v3, and physical-cleanup
 states. The canary returned the production database to zero application rows.
+Mute and personal-hide controls are now FK-backed, account-capped, and enforced
+across discovery surfaces; muting also suppresses notification creation. Private
+report intake uses an allowlisted target/reason shape, reporter-only reads and
+withdrawals, one open report per reporter/target, a 100-record open cap, and a
+separate seven-day event ledger that enforces 20 submissions per rolling day
+even if reports are withdrawn. No privileged moderation endpoint exists yet.
 Centralized authorization tests, privacy governance, metrics/alerting, and tested
 recovery remain open. One-time links now
 keep secrets in URL fragments, scrub them from browser history, and exchange them
@@ -353,9 +362,10 @@ media.
   database snapshot, and returns only explicit DTOs. Password hashes, session
   token hashes, and one-time token values are excluded. Export generation is
   recorded in the private security timeline and responses are `no-store`.
-- Export format version 3 includes followers, followed accounts, incoming and
-  outgoing requests, privacy state, and blocked accounts without exposing
-  credential or token material.
+- Export format version 5 includes followers, followed accounts, incoming and
+  outgoing requests, privacy state, blocked/muted accounts, hidden posts, open
+  reports, and the bounded report-submission ledger without exposing credential
+  or token material.
 - Synchronous export is bounded at 10,000 related records to protect the API;
   an asynchronous, encrypted delivery flow is still required for larger accounts.
 - Deletion requires the current password, the exact `STERGE CONTUL` phrase, the
@@ -480,7 +490,7 @@ accounts now require owner or accepted-follower access across content and media
 paths; public profile identity metadata remains discoverable by design. Existing
 likes, comments, saves, and historical messages are retained; they are hidden or
 made inaccessible between blocked accounts rather than erased. Retention choices,
-centralized policy tests, granular audiences, mute/restrict/report, and abuse
+centralized policy tests, granular audiences, restrict controls, and abuse
 telemetry remain required.
 
 In-app notifications now store only event metadata, never copied post/comment
@@ -490,6 +500,17 @@ maximum. Source actions remove stale like/follow/comment events, post/account
 foreign keys cascade, and blocking deletes both directions atomically. List,
 count, read, read-all, and delete operations authorize the recipient server-side;
 the two-account canary confirmed cross-account mutation returns `404`.
+
+Mute removes an actor from feeds, people/post search, saved results, comments,
+and both stored/future notifications, while explicit profile access remains
+available by design. Personal hide removes a post from feed/profile/search/saved
+lists and is reversible from a private safety center. Reports store target
+metadata and reporter-supplied context without copying target content. All
+report list/delete queries scope by reporter; a cross-account deletion canary
+returned `404`, duplicate open reports returned `409`, and FK cascades returned
+the safety tables to zero rows. A moderation queue, immutable evidence snapshots,
+appeals, moderator roles, step-up authentication, and action audit logs remain
+explicitly out of scope for this release.
 
 **Remediation:** add authorization matrix tests, transactions, nonnegative counter
 guards or derived counts, content length constraints, normalized email/username
@@ -541,6 +562,15 @@ the 500-record cap, bidirectional block cleanup, recipient-only mutations,
 export-v4 coverage, isolated and Tunnel canaries, rollback artifacts, and zero
 residual application rows. Automated notification-velocity/cap alerts and
 granular preferences remain required.
+
+**Trust-and-safety review verdict:** mitigate then ship for private user controls,
+not for moderation. Release gates were reporter-scoped authorization, strict
+target/reason validation, duplicate prevention, independent rolling anti-abuse
+events, hard per-account caps, consistent mute/hide filtering, export-v5 and
+deletion coverage, edge write limits, isolated/Tunnel canaries, rollback
+artifacts, and zero residual application rows. A moderator surface remains
+blocked on real roles/scopes, step-up authentication, evidence retention,
+tamper-resistant action logs, and an appeals policy.
 
 ### Blast radius
 

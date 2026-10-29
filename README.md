@@ -19,6 +19,10 @@ across discovery, profiles, interactions, comments, and direct-message APIs
 rather than only in the interface. A private, responsive notification inbox
 groups follow requests, accepted requests, new followers, likes, and comments;
 the navbar exposes a bounded unread counter without relying on SMTP delivery.
+Members can also silence accounts without notifying them, hide individual posts
+from personal discovery surfaces, and submit private reports for accounts,
+posts, or comments. A responsive, non-indexable safety center lets each member
+review or withdraw open reports and reverse mute/hide choices.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -92,9 +96,10 @@ The next project goals are:
    quota, ownership, and abandoned-upload lifecycle.
 4. Add metrics, alerts, retention policy, and restore drills around the deployed
    health endpoints and privacy-redacted JSON request logs.
-5. Expand the responsive product with mute/report/moderation controls,
-   notification preferences/digests, cursor pagination, richer discovery, and
-   granular audiences.
+5. Add a least-privilege moderator workflow with evidence retention, appeals,
+   auditable actions, and step-up authentication on top of the deployed private
+   report intake; continue with restrict controls, notification preferences,
+   cursor pagination, richer discovery, and granular audiences.
 6. Complete the privacy program with a data inventory, retention schedule,
    asynchronous large-account exports, DPIA screening, processor records, and
    privacy/terms/help content.

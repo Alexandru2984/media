@@ -44,7 +44,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-29: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 38 API
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 42 API
 binary unit tests plus 5 seed-binary tests, embedded versioned MySQL migrations,
 a validated canary flow, and deployed
 rollback artifacts. The frontend has
@@ -220,7 +220,9 @@ headers. Private accounts, approval/cancellation flows, protected post media,
 and a responsive request inbox are deployed. A private in-app notification
 inbox is also implemented for follow requests/acceptances, new followers, likes,
 and comments, with grouping, read state, a navbar badge, block cleanup, and
-bounded retention. Notification preferences/digests, moderation, richer
+bounded retention. Private report intake for accounts, posts, and comments,
+discreet account mute, personal post hide, and a responsive safety center are
+also deployed. Notification preferences/digests, moderator workflows, richer
 publishing, and multiple named collections remain open.
 
 ### Profiles and relationships
@@ -228,8 +230,9 @@ publishing, and multiple named collections remain open.
 - Unique handles, display names, pronouns, bio, links, avatar, cover, and badges.
 - Follow/unfollow, followers/following lists, private accounts, and bounded
   follow-request approval/cancellation. ✅ Add close-friends/custom audiences.
-- Account-level block across authenticated surfaces. ✅ Add mute, restrict,
-  report, hide counts, and audience controls.
+- Account-level block across authenticated surfaces plus discreet mute, private
+  report intake, and personal post hide. ✅ Add restrict, moderator-visible
+  aggregates, and more granular audience controls.
 - Profile completion, QR/share card, pinned posts, and profile search.
 
 ### Publishing
@@ -261,8 +264,11 @@ publishing, and multiple named collections remain open.
 
 ### Trust and safety
 
-- Report queues, reason taxonomy, evidence snapshots, moderator notes/actions,
-  appeals, repeat-abuse signals, and transparent user notices.
+- Private report intake, an allowlisted reason taxonomy, duplicate prevention,
+  rolling submission limits, owner-only withdrawal, account mute, and personal
+  post hide. ✅ Add a least-privilege moderation queue, evidence snapshots,
+  moderator notes/actions, appeals, repeat-abuse signals, and transparent user
+  notices.
 - Spam controls, link/domain reputation, new-account limits, and content quotas.
 - Admin dashboard with least privilege, step-up authentication, and audit logs.
 
