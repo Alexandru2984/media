@@ -182,6 +182,17 @@ a {
   box-shadow: 0 11px 24px rgb(37 99 235 / 28%);
 }
 
+.btn-danger {
+  border-color: color-mix(in srgb, var(--danger) 38%, transparent);
+  background: var(--danger);
+  color: #ffffff;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+.btn-danger:hover:not(:disabled) {
+  box-shadow: 0 11px 24px color-mix(in srgb, var(--danger) 34%, transparent);
+}
+
 .btn-secondary {
   border-color: var(--border);
   background: var(--bg-elevated);
@@ -2203,6 +2214,86 @@ a {
   line-height: 1.5;
 }
 
+.account-data-controls {
+  display: grid;
+  gap: 16px;
+}
+
+.account-data-card {
+  display: grid;
+  gap: 22px;
+  padding: clamp(18px, 4vw, 24px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-soft);
+}
+
+.account-data-card.danger-zone {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+  background: color-mix(in srgb, var(--danger) 5%, var(--bg-elevated));
+}
+
+.account-data-card-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.account-data-card-heading > div {
+  min-width: 0;
+}
+
+.account-data-card-heading h4 {
+  margin: 1px 0 6px;
+  font-size: 0.98rem;
+  letter-spacing: -0.015em;
+}
+
+.account-data-card-heading p,
+.field-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.account-data-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  flex: 0 0 44px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--brand) 10%, var(--bg-elevated));
+  color: var(--brand);
+}
+
+.account-data-icon.danger {
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-elevated));
+  color: var(--danger);
+}
+
+.account-data-form {
+  max-width: none;
+}
+
+.account-data-form .field-note {
+  margin-top: 7px;
+}
+
+.account-data-form code {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-elevated));
+  color: var(--danger);
+  font-size: 0.77rem;
+}
+
+.confirmation-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: 0.035em;
+}
+
 .sessions-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -2796,10 +2887,6 @@ a {
     display: none;
   }
 
-  .settings-nav-security {
-    grid-column: 1 / -1;
-  }
-
   .avatar-editor {
     flex-direction: column;
     text-align: center;
@@ -2821,6 +2908,14 @@ a {
   .session-revoke {
     width: 100%;
     grid-column: 1 / -1;
+  }
+
+  .account-data-card-heading {
+    gap: 11px;
+  }
+
+  .account-data-form .settings-actions .btn {
+    width: 100%;
   }
 }
 

@@ -1,8 +1,10 @@
 use chrono::{Duration as ChronoDuration, Utc};
 use sqlx::{query, query_as, query_scalar, MySql, MySqlPool, Transaction};
-use std::{path::PathBuf, time::Duration};
+use std::{collections::HashSet, path::PathBuf, time::Duration};
 use tokio::time::MissedTickBehavior;
 use uuid::Uuid;
+
+use crate::validation::stored_image_path_belongs_to_user;
 
 pub const MAX_ACCOUNT_UPLOAD_BYTES: i64 = 100 * 1024 * 1024;
 pub const MAX_PENDING_POST_UPLOADS: i64 = 5;
@@ -11,6 +13,7 @@ const PENDING_UPLOAD_LIFETIME_HOURS: i64 = 24;
 const WRITING_UPLOAD_LIFETIME_HOURS: i64 = 1;
 const MAINTENANCE_INTERVAL_SECONDS: u64 = 15 * 60;
 const MAINTENANCE_BATCH_SIZE: i64 = 100;
+const DELETION_RETRY_MINUTES: i64 = 15;
 
 #[derive(Clone, Copy)]
 pub enum ManagedUploadKind {
@@ -47,6 +50,18 @@ struct CleanupCandidate {
     state: String,
 }
 
+#[derive(sqlx::FromRow)]
+struct QueuedDeletion {
+    id: String,
+    url: String,
+}
+
+#[derive(Debug, Default)]
+pub struct AccountUploadQueueSummary {
+    pub pending: usize,
+    pub blocked: usize,
+}
+
 fn upload_path(url: &str) -> Option<PathBuf> {
     let (directory, filename) = if let Some(filename) = url.strip_prefix("/uploads/avatars/") {
         ("uploads/avatars", filename)
@@ -78,6 +93,186 @@ async fn remove_file(url: &str) -> Result<(), std::io::Error> {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error),
+    }
+}
+
+fn account_upload_url_belongs_to_user(url: &str, user_id: &str) -> bool {
+    let avatar_prefix = format!("{user_id}_");
+    let post_prefix = format!("post_{user_id}_");
+
+    upload_path(url).is_some()
+        && (stored_image_path_belongs_to_user(url, "/uploads/avatars/", &avatar_prefix)
+            || stored_image_path_belongs_to_user(url, "/uploads/posts/", &post_prefix))
+}
+
+pub async fn enqueue_account_uploads_for_deletion(
+    transaction: &mut Transaction<'_, MySql>,
+    user_id: &str,
+) -> Result<AccountUploadQueueSummary, sqlx::Error> {
+    let mut urls = HashSet::new();
+
+    let avatar_url: Option<String> = query_scalar("SELECT avatar_url FROM users WHERE id = ?")
+        .bind(user_id)
+        .fetch_one(&mut **transaction)
+        .await?;
+    if let Some(avatar_url) = avatar_url {
+        urls.insert(avatar_url);
+    }
+
+    let post_urls = query_scalar::<_, String>(
+        "SELECT image_url FROM posts WHERE user_id = ? AND image_url IS NOT NULL",
+    )
+    .bind(user_id)
+    .fetch_all(&mut **transaction)
+    .await?;
+    urls.extend(post_urls);
+
+    let managed_urls =
+        query_scalar::<_, String>("SELECT url FROM managed_uploads WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_all(&mut **transaction)
+            .await?;
+    urls.extend(managed_urls);
+
+    let mut summary = AccountUploadQueueSummary::default();
+    for url in urls {
+        let state = if account_upload_url_belongs_to_user(&url, user_id) {
+            summary.pending += 1;
+            "pending"
+        } else {
+            summary.blocked += 1;
+            "blocked"
+        };
+
+        query(
+            "INSERT INTO upload_deletion_queue
+                (id, url, state, attempts, next_attempt_at, created_at)
+             VALUES (?, ?, ?, 0, ?, ?)
+             ON DUPLICATE KEY UPDATE id = upload_deletion_queue.id",
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(&url)
+        .bind(state)
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(&mut **transaction)
+        .await?;
+    }
+
+    Ok(summary)
+}
+
+async fn upload_is_still_referenced(pool: &MySqlPool, url: &str) -> Result<bool, sqlx::Error> {
+    let references: i64 = query_scalar(
+        "SELECT
+            (SELECT COUNT(*) FROM users WHERE avatar_url = ?) +
+            (SELECT COUNT(*) FROM posts WHERE image_url = ?) +
+            (SELECT COUNT(*) FROM managed_uploads WHERE url = ?)",
+    )
+    .bind(url)
+    .bind(url)
+    .bind(url)
+    .fetch_one(pool)
+    .await?;
+    Ok(references > 0)
+}
+
+async fn remove_queued_deletion(pool: &MySqlPool, candidate: QueuedDeletion) {
+    match upload_is_still_referenced(pool, &candidate.url).await {
+        Ok(true) => {
+            tracing::warn!(
+                deletion_id = %candidate.id,
+                "queued upload remains referenced; preserving file"
+            );
+            if let Err(error) = query("DELETE FROM upload_deletion_queue WHERE id = ?")
+                .bind(&candidate.id)
+                .execute(pool)
+                .await
+            {
+                tracing::error!(
+                    error = %error,
+                    deletion_id = %candidate.id,
+                    "failed to discard a referenced upload deletion"
+                );
+            }
+            return;
+        }
+        Ok(false) => {}
+        Err(error) => {
+            tracing::error!(
+                error = %error,
+                deletion_id = %candidate.id,
+                "failed to check queued upload references"
+            );
+            return;
+        }
+    }
+
+    match remove_file(&candidate.url).await {
+        Ok(()) => {
+            if let Err(error) = query("DELETE FROM upload_deletion_queue WHERE id = ?")
+                .bind(&candidate.id)
+                .execute(pool)
+                .await
+            {
+                tracing::error!(
+                    error = %error,
+                    deletion_id = %candidate.id,
+                    "failed to finalize a queued upload deletion"
+                );
+            }
+        }
+        Err(error) => {
+            tracing::error!(
+                error = %error,
+                deletion_id = %candidate.id,
+                "failed to remove a queued upload; maintenance will retry"
+            );
+            let now = Utc::now();
+            if let Err(database_error) = query(
+                "UPDATE upload_deletion_queue
+                 SET attempts = attempts + 1, last_attempt_at = ?, next_attempt_at = ?
+                 WHERE id = ? AND state = 'pending'",
+            )
+            .bind(now)
+            .bind(now + ChronoDuration::minutes(DELETION_RETRY_MINUTES))
+            .bind(&candidate.id)
+            .execute(pool)
+            .await
+            {
+                tracing::error!(
+                    error = %database_error,
+                    deletion_id = %candidate.id,
+                    "failed to schedule a queued upload retry"
+                );
+            }
+        }
+    }
+}
+
+pub async fn cleanup_queued_upload_deletions(pool: &MySqlPool, limit: i64) {
+    let candidates = query_as::<_, QueuedDeletion>(
+        "SELECT id, url
+         FROM upload_deletion_queue
+         WHERE state = 'pending' AND next_attempt_at <= ?
+         ORDER BY next_attempt_at ASC, created_at ASC
+         LIMIT ?",
+    )
+    .bind(Utc::now())
+    .bind(limit)
+    .fetch_all(pool)
+    .await;
+
+    let candidates = match candidates {
+        Ok(candidates) => candidates,
+        Err(error) => {
+            tracing::error!(error = %error, "failed to select queued upload deletions");
+            return;
+        }
+    };
+
+    for candidate in candidates {
+        remove_queued_deletion(pool, candidate).await;
     }
 }
 
@@ -224,6 +419,7 @@ pub fn spawn_upload_maintenance(pool: MySqlPool) {
         loop {
             interval.tick().await;
             cleanup_expired_uploads(&pool, None, MAINTENANCE_BATCH_SIZE).await;
+            cleanup_queued_upload_deletions(&pool, MAINTENANCE_BATCH_SIZE).await;
         }
     });
 }
@@ -476,7 +672,7 @@ pub async fn finish_deleting_upload_by_url(pool: &MySqlPool, url: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::upload_path;
+    use super::{account_upload_url_belongs_to_user, upload_path};
 
     #[test]
     fn resolves_only_flat_managed_upload_paths() {
@@ -491,5 +687,26 @@ mod tests {
         assert_eq!(upload_path("/uploads/posts/../avatars/a.png"), None);
         assert_eq!(upload_path("/uploads/posts/nested/a.png"), None);
         assert_eq!(upload_path("/etc/passwd"), None);
+    }
+
+    #[test]
+    fn account_cleanup_accepts_only_owner_bound_uploads() {
+        let user_id = "9f064cec-e6ef-4194-80c0-514b7f31b197";
+        assert!(account_upload_url_belongs_to_user(
+            "/uploads/avatars/9f064cec-e6ef-4194-80c0-514b7f31b197_avatar.webp",
+            user_id
+        ));
+        assert!(account_upload_url_belongs_to_user(
+            "/uploads/posts/post_9f064cec-e6ef-4194-80c0-514b7f31b197_image.webp",
+            user_id
+        ));
+        assert!(!account_upload_url_belongs_to_user(
+            "/uploads/posts/post_another-user_image.webp",
+            user_id
+        ));
+        assert!(!account_upload_url_belongs_to_user(
+            "/uploads/posts/post_9f064cec-e6ef-4194-80c0-514b7f31b197_../secret",
+            user_id
+        ));
     }
 }

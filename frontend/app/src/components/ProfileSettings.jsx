@@ -17,6 +17,7 @@ const SECURITY_EVENT_COPY = Object.freeze({
   email_change_requested: ['Schimbare de email solicitată', 'A fost trimisă confirmarea către noua adresă.'],
   email_changed: ['Adresă de email schimbată', 'Noua adresă a fost confirmată și sesiunile vechi au fost închise.'],
   email_verified: ['Adresă de email verificată', 'Adresa contului a fost confirmată.'],
+  account_data_exported: ['Date exportate', 'A fost generată o copie a datelor contului.'],
 });
 
 function formatDate(value) {
@@ -53,6 +54,11 @@ export default function ProfileSettings(props) {
   const [securityEventsLoaded, setSecurityEventsLoaded] = createSignal(false);
   const [loadingSecurityEvents, setLoadingSecurityEvents] = createSignal(false);
   const [securityEventRetentionDays, setSecurityEventRetentionDays] = createSignal(90);
+  const [exportPassword, setExportPassword] = createSignal('');
+  const [exportingData, setExportingData] = createSignal(false);
+  const [deletePassword, setDeletePassword] = createSignal('');
+  const [deleteConfirmation, setDeleteConfirmation] = createSignal('');
+  const [deletingAccount, setDeletingAccount] = createSignal(false);
   const [message, setMessage] = createSignal({ type: '', text: '' });
   let avatarInput;
   let messageTimeout;
@@ -236,13 +242,66 @@ export default function ProfileSettings(props) {
     }
   };
 
+  const handleDataExport = async (event) => {
+    event.preventDefault();
+    if (!exportPassword() || exportingData()) return;
+
+    setExportingData(true);
+    try {
+      const exportData = await api.exportAccountData(exportPassword());
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const downloadUrl = URL.createObjectURL(blob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = downloadUrl;
+      downloadLink.download = `media-date-cont-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.append(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      setSecurityEventsLoaded(false);
+      showMessage('success', 'Copia datelor a fost generată și descărcată.');
+    } catch (requestError) {
+      console.error('Failed to export account data:', requestError);
+      showMessage('error', requestError.status === 401
+        ? 'Parola introdusă nu este corectă.'
+        : 'Copia datelor nu a putut fi generată. Încearcă din nou.');
+    } finally {
+      setExportPassword('');
+      setExportingData(false);
+    }
+  };
+
+  const handleAccountDeletion = async (event) => {
+    event.preventDefault();
+    if (deleteConfirmation() !== 'STERGE CONTUL') {
+      showMessage('error', 'Scrie exact STERGE CONTUL pentru a confirma.');
+      return;
+    }
+    if (!deletePassword() || deletingAccount()) return;
+    if (!window.confirm('Ștergi definitiv contul? Postările, mesajele, sesiunile și fișierele asociate nu vor mai putea fi recuperate.')) return;
+
+    setDeletingAccount(true);
+    try {
+      await api.deleteAccount(deletePassword(), deleteConfirmation());
+      auth.setUser(null);
+      window.location.replace('/');
+    } catch (requestError) {
+      console.error('Failed to delete account:', requestError);
+      showMessage('error', requestError.status === 401
+        ? 'Parola introdusă nu este corectă.'
+        : 'Contul nu a putut fi șters. Datele au rămas neschimbate; încearcă din nou.');
+      setDeletePassword('');
+      setDeletingAccount(false);
+    }
+  };
+
   return (
     <section class="settings-layout" aria-labelledby="account-settings-title">
       <header class="settings-heading">
         <div>
           <p class="sidebar-eyebrow">Contul tău</p>
           <h2 id="account-settings-title">Setări și securitate</h2>
-          <p>Administrează identitatea și datele de acces ale contului.</p>
+          <p>Administrează identitatea, accesul și datele contului.</p>
         </div>
       </header>
 
@@ -267,6 +326,10 @@ export default function ProfileSettings(props) {
           <button type="button" role="tab" aria-selected={activeTab() === 'security'} class={`settings-nav-security ${activeTab() === 'security' ? 'is-active' : ''}`} onClick={() => selectTab('security')}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5.5A2.5 2.5 0 0 1 7.5 3h9A2.5 2.5 0 0 1 19 5.5v13a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 18.5v-13Z" stroke="currentColor" stroke-width="1.8" /><path d="M9 8h6m-6 4h6m-6 4h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
             <span><strong>Activitate</strong><small>Istoric de securitate</small></span>
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab() === 'data'} class={`settings-nav-data ${activeTab() === 'data' ? 'is-active' : ''}`} onClick={() => selectTab('data')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <span><strong>Date și cont</strong><small>Export sau ștergere</small></span>
           </button>
         </div>
 
@@ -424,6 +487,48 @@ export default function ProfileSettings(props) {
                   </ol>
                 </Show>
               </Show>
+            </div>
+          </Show>
+
+          <Show when={activeTab() === 'data'}>
+            <div class="settings-section">
+              <h3>Datele și contul tău</h3>
+              <p class="settings-description">Descarcă o copie structurată a datelor sau șterge definitiv contul. Ambele acțiuni cer parola actuală.</p>
+
+              <div class="account-data-controls">
+                <article class="account-data-card">
+                  <div class="account-data-card-heading">
+                    <span class="account-data-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                    <div><h4>Descarcă datele</h4><p>Primești un fișier JSON cu profilul, conținutul, interacțiunile, mesajele, sesiunile și activitatea contului. Parolele și tokenurile nu sunt incluse.</p></div>
+                  </div>
+                  <form class="settings-form account-data-form" onSubmit={handleDataExport}>
+                    <div>
+                      <label class="field-label" for="export-account-password">Confirmă cu parola</label>
+                      <input id="export-account-password" class="input" type="password" value={exportPassword()} onInput={(event) => setExportPassword(event.currentTarget.value)} autocomplete="current-password" aria-describedby="export-account-note" required />
+                      <p id="export-account-note" class="field-note">Fișierul poate conține informații private. Păstrează-l într-un loc sigur.</p>
+                    </div>
+                    <div class="settings-actions"><button type="submit" class="btn btn-primary" disabled={exportingData()}>{exportingData() ? 'Se pregătește…' : 'Descarcă copia datelor'}</button></div>
+                  </form>
+                </article>
+
+                <article class="account-data-card danger-zone">
+                  <div class="account-data-card-heading">
+                    <span class="account-data-icon danger" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7h16m-10 4v6m4-6v6M9 7l1-3h4l1 3m3 0-1 14H7L6 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+                    <div><h4>Șterge definitiv contul</h4><p>Profilul, postările, comentariile, aprecierile, salvările, mesajele, sesiunile și fișierele asociate vor fi eliminate. Acțiunea nu poate fi anulată.</p></div>
+                  </div>
+                  <form class="settings-form account-data-form" onSubmit={handleAccountDeletion}>
+                    <div>
+                      <label class="field-label" for="delete-account-password">Parola actuală</label>
+                      <input id="delete-account-password" class="input" type="password" value={deletePassword()} onInput={(event) => setDeletePassword(event.currentTarget.value)} autocomplete="current-password" required />
+                    </div>
+                    <div>
+                      <label class="field-label" for="delete-account-confirmation">Scrie <code>STERGE CONTUL</code></label>
+                      <input id="delete-account-confirmation" class="input confirmation-input" type="text" value={deleteConfirmation()} onInput={(event) => setDeleteConfirmation(event.currentTarget.value)} autocomplete="off" autocapitalize="characters" spellcheck={false} required />
+                    </div>
+                    <div class="settings-actions"><button type="submit" class="btn btn-danger" disabled={deletingAccount() || deleteConfirmation() !== 'STERGE CONTUL'}>{deletingAccount() ? 'Se șterge…' : 'Șterge definitiv contul'}</button></div>
+                  </form>
+                </article>
+              </div>
             </div>
           </Show>
         </div>

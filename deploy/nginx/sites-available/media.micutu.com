@@ -165,6 +165,12 @@ server {
         include snippets/media-api-proxy.conf;
     }
 
+    # Password-confirmed privacy actions are expensive and one is destructive.
+    location ~ ^/api/users/me(?:/export)?$ {
+        limit_req zone=media_auth burst=3 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
     # Text search is intentionally stricter than ordinary read endpoints because
     # partial matches cannot always use a conventional database index.
     location = /api/search {

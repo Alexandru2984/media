@@ -82,6 +82,17 @@ pub struct ChangeEmail {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ExportAccountData {
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DeleteAccount {
+    pub password: String,
+    pub confirmation: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct OneTimeTokenRequest {
     pub token: String,
 }

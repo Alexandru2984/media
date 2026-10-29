@@ -34,6 +34,8 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/auth/reset-password", post(handlers::reset_password))
         // User routes
         .route("/users/:id", get(handlers::get_profile))
+        .route("/users/me", delete(handlers::delete_account))
+        .route("/users/me/export", post(handlers::export_account_data))
         .route("/users/me/profile", put(handlers::update_profile))
         .route(
             "/users/me/avatar",

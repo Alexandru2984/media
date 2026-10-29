@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::Json,
 };
 use chrono::{DateTime, Utc};
@@ -24,7 +24,8 @@ use crate::{
     },
     tokens::{generate_one_time_token, hash_one_time_token},
     upload_lifecycle::{
-        attach_avatar_upload, claim_post_upload, discard_upload, finish_deleting_upload_by_url,
+        attach_avatar_upload, claim_post_upload, cleanup_queued_upload_deletions, discard_upload,
+        enqueue_account_uploads_for_deletion, finish_deleting_upload_by_url,
         mark_post_upload_deleting, mark_post_upload_pending, reserve_upload, ManagedUploadKind,
         UploadLifecycleError,
     },
@@ -37,6 +38,9 @@ use crate::{
         MAXIMUM_POST_CHARACTERS,
     },
 };
+
+const MAXIMUM_ACCOUNT_EXPORT_RECORDS: i64 = 10_000;
+const ACCOUNT_DELETION_CONFIRMATION: &str = "STERGE CONTUL";
 
 fn image_processing_status(error: ImageProcessingError) -> StatusCode {
     match error {
@@ -103,6 +107,122 @@ struct ActiveSessionResponse {
     last_seen_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
     current: bool,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportCounts {
+    posts: i64,
+    comments: i64,
+    likes: i64,
+    saved_posts: i64,
+    messages: i64,
+    sessions: i64,
+    security_events: i64,
+    pending_account_actions: i64,
+    uploads: i64,
+}
+
+impl ExportCounts {
+    fn total(&self) -> Option<i64> {
+        [
+            self.posts,
+            self.comments,
+            self.likes,
+            self.saved_posts,
+            self.messages,
+            self.sessions,
+            self.security_events,
+            self.pending_account_actions,
+            self.uploads,
+        ]
+        .into_iter()
+        .try_fold(0_i64, i64::checked_add)
+    }
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportProfile {
+    id: String,
+    username: String,
+    email: String,
+    email_verified: bool,
+    bio: Option<String>,
+    avatar_url: Option<String>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportLike {
+    post_id: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportSavedPost {
+    post_id: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct ExportSessionRow {
+    id: String,
+    created_at: DateTime<Utc>,
+    last_seen_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+    revoked_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize)]
+struct ExportSession {
+    id: String,
+    created_at: DateTime<Utc>,
+    last_seen_at: DateTime<Utc>,
+    expires_at: DateTime<Utc>,
+    revoked_at: Option<DateTime<Utc>>,
+    current: bool,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportSecurityEvent {
+    event_type: String,
+    occurred_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportPendingAccountAction {
+    token_type: String,
+    expires_at: DateTime<Utc>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportUpload {
+    url: String,
+    kind: String,
+    state: String,
+    size_bytes: i64,
+    post_id: Option<String>,
+    created_at: DateTime<Utc>,
+    attached_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize)]
+pub(crate) struct AccountDataExport {
+    format: &'static str,
+    format_version: u8,
+    exported_at: DateTime<Utc>,
+    profile: ExportProfile,
+    counts: ExportCounts,
+    posts: Vec<Post>,
+    comments: Vec<Comment>,
+    likes: Vec<ExportLike>,
+    saved_posts: Vec<ExportSavedPost>,
+    messages: Vec<Message>,
+    sessions: Vec<ExportSession>,
+    security_events: Vec<ExportSecurityEvent>,
+    pending_account_actions: Vec<ExportPendingAccountAction>,
+    uploads: Vec<ExportUpload>,
 }
 
 fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
@@ -194,6 +314,42 @@ async fn verify_and_upgrade_password(
 
     // A concurrent password change must win over a login using the old secret.
     Ok(upgraded.rows_affected() == 1)
+}
+
+async fn reauthenticate_user(
+    pool: &MySqlPool,
+    user_id: &str,
+    password: &str,
+) -> Result<User, StatusCode> {
+    if !password_is_safe_to_verify(password) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|error| {
+            tracing::error!(error = %error, "failed to load account for reauthentication");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
+    let verification = verify_password(password, &user.password_hash)
+        .await
+        .map_err(|error| {
+            tracing::error!(error = %error, "sensitive-action password verification failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    if !verification.valid {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    Ok(user)
+}
+
+fn account_deletion_confirmation_is_valid(confirmation: &str) -> bool {
+    confirmation == ACCOUNT_DELETION_CONFIRMATION
 }
 
 // Auth handlers
@@ -548,6 +704,302 @@ pub async fn get_profile(
         posts_count,
         created_at: user.created_at,
     }))
+}
+
+pub async fn export_account_data(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+    Json(payload): Json<ExportAccountData>,
+) -> Result<(HeaderMap, Json<AccountDataExport>), StatusCode> {
+    let authenticated_session = get_authenticated_session(&pool, &headers).await?;
+    let user =
+        reauthenticate_user(&pool, &authenticated_session.user_id, &payload.password).await?;
+    let mut transaction = pool.begin().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to begin account export transaction");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let current_password_hash: Option<String> =
+        query_scalar("SELECT password_hash FROM users WHERE id = ? FOR UPDATE")
+            .bind(&authenticated_session.user_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|error| {
+                tracing::error!(error = %error, "failed to lock account for export");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    if current_password_hash.as_deref() != Some(user.password_hash.as_str()) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let counts = query_as::<_, ExportCounts>(
+        "SELECT
+            (SELECT COUNT(*) FROM posts WHERE user_id = ?) AS posts,
+            (SELECT COUNT(*) FROM comments WHERE user_id = ?) AS comments,
+            (SELECT COUNT(*) FROM likes WHERE user_id = ?) AS likes,
+            (SELECT COUNT(*) FROM saved_posts WHERE user_id = ?) AS saved_posts,
+            (SELECT COUNT(*) FROM messages WHERE sender_id = ? OR receiver_id = ?) AS messages,
+            (SELECT COUNT(*) FROM sessions WHERE user_id = ?) AS sessions,
+            (SELECT COUNT(*) FROM security_events WHERE user_id = ?) AS security_events,
+            (SELECT COUNT(*) FROM email_tokens WHERE user_id = ?) AS pending_account_actions,
+            (SELECT COUNT(*) FROM managed_uploads WHERE user_id = ?) AS uploads",
+    )
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to count account export records");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    if counts
+        .total()
+        .is_none_or(|total| total > MAXIMUM_ACCOUNT_EXPORT_RECORDS)
+    {
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    let profile = query_as::<_, ExportProfile>(
+        "SELECT id, username, email, (email_verified <> 0) AS email_verified,
+                bio, avatar_url, created_at, updated_at
+         FROM users WHERE id = ?",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let posts = query_as::<_, Post>(
+        "SELECT id, user_id, content, image_url, likes_count, comments_count,
+                created_at, updated_at
+         FROM posts WHERE user_id = ? ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let comments = query_as::<_, Comment>(
+        "SELECT id, post_id, user_id, content, created_at, updated_at
+         FROM comments WHERE user_id = ? ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let likes = query_as::<_, ExportLike>(
+        "SELECT post_id, created_at FROM likes
+         WHERE user_id = ? ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let saved_posts = query_as::<_, ExportSavedPost>(
+        "SELECT post_id, created_at FROM saved_posts
+         WHERE user_id = ? ORDER BY created_at ASC, post_id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let messages = query_as::<_, Message>(
+        "SELECT id, sender_id, receiver_id, content, `read`, created_at
+         FROM messages WHERE sender_id = ? OR receiver_id = ?
+         ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let session_rows = query_as::<_, ExportSessionRow>(
+        "SELECT id, created_at, last_seen_at, expires_at, revoked_at
+         FROM sessions WHERE user_id = ? ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let sessions = session_rows
+        .into_iter()
+        .map(|session| ExportSession {
+            current: session.id == authenticated_session.session_id,
+            id: session.id,
+            created_at: session.created_at,
+            last_seen_at: session.last_seen_at,
+            expires_at: session.expires_at,
+            revoked_at: session.revoked_at,
+        })
+        .collect();
+
+    let security_events = query_as::<_, ExportSecurityEvent>(
+        "SELECT event_type, occurred_at FROM security_events
+         WHERE user_id = ? ORDER BY occurred_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let pending_account_actions = query_as::<_, ExportPendingAccountAction>(
+        "SELECT token_type, expires_at, created_at FROM email_tokens
+         WHERE user_id = ? ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let uploads = query_as::<_, ExportUpload>(
+        "SELECT url, kind, state, size_bytes, post_id, created_at, attached_at
+         FROM managed_uploads WHERE user_id = ? ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let exported_at = Utc::now();
+    transaction.commit().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to commit account export snapshot");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    record_security_event(
+        &pool,
+        &authenticated_session.user_id,
+        SecurityEventKind::AccountDataExported,
+    )
+    .await;
+
+    let mut response_headers = HeaderMap::new();
+    response_headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    let disposition = format!(
+        "attachment; filename=\"media-data-export-{}.json\"",
+        exported_at.format("%Y-%m-%d")
+    );
+    response_headers.insert(
+        header::CONTENT_DISPOSITION,
+        HeaderValue::from_str(&disposition).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+    );
+
+    Ok((
+        response_headers,
+        Json(AccountDataExport {
+            format: "media-account-data",
+            format_version: 1,
+            exported_at,
+            profile,
+            counts,
+            posts,
+            comments,
+            likes,
+            saved_posts,
+            messages,
+            sessions,
+            security_events,
+            pending_account_actions,
+            uploads,
+        }),
+    ))
+}
+
+pub async fn delete_account(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+    Json(payload): Json<DeleteAccount>,
+) -> Result<(HeaderMap, Json<Value>), StatusCode> {
+    if !account_deletion_confirmation_is_valid(&payload.confirmation) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let authenticated_session = get_authenticated_session(&pool, &headers).await?;
+    let user =
+        reauthenticate_user(&pool, &authenticated_session.user_id, &payload.password).await?;
+    let cleared_cookie = clear_session_cookie().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut transaction = pool.begin().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to begin account deletion transaction");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let current_password_hash: Option<String> =
+        query_scalar("SELECT password_hash FROM users WHERE id = ? FOR UPDATE")
+            .bind(&authenticated_session.user_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|error| {
+                tracing::error!(error = %error, "failed to lock account for deletion");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    if current_password_hash.as_deref() != Some(user.password_hash.as_str()) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    let queued_uploads =
+        enqueue_account_uploads_for_deletion(&mut transaction, &authenticated_session.user_id)
+            .await
+            .map_err(|error| {
+                tracing::error!(error = %error, "failed to queue account uploads for deletion");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+
+    let deleted = query("DELETE FROM users WHERE id = ? AND password_hash = ?")
+        .bind(&authenticated_session.user_id)
+        .bind(&user.password_hash)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| {
+            tracing::error!(error = %error, "failed to delete account data");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    if deleted.rows_affected() != 1 {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
+
+    transaction.commit().await.map_err(|error| {
+        tracing::error!(error = %error, "failed to commit account deletion");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if queued_uploads.blocked > 0 {
+        tracing::error!(
+            blocked_uploads = queued_uploads.blocked,
+            "account deleted with unsafe upload paths retained in the blocked queue"
+        );
+    }
+    tracing::info!(
+        queued_uploads = queued_uploads.pending,
+        blocked_uploads = queued_uploads.blocked,
+        "account and related database records deleted"
+    );
+    let cleanup_pool = pool.clone();
+    tokio::spawn(async move {
+        cleanup_queued_upload_deletions(&cleanup_pool, 100).await;
+    });
+
+    let mut response_headers = HeaderMap::new();
+    response_headers.insert(header::SET_COOKIE, cleared_cookie);
+    response_headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    Ok((
+        response_headers,
+        Json(json!({
+            "success": true,
+            "message": "Contul și datele asociate au fost șterse"
+        })),
+    ))
 }
 
 // Post handlers
@@ -2151,4 +2603,64 @@ pub async fn reset_password(
     Ok(Json(json!({
         "message": "Parola a fost resetată cu succes"
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        account_deletion_confirmation_is_valid, AccountDataExport, ExportCounts, ExportProfile,
+    };
+    use chrono::Utc;
+
+    #[test]
+    fn destructive_confirmation_is_exact() {
+        assert!(account_deletion_confirmation_is_valid("STERGE CONTUL"));
+        assert!(!account_deletion_confirmation_is_valid("sterge contul"));
+        assert!(!account_deletion_confirmation_is_valid("STERGE CONTUL "));
+    }
+
+    #[test]
+    fn empty_export_contains_no_credential_material() {
+        let now = Utc::now();
+        let export = AccountDataExport {
+            format: "media-account-data",
+            format_version: 1,
+            exported_at: now,
+            profile: ExportProfile {
+                id: "user-id".to_owned(),
+                username: "utilizator".to_owned(),
+                email: "user@example.com".to_owned(),
+                email_verified: true,
+                bio: None,
+                avatar_url: None,
+                created_at: now,
+                updated_at: now,
+            },
+            counts: ExportCounts {
+                posts: 0,
+                comments: 0,
+                likes: 0,
+                saved_posts: 0,
+                messages: 0,
+                sessions: 0,
+                security_events: 0,
+                pending_account_actions: 0,
+                uploads: 0,
+            },
+            posts: vec![],
+            comments: vec![],
+            likes: vec![],
+            saved_posts: vec![],
+            messages: vec![],
+            sessions: vec![],
+            security_events: vec![],
+            pending_account_actions: vec![],
+            uploads: vec![],
+        };
+
+        let serialized = serde_json::to_string(&export).unwrap();
+        assert!(!serialized.contains("password_hash"));
+        assert!(!serialized.contains("token_hash"));
+        assert!(!serialized.contains("\"token\":"));
+    }
 }

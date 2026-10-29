@@ -234,6 +234,20 @@ class ApiService {
     });
   }
 
+  async exportAccountData(password) {
+    return this.request('/users/me/export', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  }
+
+  async deleteAccount(password, confirmation) {
+    return this.request('/users/me', {
+      method: 'DELETE',
+      body: JSON.stringify({ password, confirmation }),
+    });
+  }
+
   // Upload avatar
   async uploadAvatar(file) {
     const formData = new FormData();
