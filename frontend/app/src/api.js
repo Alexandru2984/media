@@ -163,6 +163,31 @@ class ApiService {
     return this.request(`/saved-posts?limit=${limit}&offset=${offset}`);
   }
 
+  // Notifications
+  async getNotifications(limit = 20, offset = 0) {
+    return this.request(`/notifications?limit=${limit}&offset=${offset}`);
+  }
+
+  async getUnreadNotificationCount() {
+    return this.request('/notifications/unread-count');
+  }
+
+  async markNotificationRead(notificationId) {
+    return this.request(`/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: 'PUT',
+    });
+  }
+
+  async markAllNotificationsRead() {
+    return this.request('/notifications/read-all', { method: 'PUT' });
+  }
+
+  async deleteNotification(notificationId) {
+    return this.request(`/notifications/${encodeURIComponent(notificationId)}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Comments
   async getComments(postId) {
     return this.request(`/posts/${postId}/comments`);

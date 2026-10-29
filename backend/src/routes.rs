@@ -7,7 +7,7 @@ use axum::{
 };
 use sqlx::MySqlPool;
 
-use crate::{handlers, health, security};
+use crate::{handlers, health, notifications, security};
 
 pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
     let api_routes = Router::new()
@@ -80,6 +80,24 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/posts/:id", delete(handlers::delete_post))
         .route("/posts/:id/like", post(handlers::like_post))
         .route("/posts/:id/save", post(handlers::save_post))
+        // Private in-app notifications
+        .route("/notifications", get(notifications::list_notifications))
+        .route(
+            "/notifications/unread-count",
+            get(notifications::unread_notification_count),
+        )
+        .route(
+            "/notifications/read-all",
+            put(notifications::mark_all_notifications_read),
+        )
+        .route(
+            "/notifications/:id/read",
+            put(notifications::mark_notification_read),
+        )
+        .route(
+            "/notifications/:id",
+            delete(notifications::delete_notification),
+        )
         // Comment routes
         .route("/posts/:id/comments", get(handlers::get_comments))
         .route("/posts/:id/comments", post(handlers::create_comment))

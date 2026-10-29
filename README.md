@@ -16,7 +16,9 @@ Accounts can also be private: follow requests require explicit approval, and
 post text, comments, relationship lists, saved results, search results, and post
 media all enforce the current audience on the server. Block policy is enforced
 across discovery, profiles, interactions, comments, and direct-message APIs
-rather than only in the interface.
+rather than only in the interface. A private, responsive notification inbox
+groups follow requests, accepted requests, new followers, likes, and comments;
+the navbar exposes a bounded unread counter without relying on SMTP delivery.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -91,7 +93,8 @@ The next project goals are:
 4. Add metrics, alerts, retention policy, and restore drills around the deployed
    health endpoints and privacy-redacted JSON request logs.
 5. Expand the responsive product with mute/report/moderation controls,
-   notifications, cursor pagination, richer discovery, and granular audiences.
+   notification preferences/digests, cursor pagination, richer discovery, and
+   granular audiences.
 6. Complete the privacy program with a data inventory, retention schedule,
    asynchronous large-account exports, DPIA screening, processor records, and
    privacy/terms/help content.

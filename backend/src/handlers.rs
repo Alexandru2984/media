@@ -17,6 +17,7 @@ use crate::{
     },
     email::EmailService,
     models::*,
+    notifications::{delete_notification_event, upsert_notification, NotificationKind},
     passwords::{hash_password, spend_password_work, verify_password},
     security_events::{
         recent_security_events, record_security_event, SecurityEventKind,
@@ -149,6 +150,7 @@ struct ExportCounts {
     blocked_users: i64,
     incoming_follow_requests: i64,
     outgoing_follow_requests: i64,
+    notifications: i64,
 }
 
 impl ExportCounts {
@@ -168,6 +170,7 @@ impl ExportCounts {
             self.blocked_users,
             self.incoming_follow_requests,
             self.outgoing_follow_requests,
+            self.notifications,
         ]
         .into_iter()
         .try_fold(0_i64, i64::checked_add)
@@ -202,6 +205,16 @@ struct ExportSavedPost {
 #[derive(Serialize, sqlx::FromRow)]
 struct ExportRelationship {
     user_id: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportNotification {
+    id: String,
+    actor_id: String,
+    kind: String,
+    post_id: Option<String>,
+    read_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
 }
 
@@ -269,6 +282,7 @@ pub(crate) struct AccountDataExport {
     blocked_users: Vec<ExportRelationship>,
     incoming_follow_requests: Vec<ExportRelationship>,
     outgoing_follow_requests: Vec<ExportRelationship>,
+    notifications: Vec<ExportNotification>,
 }
 
 fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
@@ -995,6 +1009,14 @@ pub async fn follow_user(
             .execute(&mut *transaction)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        delete_notification_event(
+            &mut transaction,
+            &target_user_id,
+            &current_user_id,
+            NotificationKind::FollowRequest,
+            None,
+        )
+        .await?;
         transaction
             .commit()
             .await
@@ -1065,6 +1087,14 @@ pub async fn follow_user(
         .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        upsert_notification(
+            &mut transaction,
+            &target_user_id,
+            &current_user_id,
+            NotificationKind::FollowRequest,
+            None,
+        )
+        .await?;
     } else {
         query("DELETE FROM follow_requests WHERE requester_id = ? AND target_id = ?")
             .bind(&current_user_id)
@@ -1072,6 +1102,14 @@ pub async fn follow_user(
             .execute(&mut *transaction)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        delete_notification_event(
+            &mut transaction,
+            &target_user_id,
+            &current_user_id,
+            NotificationKind::FollowRequest,
+            None,
+        )
+        .await?;
         query(
             "INSERT INTO follows (follower_id, followed_id, created_at)
              VALUES (?, ?, ?)",
@@ -1082,6 +1120,14 @@ pub async fn follow_user(
         .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        upsert_notification(
+            &mut transaction,
+            &target_user_id,
+            &current_user_id,
+            NotificationKind::NewFollower,
+            None,
+        )
+        .await?;
     }
 
     transaction
@@ -1130,6 +1176,22 @@ pub async fn unfollow_user(
         .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    delete_notification_event(
+        &mut transaction,
+        &target_user_id,
+        &current_user_id,
+        NotificationKind::FollowRequest,
+        None,
+    )
+    .await?;
+    delete_notification_event(
+        &mut transaction,
+        &target_user_id,
+        &current_user_id,
+        NotificationKind::NewFollower,
+        None,
+    )
+    .await?;
     transaction
         .commit()
         .await
@@ -1173,6 +1235,19 @@ pub async fn update_privacy(
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
             .rows_affected();
+            query(
+                "DELETE notification
+                 FROM notifications notification
+                 INNER JOIN follow_requests request
+                    ON request.target_id = notification.recipient_id
+                   AND request.requester_id = notification.actor_id
+                 WHERE request.target_id = ?
+                   AND notification.kind = 'follow_request'",
+            )
+            .bind(&user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
             query("DELETE FROM follow_requests WHERE target_id = ?")
                 .bind(&user_id)
                 .execute(&mut *transaction)
@@ -1343,6 +1418,24 @@ pub async fn accept_follow_request(
         .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if request_exists {
+        delete_notification_event(
+            &mut transaction,
+            &target_id,
+            &requester_id,
+            NotificationKind::FollowRequest,
+            None,
+        )
+        .await?;
+        upsert_notification(
+            &mut transaction,
+            &requester_id,
+            &target_id,
+            NotificationKind::FollowAccepted,
+            None,
+        )
+        .await?;
+    }
 
     transaction
         .commit()
@@ -1386,6 +1479,14 @@ pub async fn reject_follow_request(
     if deleted.rows_affected() != 1 {
         return Err(StatusCode::NOT_FOUND);
     }
+    delete_notification_event(
+        &mut transaction,
+        &target_id,
+        &requester_id,
+        NotificationKind::FollowRequest,
+        None,
+    )
+    .await?;
     transaction
         .commit()
         .await
@@ -1447,6 +1548,18 @@ pub async fn block_user(
         "DELETE FROM follow_requests
          WHERE (requester_id = ? AND target_id = ?)
             OR (requester_id = ? AND target_id = ?)",
+    )
+    .bind(&current_user_id)
+    .bind(&target_user_id)
+    .bind(&target_user_id)
+    .bind(&current_user_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    query(
+        "DELETE FROM notifications
+         WHERE (recipient_id = ? AND actor_id = ?)
+            OR (recipient_id = ? AND actor_id = ?)",
     )
     .bind(&current_user_id)
     .bind(&target_user_id)
@@ -1664,8 +1777,10 @@ pub async fn export_account_data(
             (SELECT COUNT(*) FROM follows WHERE follower_id = ?) AS following,
             (SELECT COUNT(*) FROM user_blocks WHERE blocker_id = ?) AS blocked_users,
             (SELECT COUNT(*) FROM follow_requests WHERE target_id = ?) AS incoming_follow_requests,
-            (SELECT COUNT(*) FROM follow_requests WHERE requester_id = ?) AS outgoing_follow_requests",
+            (SELECT COUNT(*) FROM follow_requests WHERE requester_id = ?) AS outgoing_follow_requests,
+            (SELECT COUNT(*) FROM notifications WHERE recipient_id = ?) AS notifications",
     )
+    .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
@@ -1839,6 +1954,15 @@ pub async fn export_account_data(
     .fetch_all(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let notifications = query_as::<_, ExportNotification>(
+        "SELECT id, actor_id, kind, post_id, read_at, created_at
+         FROM notifications WHERE recipient_id = ?
+         ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let exported_at = Utc::now();
     transaction.commit().await.map_err(|error| {
@@ -1868,7 +1992,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 3,
+            format_version: 4,
             exported_at,
             profile,
             counts,
@@ -1886,6 +2010,7 @@ pub async fn export_account_data(
             blocked_users,
             incoming_follow_requests,
             outgoing_follow_requests,
+            notifications,
         }),
     ))
 }
@@ -2267,6 +2392,15 @@ pub async fn like_post(
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+        delete_notification_event(
+            &mut transaction,
+            &post_author_id,
+            &user_id,
+            NotificationKind::PostLike,
+            Some(&post_id),
+        )
+        .await?;
+
         false
     } else {
         query("INSERT INTO likes (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)")
@@ -2283,6 +2417,15 @@ pub async fn like_post(
             .execute(&mut *transaction)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        upsert_notification(
+            &mut transaction,
+            &post_author_id,
+            &user_id,
+            NotificationKind::PostLike,
+            Some(&post_id),
+        )
+        .await?;
 
         true
     };
@@ -2501,6 +2644,15 @@ pub async fn create_comment(
         .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    upsert_notification(
+        &mut transaction,
+        &post_author_id,
+        &user_id,
+        NotificationKind::PostComment,
+        Some(&post_id),
+    )
+    .await?;
 
     transaction
         .commit()
@@ -3286,6 +3438,12 @@ pub async fn delete_comment(
     }
 
     let post_id = comment.post_id.clone();
+    let post_author_id: Option<String> =
+        query_scalar("SELECT user_id FROM posts WHERE id = ? FOR UPDATE")
+            .bind(&post_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     query("DELETE FROM comments WHERE id = ?")
         .bind(&comment_id)
@@ -3299,6 +3457,26 @@ pub async fn delete_comment(
         .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let remaining_comments: i64 =
+        query_scalar("SELECT COUNT(*) FROM comments WHERE post_id = ? AND user_id = ?")
+            .bind(&post_id)
+            .bind(&user_id)
+            .fetch_one(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if remaining_comments == 0 {
+        if let Some(post_author_id) = post_author_id {
+            delete_notification_event(
+                &mut transaction,
+                &post_author_id,
+                &user_id,
+                NotificationKind::PostComment,
+                Some(&post_id),
+            )
+            .await?;
+        }
+    }
 
     transaction
         .commit()
@@ -3902,7 +4080,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 3,
+            format_version: 4,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),
@@ -3930,6 +4108,7 @@ mod tests {
                 blocked_users: 0,
                 incoming_follow_requests: 0,
                 outgoing_follow_requests: 0,
+                notifications: 0,
             },
             posts: vec![],
             comments: vec![],
@@ -3945,6 +4124,7 @@ mod tests {
             blocked_users: vec![],
             incoming_follow_requests: vec![],
             outgoing_follow_requests: vec![],
+            notifications: vec![],
         };
 
         let serialized = serde_json::to_string(&export).unwrap();

@@ -354,6 +354,33 @@ a {
   gap: 9px;
 }
 
+.notification-nav-button {
+  position: relative;
+}
+
+.notification-nav-button.is-active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.notification-nav-badge {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  display: grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  padding-inline: 4px;
+  border: 2px solid var(--bg-elevated);
+  border-radius: 999px;
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
 .nav-link {
   display: inline-flex;
   min-height: 42px;
@@ -572,6 +599,141 @@ a {
   margin: 6px 0 0;
   color: var(--text-muted);
   line-height: 1.55;
+}
+
+.notifications-page {
+  width: min(100% - 32px, 780px);
+  min-height: calc(100vh - var(--nav-height));
+  padding-block: 42px 72px;
+}
+
+.notifications-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.notifications-hero-icon {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+  color: var(--accent);
+}
+
+.notifications-hero h1 {
+  margin: 0;
+  font-size: clamp(1.65rem, 5vw, 2.15rem);
+  letter-spacing: -0.04em;
+}
+
+.notifications-hero-copy > p:last-child {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.notifications-read-all {
+  white-space: nowrap;
+}
+
+.notifications-alert {
+  margin-bottom: 16px;
+}
+
+.notifications-list {
+  display: grid;
+  gap: 10px;
+}
+
+.notification-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 86px;
+  padding: 16px;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+
+.notification-card.is-unread {
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--brand) 7%, transparent), transparent 52%),
+    var(--bg-elevated);
+}
+
+.notification-card:hover {
+  transform: translateY(-1px);
+}
+
+.notification-unread-dot {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--bg-elevated);
+  border-radius: 999px;
+  background: var(--brand);
+}
+
+.notification-avatar-link {
+  display: grid;
+  border-radius: 999px;
+}
+
+.notification-avatar {
+  width: 50px;
+  height: 50px;
+}
+
+.notification-copy {
+  min-width: 0;
+}
+
+.notification-copy p {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.notification-copy p a {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.notification-copy p a:hover {
+  color: var(--brand);
+}
+
+.notification-copy time {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+
+.notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.notification-actions .btn {
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.notification-dismiss:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
 }
 
 .mobile-bottom-nav {
@@ -2897,6 +3059,28 @@ a {
     padding-block: 28px calc(104px + env(safe-area-inset-bottom));
   }
 
+  .notifications-page {
+    width: min(100% - 24px, 780px);
+    padding-block: 28px calc(104px + env(safe-area-inset-bottom));
+  }
+
+  .notifications-hero {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 13px;
+  }
+
+  .notifications-hero-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+  }
+
+  .notifications-read-all {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
   .connections-page {
     width: min(100% - 24px, 760px);
     padding-block: 28px calc(104px + env(safe-area-inset-bottom));
@@ -3177,6 +3361,16 @@ a {
 
   .request-actions .btn {
     width: 100%;
+  }
+
+  .notification-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .notification-actions {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 
   .settings-nav {

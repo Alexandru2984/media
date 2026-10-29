@@ -45,6 +45,7 @@ export default function FollowRequests() {
       if (accept) await api.acceptFollowRequest(request.id);
       else await api.rejectFollowRequest(request.id);
       setRequests((current) => current.filter((item) => item.id !== request.id));
+      window.dispatchEvent(new CustomEvent('media:notifications-changed'));
     } catch (requestError) {
       console.error('Failed to decide follow request:', requestError);
       if (requestError.status === 404) {

@@ -61,7 +61,7 @@ server {
 
     # Private application routes must not enter a search index. Serve the SPA
     # directly so the route keeps this response policy.
-    location ~ ^/(login|register|forgot-password|search|salvate|cereri|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
+    location ~ ^/(login|register|forgot-password|search|salvate|cereri|notificari|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
         try_files /index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
@@ -187,6 +187,14 @@ server {
     }
 
     location ~ ^/api/users/me/(privacy|follow-requests(?:/[^/]+)?)$ {
+        limit_req zone=media_api burst=60 nodelay;
+        limit_req zone=media_social_write burst=8 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    # Notification state is private and bounded, but write actions still share
+    # the stricter social mutation budget to limit polling/write amplification.
+    location ~ ^/api/notifications(?:/.*)?$ {
         limit_req zone=media_api burst=60 nodelay;
         limit_req zone=media_social_write burst=8 nodelay;
         include snippets/media-api-proxy.conf;

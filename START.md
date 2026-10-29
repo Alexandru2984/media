@@ -76,6 +76,9 @@ Vite sau să trimită originea locală configurată.
 - `GET|POST /api/posts/:id/comments`, `PUT|DELETE /api/comments/:id`
 - `GET /api/search?q=...`
 - `GET /api/users/:id`, `PUT /api/users/me/profile`
+- `GET /api/notifications`, `GET /api/notifications/unread-count`
+- `PUT /api/notifications/:id/read`, `PUT /api/notifications/read-all`
+- `DELETE /api/notifications/:id`
 - `POST /api/users/me/avatar`, `POST /api/posts/upload-image`
 - `GET|POST /api/messages`
 - `GET /api/health/live`, `GET /api/health/ready`

@@ -1,5 +1,6 @@
 import { A, useLocation, useNavigate } from '@solidjs/router';
-import { Show } from 'solid-js';
+import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js';
+import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
 import { getImageUrl } from '../utils/urls';
@@ -30,6 +31,47 @@ export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const [unreadNotifications, setUnreadNotifications] = createSignal(0);
+  let loadedForUser = null;
+
+  const refreshUnreadNotifications = async () => {
+    if (!auth.isAuthenticated()) {
+      setUnreadNotifications(0);
+      return;
+    }
+    try {
+      const result = await api.getUnreadNotificationCount();
+      setUnreadNotifications(Number(result.count) || 0);
+    } catch (error) {
+      if (error.status !== 401) console.error('Failed to refresh unread notifications:', error);
+    }
+  };
+
+  const refreshWhenVisible = () => {
+    if (document.visibilityState === 'visible') void refreshUnreadNotifications();
+  };
+
+  createEffect(() => {
+    const userId = auth.user()?.id || null;
+    if (userId !== loadedForUser) {
+      loadedForUser = userId;
+      if (userId) void refreshUnreadNotifications();
+      else setUnreadNotifications(0);
+    }
+  });
+
+  onMount(() => {
+    const timer = window.setInterval(refreshWhenVisible, 60_000);
+    window.addEventListener('focus', refreshWhenVisible);
+    window.addEventListener('media:notifications-changed', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    onCleanup(() => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshWhenVisible);
+      window.removeEventListener('media:notifications-changed', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    });
+  });
 
   const handleLogout = async () => {
     await auth.logout();
@@ -91,6 +133,21 @@ export default function Navbar() {
         </Show>
 
         <div class="nav-actions">
+          <Show when={auth.isAuthenticated()}>
+            <A
+              href="/notificari"
+              class={`icon-button notification-nav-button ${location.pathname === '/notificari' ? 'is-active' : ''}`}
+              aria-label={unreadNotifications() > 0 ? `${unreadNotifications()} notificări necitite` : 'Notificări'}
+              title="Notificări"
+            >
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM9.8 21h4.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <Show when={unreadNotifications() > 0}>
+                <span class="notification-nav-badge" aria-hidden="true">{unreadNotifications() > 99 ? '99+' : unreadNotifications()}</span>
+              </Show>
+            </A>
+          </Show>
           <button
             type="button"
             class="icon-button"

@@ -217,7 +217,10 @@ was visually checked at 1440, 390, and 320 px. Follow/unfollow, bounded
 followers/following lists, a chronological following feed, and bidirectional
 blocking are also deployed with responsive controls and private-route `noindex`
 headers. Private accounts, approval/cancellation flows, protected post media,
-and a responsive request inbox are deployed. Notifications, moderation, richer
+and a responsive request inbox are deployed. A private in-app notification
+inbox is also implemented for follow requests/acceptances, new followers, likes,
+and comments, with grouping, read state, a navbar badge, block cleanup, and
+bounded retention. Notification preferences/digests, moderation, richer
 publishing, and multiple named collections remain open.
 
 ### Profiles and relationships
@@ -252,7 +255,9 @@ publishing, and multiple named collections remain open.
 - Real-time one-to-one conversations, unread counts, typing/read state, and
   attachment safety; groups only after abuse controls are ready.
 - In-app and optional email/push notifications with granular preferences,
-  quiet hours, digests, grouping, and per-event unsubscribe.
+  quiet hours, digests, grouping, and per-event unsubscribe. ✅ The bounded
+  in-app foundation, grouping, read state, and responsive inbox are complete;
+  preferences and external delivery remain open.
 
 ### Trust and safety
 

@@ -98,6 +98,14 @@ Pentru export/ștergere, canarul trebuie să includă două conturi și să veri
 - fișierele owner-bound și rândurile din `upload_deletion_queue` dispar;
 - contul martor rămâne intact până la cleanupul explicit al canarului.
 
+Pentru notificări, canarul cu două conturi trebuie să verifice:
+
+- deduplicarea cererilor, aprecierilor și comentariilor repetate;
+- respingerea IDOR la citire/ștergere și filtrarea bidirecțională la block;
+- eliminarea notificării la anularea acțiunii și cascadele la post/cont;
+- contorul necitit, citirea individuală/globală și exportul explicit v4;
+- maximum 500 de înregistrări per destinatar și zero rânduri canary la final.
+
 Nu afișa cookie-uri, parole, hashuri, environmentul sau URL-ul bazei în outputul
 CI/jurnal.
 
