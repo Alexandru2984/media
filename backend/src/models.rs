@@ -12,7 +12,6 @@ pub struct User {
     pub email_verified: Option<i64>,
     pub bio: Option<String>,
     pub avatar_url: Option<String>,
-    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -143,6 +142,31 @@ pub struct UserProfile {
     pub bio: Option<String>,
     pub avatar_url: Option<String>,
     pub posts_count: i64,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ProfileDetail {
+    pub id: String,
+    pub username: String,
+    pub bio: Option<String>,
+    pub avatar_url: Option<String>,
+    pub posts_count: i64,
+    pub followers_count: i64,
+    pub following_count: i64,
+    pub is_following: bool,
+    pub is_blocked: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ConnectionProfile {
+    pub id: String,
+    pub username: String,
+    pub bio: Option<String>,
+    pub avatar_url: Option<String>,
+    pub posts_count: i64,
+    pub is_following: bool,
     pub created_at: DateTime<Utc>,
 }
 

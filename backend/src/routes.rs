@@ -34,6 +34,16 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/auth/reset-password", post(handlers::reset_password))
         // User routes
         .route("/users/:id", get(handlers::get_profile))
+        .route(
+            "/users/:id/follow",
+            put(handlers::follow_user).delete(handlers::unfollow_user),
+        )
+        .route(
+            "/users/:id/block",
+            put(handlers::block_user).delete(handlers::unblock_user),
+        )
+        .route("/users/:id/followers", get(handlers::get_followers))
+        .route("/users/:id/following", get(handlers::get_following))
         .route("/users/me", delete(handlers::delete_account))
         .route("/users/me/export", post(handlers::export_account_data))
         .route("/users/me/profile", put(handlers::update_profile))
@@ -51,6 +61,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         // Post routes
         .route("/posts", get(handlers::get_posts))
         .route("/posts", post(handlers::create_post))
+        .route("/feed/following", get(handlers::get_following_feed))
         .route("/saved-posts", get(handlers::get_saved_posts))
         .route(
             "/posts/upload-image",

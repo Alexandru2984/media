@@ -41,6 +41,7 @@ use crate::{
 
 const MAXIMUM_ACCOUNT_EXPORT_RECORDS: i64 = 10_000;
 const ACCOUNT_DELETION_CONFIRMATION: &str = "STERGE CONTUL";
+const MAXIMUM_FOLLOWING_PER_ACCOUNT: i64 = 5_000;
 
 fn image_processing_status(error: ImageProcessingError) -> StatusCode {
     match error {
@@ -93,6 +94,12 @@ struct CommentFeedRow {
 }
 
 #[derive(sqlx::FromRow)]
+struct BlockDirections {
+    current_blocks: bool,
+    blocked_by: bool,
+}
+
+#[derive(sqlx::FromRow)]
 struct ActiveSessionRow {
     id: String,
     created_at: DateTime<Utc>,
@@ -120,6 +127,9 @@ struct ExportCounts {
     security_events: i64,
     pending_account_actions: i64,
     uploads: i64,
+    followers: i64,
+    following: i64,
+    blocked_users: i64,
 }
 
 impl ExportCounts {
@@ -134,6 +144,9 @@ impl ExportCounts {
             self.security_events,
             self.pending_account_actions,
             self.uploads,
+            self.followers,
+            self.following,
+            self.blocked_users,
         ]
         .into_iter()
         .try_fold(0_i64, i64::checked_add)
@@ -161,6 +174,12 @@ struct ExportLike {
 #[derive(Serialize, sqlx::FromRow)]
 struct ExportSavedPost {
     post_id: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportRelationship {
+    user_id: String,
     created_at: DateTime<Utc>,
 }
 
@@ -223,6 +242,9 @@ pub(crate) struct AccountDataExport {
     security_events: Vec<ExportSecurityEvent>,
     pending_account_actions: Vec<ExportPendingAccountAction>,
     uploads: Vec<ExportUpload>,
+    followers: Vec<ExportRelationship>,
+    following: Vec<ExportRelationship>,
+    blocked_users: Vec<ExportRelationship>,
 }
 
 fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
@@ -244,6 +266,43 @@ fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
         is_liked: row.is_liked,
         is_saved: row.is_saved,
     }
+}
+
+async fn block_directions(
+    pool: &MySqlPool,
+    current_user_id: &str,
+    other_user_id: &str,
+) -> Result<BlockDirections, StatusCode> {
+    query_as::<_, BlockDirections>(
+        "SELECT
+            EXISTS(
+                SELECT 1 FROM user_blocks
+                WHERE blocker_id = ? AND blocked_id = ?
+            ) AS current_blocks,
+            EXISTS(
+                SELECT 1 FROM user_blocks
+                WHERE blocker_id = ? AND blocked_id = ?
+            ) AS blocked_by",
+    )
+    .bind(current_user_id)
+    .bind(other_user_id)
+    .bind(other_user_id)
+    .bind(current_user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to evaluate block policy");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })
+}
+
+async fn blocked_pair_exists(
+    pool: &MySqlPool,
+    first_user_id: &str,
+    second_user_id: &str,
+) -> Result<bool, StatusCode> {
+    let directions = block_directions(pool, first_user_id, second_user_id).await?;
+    Ok(directions.current_blocks || directions.blocked_by)
 }
 
 async fn remove_unreferenced_post_upload(pool: &MySqlPool, url: Option<&str>, user_id: &str) {
@@ -682,28 +741,362 @@ pub async fn get_current_user(pool: &MySqlPool, headers: &HeaderMap) -> Result<S
 pub async fn get_profile(
     State(pool): State<MySqlPool>,
     Path(user_id): Path<String>,
-) -> Result<Json<UserProfile>, StatusCode> {
-    let user = query_as::<_, User>("SELECT * FROM users WHERE id = ?")
-        .bind(&user_id)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .ok_or(StatusCode::NOT_FOUND)?;
+    headers: HeaderMap,
+) -> Result<Json<ProfileDetail>, StatusCode> {
+    if Uuid::parse_str(&user_id).is_err() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let current_user_id = get_current_user(&pool, &headers).await.ok();
+    if let Some(current_user_id) = current_user_id.as_deref() {
+        if current_user_id != user_id {
+            let directions = block_directions(&pool, current_user_id, &user_id).await?;
+            if directions.blocked_by {
+                return Err(StatusCode::NOT_FOUND);
+            }
+        }
+    }
 
-    let posts_count: i64 = query_scalar("SELECT COUNT(*) FROM posts WHERE user_id = ?")
-        .bind(&user_id)
+    let profile = query_as::<_, ProfileDetail>(
+        "SELECT u.id, u.username, u.bio, u.avatar_url,
+                (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS posts_count,
+                (SELECT COUNT(*) FROM follows WHERE followed_id = u.id) AS followers_count,
+                (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) AS following_count,
+                EXISTS(
+                    SELECT 1 FROM follows
+                    WHERE follower_id = ? AND followed_id = u.id
+                ) AS is_following,
+                EXISTS(
+                    SELECT 1 FROM user_blocks
+                    WHERE blocker_id = ? AND blocked_id = u.id
+                ) AS is_blocked,
+                u.created_at
+         FROM users u
+         WHERE u.id = ?",
+    )
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
+    .bind(&user_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to fetch profile");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok(Json(profile))
+}
+
+pub async fn follow_user(
+    State(pool): State<MySqlPool>,
+    Path(target_user_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let current_user_id = get_current_user(&pool, &headers).await?;
+    if Uuid::parse_str(&target_user_id).is_err() || target_user_id == current_user_id {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let locked_users =
+        query_scalar::<_, String>("SELECT id FROM users WHERE id IN (?, ?) ORDER BY id FOR UPDATE")
+            .bind(&current_user_id)
+            .bind(&target_user_id)
+            .fetch_all(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if locked_users.len() != 2 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    let is_blocked: bool = query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM user_blocks
+            WHERE (blocker_id = ? AND blocked_id = ?)
+               OR (blocker_id = ? AND blocked_id = ?)
+         )",
+    )
+    .bind(&current_user_id)
+    .bind(&target_user_id)
+    .bind(&target_user_id)
+    .bind(&current_user_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if is_blocked {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let already_following: bool = query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM follows WHERE follower_id = ? AND followed_id = ?
+         )",
+    )
+    .bind(&current_user_id)
+    .bind(&target_user_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !already_following {
+        let following_count: i64 =
+            query_scalar("SELECT COUNT(*) FROM follows WHERE follower_id = ?")
+                .bind(&current_user_id)
+                .fetch_one(&mut *transaction)
+                .await
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        if following_count >= MAXIMUM_FOLLOWING_PER_ACCOUNT {
+            return Err(StatusCode::CONFLICT);
+        }
+        query(
+            "INSERT INTO follows (follower_id, followed_id, created_at)
+             VALUES (?, ?, ?)",
+        )
+        .bind(&current_user_id)
+        .bind(&target_user_id)
+        .bind(Utc::now())
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+
+    transaction
+        .commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(json!({ "following": true })))
+}
+
+pub async fn unfollow_user(
+    State(pool): State<MySqlPool>,
+    Path(target_user_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let current_user_id = get_current_user(&pool, &headers).await?;
+    if Uuid::parse_str(&target_user_id).is_err() || target_user_id == current_user_id {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    query("DELETE FROM follows WHERE follower_id = ? AND followed_id = ?")
+        .bind(&current_user_id)
+        .bind(&target_user_id)
+        .execute(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(json!({ "following": false })))
+}
+
+pub async fn block_user(
+    State(pool): State<MySqlPool>,
+    Path(target_user_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let current_user_id = get_current_user(&pool, &headers).await?;
+    if Uuid::parse_str(&target_user_id).is_err() || target_user_id == current_user_id {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let locked_users =
+        query_scalar::<_, String>("SELECT id FROM users WHERE id IN (?, ?) ORDER BY id FOR UPDATE")
+            .bind(&current_user_id)
+            .bind(&target_user_id)
+            .fetch_all(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if locked_users.len() != 2 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    query(
+        "INSERT INTO user_blocks (blocker_id, blocked_id, created_at)
+         VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE blocker_id = user_blocks.blocker_id",
+    )
+    .bind(&current_user_id)
+    .bind(&target_user_id)
+    .bind(Utc::now())
+    .execute(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    query(
+        "DELETE FROM follows
+         WHERE (follower_id = ? AND followed_id = ?)
+            OR (follower_id = ? AND followed_id = ?)",
+    )
+    .bind(&current_user_id)
+    .bind(&target_user_id)
+    .bind(&target_user_id)
+    .bind(&current_user_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(json!({ "blocked": true, "following": false })))
+}
+
+pub async fn unblock_user(
+    State(pool): State<MySqlPool>,
+    Path(target_user_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<Value>, StatusCode> {
+    let current_user_id = get_current_user(&pool, &headers).await?;
+    if Uuid::parse_str(&target_user_id).is_err() || target_user_id == current_user_id {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    query("DELETE FROM user_blocks WHERE blocker_id = ? AND blocked_id = ?")
+        .bind(&current_user_id)
+        .bind(&target_user_id)
+        .execute(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(json!({ "blocked": false })))
+}
+
+pub async fn get_followers(
+    State(pool): State<MySqlPool>,
+    Path(target_user_id): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<ConnectionProfile>>, StatusCode> {
+    let current_user_id = get_current_user(&pool, &headers).await?;
+    if Uuid::parse_str(&target_user_id).is_err() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if target_user_id != current_user_id
+        && blocked_pair_exists(&pool, &current_user_id, &target_user_id).await?
+    {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let target_exists: bool = query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)")
+        .bind(&target_user_id)
         .fetch_one(&pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !target_exists {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let limit = params
+        .get("limit")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(20)
+        .clamp(1, 50);
+    let offset = params
+        .get("offset")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(0)
+        .clamp(0, 1_000_000);
 
-    Ok(Json(UserProfile {
-        id: user.id,
-        username: user.username,
-        bio: user.bio,
-        avatar_url: user.avatar_url,
-        posts_count,
-        created_at: user.created_at,
-    }))
+    let users = query_as::<_, ConnectionProfile>(
+        "SELECT u.id, u.username, u.bio, u.avatar_url,
+                (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS posts_count,
+                EXISTS(
+                    SELECT 1 FROM follows current_follow
+                    WHERE current_follow.follower_id = ?
+                      AND current_follow.followed_id = u.id
+                ) AS is_following,
+                u.created_at
+         FROM follows relationship
+         INNER JOIN users u ON u.id = relationship.follower_id
+         WHERE relationship.followed_id = ?
+           AND NOT EXISTS(
+               SELECT 1 FROM user_blocks block_pair
+               WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = u.id)
+                  OR (block_pair.blocker_id = u.id AND block_pair.blocked_id = ?)
+           )
+         ORDER BY relationship.created_at DESC, u.id ASC
+         LIMIT ? OFFSET ?",
+    )
+    .bind(&current_user_id)
+    .bind(&target_user_id)
+    .bind(&current_user_id)
+    .bind(&current_user_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to fetch followers");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(users))
+}
+
+pub async fn get_following(
+    State(pool): State<MySqlPool>,
+    Path(target_user_id): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<ConnectionProfile>>, StatusCode> {
+    let current_user_id = get_current_user(&pool, &headers).await?;
+    if Uuid::parse_str(&target_user_id).is_err() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if target_user_id != current_user_id
+        && blocked_pair_exists(&pool, &current_user_id, &target_user_id).await?
+    {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let target_exists: bool = query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)")
+        .bind(&target_user_id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !target_exists {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let limit = params
+        .get("limit")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(20)
+        .clamp(1, 50);
+    let offset = params
+        .get("offset")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(0)
+        .clamp(0, 1_000_000);
+
+    let users = query_as::<_, ConnectionProfile>(
+        "SELECT u.id, u.username, u.bio, u.avatar_url,
+                (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS posts_count,
+                EXISTS(
+                    SELECT 1 FROM follows current_follow
+                    WHERE current_follow.follower_id = ?
+                      AND current_follow.followed_id = u.id
+                ) AS is_following,
+                u.created_at
+         FROM follows relationship
+         INNER JOIN users u ON u.id = relationship.followed_id
+         WHERE relationship.follower_id = ?
+           AND NOT EXISTS(
+               SELECT 1 FROM user_blocks block_pair
+               WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = u.id)
+                  OR (block_pair.blocker_id = u.id AND block_pair.blocked_id = ?)
+           )
+         ORDER BY relationship.created_at DESC, u.id ASC
+         LIMIT ? OFFSET ?",
+    )
+    .bind(&current_user_id)
+    .bind(&target_user_id)
+    .bind(&current_user_id)
+    .bind(&current_user_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to fetch following");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(users))
 }
 
 pub async fn export_account_data(
@@ -742,8 +1135,14 @@ pub async fn export_account_data(
             (SELECT COUNT(*) FROM sessions WHERE user_id = ?) AS sessions,
             (SELECT COUNT(*) FROM security_events WHERE user_id = ?) AS security_events,
             (SELECT COUNT(*) FROM email_tokens WHERE user_id = ?) AS pending_account_actions,
-            (SELECT COUNT(*) FROM managed_uploads WHERE user_id = ?) AS uploads",
+            (SELECT COUNT(*) FROM managed_uploads WHERE user_id = ?) AS uploads,
+            (SELECT COUNT(*) FROM follows WHERE followed_id = ?) AS followers,
+            (SELECT COUNT(*) FROM follows WHERE follower_id = ?) AS following,
+            (SELECT COUNT(*) FROM user_blocks WHERE blocker_id = ?) AS blocked_users",
     )
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
@@ -872,6 +1271,31 @@ pub async fn export_account_data(
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    let followers = query_as::<_, ExportRelationship>(
+        "SELECT follower_id AS user_id, created_at FROM follows
+         WHERE followed_id = ? ORDER BY created_at ASC, follower_id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let following = query_as::<_, ExportRelationship>(
+        "SELECT followed_id AS user_id, created_at FROM follows
+         WHERE follower_id = ? ORDER BY created_at ASC, followed_id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let blocked_users = query_as::<_, ExportRelationship>(
+        "SELECT blocked_id AS user_id, created_at FROM user_blocks
+         WHERE blocker_id = ? ORDER BY created_at ASC, blocked_id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     let exported_at = Utc::now();
     transaction.commit().await.map_err(|error| {
         tracing::error!(error = %error, "failed to commit account export snapshot");
@@ -900,7 +1324,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 1,
+            format_version: 2,
             exported_at,
             profile,
             counts,
@@ -913,6 +1337,9 @@ pub async fn export_account_data(
             security_events,
             pending_account_actions,
             uploads,
+            followers,
+            following,
+            blocked_users,
         }),
     ))
 }
@@ -1147,9 +1574,16 @@ pub async fn get_posts(
            ON current_like.post_id = p.id AND current_like.user_id = ?
          LEFT JOIN saved_posts current_save
            ON current_save.post_id = p.id AND current_save.user_id = ?
+         WHERE NOT EXISTS(
+             SELECT 1 FROM user_blocks block_pair
+             WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
+                OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
+         )
          ORDER BY p.created_at DESC
          LIMIT ? OFFSET ?",
     )
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(limit)
@@ -1157,6 +1591,70 @@ pub async fn get_posts(
     .fetch_all(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(
+        rows.into_iter().map(post_feed_row_to_response).collect(),
+    ))
+}
+
+pub async fn get_following_feed(
+    State(pool): State<MySqlPool>,
+    Query(params): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
+    let current_user_id = get_current_user(&pool, &headers).await?;
+    let limit = params
+        .get("limit")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(10)
+        .clamp(1, 50);
+    let offset = params
+        .get("offset")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(0)
+        .clamp(0, 1_000_000);
+
+    let rows = query_as::<_, PostFeedRow>(
+        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+                u.id AS user_id, u.username, u.bio, u.avatar_url,
+                post_counts.posts_count AS user_posts_count,
+                u.created_at AS user_created_at,
+                (current_like.id IS NOT NULL) AS is_liked,
+                (current_save.user_id IS NOT NULL) AS is_saved
+         FROM follows relationship
+         INNER JOIN posts p ON p.user_id = relationship.followed_id
+         INNER JOIN users u ON u.id = p.user_id
+         INNER JOIN (
+             SELECT user_id, COUNT(*) AS posts_count
+             FROM posts
+             GROUP BY user_id
+         ) post_counts ON post_counts.user_id = p.user_id
+         LEFT JOIN likes current_like
+           ON current_like.post_id = p.id AND current_like.user_id = ?
+         LEFT JOIN saved_posts current_save
+           ON current_save.post_id = p.id AND current_save.user_id = ?
+         WHERE relationship.follower_id = ?
+           AND NOT EXISTS(
+               SELECT 1 FROM user_blocks block_pair
+               WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
+                  OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
+           )
+         ORDER BY p.created_at DESC
+         LIMIT ? OFFSET ?",
+    )
+    .bind(&current_user_id)
+    .bind(&current_user_id)
+    .bind(&current_user_id)
+    .bind(&current_user_id)
+    .bind(&current_user_id)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to fetch following feed");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(Json(
         rows.into_iter().map(post_feed_row_to_response).collect(),
@@ -1177,13 +1675,31 @@ pub async fn like_post(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     // Lock the post so concurrent toggles cannot race the denormalized counter.
-    let post_exists: Option<String> = query_scalar("SELECT id FROM posts WHERE id = ? FOR UPDATE")
-        .bind(&post_id)
-        .fetch_optional(&mut *transaction)
+    let post_author_id: Option<String> =
+        query_scalar("SELECT user_id FROM posts WHERE id = ? FOR UPDATE")
+            .bind(&post_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let post_author_id = post_author_id.ok_or(StatusCode::NOT_FOUND)?;
+    if post_author_id != user_id {
+        let is_blocked: bool = query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM user_blocks
+                WHERE (blocker_id = ? AND blocked_id = ?)
+                   OR (blocker_id = ? AND blocked_id = ?)
+             )",
+        )
+        .bind(&user_id)
+        .bind(&post_author_id)
+        .bind(&post_author_id)
+        .bind(&user_id)
+        .fetch_one(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if post_exists.is_none() {
-        return Err(StatusCode::NOT_FOUND);
+        if is_blocked {
+            return Err(StatusCode::FORBIDDEN);
+        }
     }
 
     let existing_like: Option<String> =
@@ -1258,13 +1774,31 @@ pub async fn save_post(
 
     // The post lock serializes concurrent toggles and guarantees that the
     // foreign-key target remains present until this transaction completes.
-    let post_exists: Option<String> = query_scalar("SELECT id FROM posts WHERE id = ? FOR UPDATE")
-        .bind(&post_id)
-        .fetch_optional(&mut *transaction)
+    let post_author_id: Option<String> =
+        query_scalar("SELECT user_id FROM posts WHERE id = ? FOR UPDATE")
+            .bind(&post_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let post_author_id = post_author_id.ok_or(StatusCode::NOT_FOUND)?;
+    if post_author_id != user_id {
+        let is_blocked: bool = query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM user_blocks
+                WHERE (blocker_id = ? AND blocked_id = ?)
+                   OR (blocker_id = ? AND blocked_id = ?)
+             )",
+        )
+        .bind(&user_id)
+        .bind(&post_author_id)
+        .bind(&post_author_id)
+        .bind(&user_id)
+        .fetch_one(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if post_exists.is_none() {
-        return Err(StatusCode::NOT_FOUND);
+        if is_blocked {
+            return Err(StatusCode::FORBIDDEN);
+        }
     }
 
     let already_saved: Option<String> = query_scalar(
@@ -1342,9 +1876,16 @@ pub async fn get_saved_posts(
          LEFT JOIN likes current_like
            ON current_like.post_id = p.id AND current_like.user_id = ?
          WHERE saved.user_id = ?
+           AND NOT EXISTS(
+               SELECT 1 FROM user_blocks block_pair
+               WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
+                  OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
+           )
          ORDER BY saved.created_at DESC
          LIMIT ? OFFSET ?",
     )
+    .bind(&user_id)
+    .bind(&user_id)
     .bind(&user_id)
     .bind(&user_id)
     .bind(limit)
@@ -1381,13 +1922,31 @@ pub async fn create_comment(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let post_exists: Option<String> = query_scalar("SELECT id FROM posts WHERE id = ? FOR UPDATE")
-        .bind(&post_id)
-        .fetch_optional(&mut *transaction)
+    let post_author_id: Option<String> =
+        query_scalar("SELECT user_id FROM posts WHERE id = ? FOR UPDATE")
+            .bind(&post_id)
+            .fetch_optional(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let post_author_id = post_author_id.ok_or(StatusCode::NOT_FOUND)?;
+    if post_author_id != user_id {
+        let is_blocked: bool = query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM user_blocks
+                WHERE (blocker_id = ? AND blocked_id = ?)
+                   OR (blocker_id = ? AND blocked_id = ?)
+             )",
+        )
+        .bind(&user_id)
+        .bind(&post_author_id)
+        .bind(&post_author_id)
+        .bind(&user_id)
+        .fetch_one(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if post_exists.is_none() {
-        return Err(StatusCode::NOT_FOUND);
+        if is_blocked {
+            return Err(StatusCode::FORBIDDEN);
+        }
     }
 
     query(
@@ -1428,16 +1987,38 @@ pub async fn create_comment(
 pub async fn get_comments(
     State(pool): State<MySqlPool>,
     Path(post_id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<Json<Vec<Value>>, StatusCode> {
+    let current_user_id = get_current_user(&pool, &headers).await.ok();
+    if let Some(current_user_id) = current_user_id.as_deref() {
+        let post_author_id: Option<String> = query_scalar("SELECT user_id FROM posts WHERE id = ?")
+            .bind(&post_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let post_author_id = post_author_id.ok_or(StatusCode::NOT_FOUND)?;
+        if post_author_id != current_user_id
+            && blocked_pair_exists(&pool, current_user_id, &post_author_id).await?
+        {
+            return Err(StatusCode::NOT_FOUND);
+        }
+    }
     let comments = query_as::<_, CommentFeedRow>(
         "SELECT c.id, c.content, c.created_at,
                 u.id AS user_id, u.username, u.avatar_url
          FROM comments c
          INNER JOIN users u ON u.id = c.user_id
          WHERE c.post_id = ?
+           AND NOT EXISTS(
+               SELECT 1 FROM user_blocks block_pair
+               WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = c.user_id)
+                  OR (block_pair.blocker_id = c.user_id AND block_pair.blocked_id = ?)
+           )
          ORDER BY c.created_at ASC",
     )
     .bind(&post_id)
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
     .fetch_all(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -2214,6 +2795,38 @@ pub async fn send_message(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let locked_users =
+        query_scalar::<_, String>("SELECT id FROM users WHERE id IN (?, ?) ORDER BY id FOR UPDATE")
+            .bind(&sender_id)
+            .bind(&payload.receiver_id)
+            .fetch_all(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if locked_users.len() != 2 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let is_blocked: bool = query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM user_blocks
+            WHERE (blocker_id = ? AND blocked_id = ?)
+               OR (blocker_id = ? AND blocked_id = ?)
+        )",
+    )
+    .bind(&sender_id)
+    .bind(&payload.receiver_id)
+    .bind(&payload.receiver_id)
+    .bind(&sender_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if is_blocked {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
     let message_id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
@@ -2226,13 +2839,18 @@ pub async fn send_message(
     .bind(&payload.receiver_id)
     .bind(content)
     .bind(now)
-    .execute(&pool)
+    .execute(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let message = query_as::<_, Message>("SELECT * FROM messages WHERE id = ?")
         .bind(&message_id)
-        .fetch_one(&pool)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    transaction
+        .commit()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -2250,6 +2868,9 @@ pub async fn get_messages(
 
     if Uuid::parse_str(other_user_id).is_err() || other_user_id == &user_id {
         return Err(StatusCode::BAD_REQUEST);
+    }
+    if blocked_pair_exists(&pool, &user_id, other_user_id).await? {
+        return Err(StatusCode::FORBIDDEN);
     }
 
     let messages = query_as::<_, MessageWithUser>(
@@ -2288,6 +2909,20 @@ pub async fn get_user_posts(
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
     let current_user_id = get_current_user(&pool, &headers).await.ok();
+    if Uuid::parse_str(&user_id).is_err() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if let Some(current_user_id) = current_user_id.as_deref() {
+        if current_user_id != user_id {
+            let directions = block_directions(&pool, current_user_id, &user_id).await?;
+            if directions.blocked_by {
+                return Err(StatusCode::NOT_FOUND);
+            }
+            if directions.current_blocks {
+                return Ok(Json(Vec::new()));
+            }
+        }
+    }
     let limit = params
         .get("limit")
         .and_then(|value| value.parse::<i64>().ok())
@@ -2358,10 +2993,17 @@ pub async fn search(
              GROUP BY user_id
          ) post_counts ON post_counts.user_id = u.id
          WHERE INSTR(LOWER(u.username), LOWER(?)) > 0
+           AND NOT EXISTS(
+               SELECT 1 FROM user_blocks block_pair
+               WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = u.id)
+                  OR (block_pair.blocker_id = u.id AND block_pair.blocked_id = ?)
+           )
          ORDER BY u.username ASC
          LIMIT 12",
     )
     .bind(search_term)
+    .bind(&current_user_id)
+    .bind(&current_user_id)
     .fetch_all(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -2385,12 +3027,19 @@ pub async fn search(
          LEFT JOIN saved_posts current_save
            ON current_save.post_id = p.id AND current_save.user_id = ?
          WHERE INSTR(LOWER(p.content), LOWER(?)) > 0
+           AND NOT EXISTS(
+               SELECT 1 FROM user_blocks block_pair
+               WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
+                  OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
+           )
          ORDER BY p.created_at DESC
          LIMIT 20",
     )
     .bind(&current_user_id)
     .bind(&current_user_id)
     .bind(search_term)
+    .bind(&current_user_id)
+    .bind(&current_user_id)
     .fetch_all(&pool)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -2664,7 +3313,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 1,
+            format_version: 2,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),
@@ -2686,6 +3335,9 @@ mod tests {
                 security_events: 0,
                 pending_account_actions: 0,
                 uploads: 0,
+                followers: 0,
+                following: 0,
+                blocked_users: 0,
             },
             posts: vec![],
             comments: vec![],
@@ -2696,6 +3348,9 @@ mod tests {
             security_events: vec![],
             pending_account_actions: vec![],
             uploads: vec![],
+            followers: vec![],
+            following: vec![],
+            blocked_users: vec![],
         };
 
         let serialized = serde_json::to_string(&export).unwrap();

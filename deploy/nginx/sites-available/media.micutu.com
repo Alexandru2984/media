@@ -178,6 +178,14 @@ server {
         include snippets/media-api-proxy.conf;
     }
 
+    # Relationship mutations are cheap individually but can be abused for spam,
+    # harassment, or high-cardinality database growth.
+    location ~ ^/api/users/[^/]+/(follow|block)$ {
+        limit_req zone=media_api burst=60 nodelay;
+        limit_req zone=media_social_write burst=8 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
     location = /api/users/me/avatar {
         # Multipart framing must fit in addition to the 5 MiB file itself.
         client_max_body_size 6m;
