@@ -11,9 +11,12 @@ also keep a private, paginated collection of saved posts, download a
 password-confirmed JSON copy of their account data, and permanently delete their
 account through a double-confirmed flow with retryable media cleanup.
 Members can follow or unfollow one another, browse bounded follower/following
-lists, switch to a dedicated following feed, and block unwanted accounts. Block
-policy is enforced across authenticated discovery, profiles, interactions,
-comments, and direct-message APIs rather than only in the interface.
+lists, switch to a dedicated following feed, and block unwanted accounts.
+Accounts can also be private: follow requests require explicit approval, and
+post text, comments, relationship lists, saved results, search results, and post
+media all enforce the current audience on the server. Block policy is enforced
+across discovery, profiles, interactions, comments, and direct-message APIs
+rather than only in the interface.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -42,6 +45,11 @@ Browser
   after a valid login
 - Email: SMTP for verification and password-reset messages
 - Edge and origin: Cloudflare Tunnel, Nginx, and a systemd-managed API process
+
+> [!WARNING]
+> The 2026-10-29 production canary confirmed that the configured SMTP provider
+> currently rejects authentication with `535`. Verification and recovery email
+> delivery remain unavailable until the Brevo credential is rotated and tested.
 
 ## Repository layout
 
@@ -82,9 +90,8 @@ The next project goals are:
    quota, ownership, and abandoned-upload lifecycle.
 4. Add metrics, alerts, retention policy, and restore drills around the deployed
    health endpoints and privacy-redacted JSON request logs.
-5. Expand the responsive product with private accounts and follow requests,
-   mute/report/moderation controls, notifications, cursor pagination, and richer
-   discovery.
+5. Expand the responsive product with mute/report/moderation controls,
+   notifications, cursor pagination, richer discovery, and granular audiences.
 6. Complete the privacy program with a data inventory, retention schedule,
    asynchronous large-account exports, DPIA screening, processor records, and
    privacy/terms/help content.

@@ -197,3 +197,34 @@ reference-checked retryable cleanup, clean dependency audits, rollback artifacts
 and a zero-residue production canary. Asynchronous large-account export,
 retention/legal-hold policy, privacy documentation, queue alerts, and restore
 testing remain mandatory follow-up work.
+
+## CISO review record — private accounts and follow requests
+
+**Date:** 2026-10-29
+
+- Top threats: privacy bypass through secondary JSON or media routes
+  (medium/high), follow-request spam and relationship growth (medium/medium), and
+  request/block/privacy races that grant stale access (medium/high).
+- Controls: transactional two-account locks, FK-backed pending requests, 5,000
+  outgoing and 1,000 incoming-pending limits, stricter edge write throttling,
+  one audience rule across content paths, and per-request Nginx authorization for
+  non-cacheable post media. Blocking removes pending and accepted edges.
+- Validation: isolated and Cloudflare Tunnel matrices exercised public, pending,
+  accepted, revoked, blocked, search, saved, comment, interaction, connection,
+  export-v3, file cleanup, and stale-media behavior. Canary data returned to zero
+  application rows; one separately verified 2025 orphan with no DB owner or
+  reference was permanently removed.
+- Rollback: root-only artifacts are
+  `media-binary-pre-private-20261029T131654Z-b7114c9`,
+  `media-nginx-pre-private-20261029T131654Z-b7114c9/`, and
+  `media-db-pre-private-20261029T131654Z-b7114c9.sql` under `/var/backups`. The
+  previous frontend release remains available. A second binary backup,
+  `media-binary-pre-media-auth-fix-20261029T131954Z-f5aaa9d`, protects the
+  auth-subrequest status correction.
+- Open incident: Brevo rejects SMTP authentication with permanent `535` errors.
+  Verification and recovery delivery are unavailable until the credential is
+  rotated and an end-to-end mailbox canary passes.
+
+**Verdict:** mitigate then ship for private-account authorization. SMTP remains
+an independent P1 incident; centralized policy tests, abuse alerts, granular
+audiences, and a restore drill remain required.

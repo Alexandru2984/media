@@ -7,9 +7,10 @@
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
 **Verdict:** 🟠 Core containment, revocable sessions, versioned migrations,
-bounded image re-encoding, user-facing export/deletion controls, and block-aware
-social relationships are deployed; broader authorization, privacy governance,
-alerting, and recovery work remain
+bounded image re-encoding, user-facing export/deletion controls, private-account
+audiences, and block-aware social relationships are deployed; SMTP delivery is
+currently broken, while broader authorization, privacy governance, alerting, and
+recovery work remain
 
 ## Scope and limitations
 
@@ -27,11 +28,13 @@ lookup, individual/bulk remote logout, cross-account IDOR rejection, the
 20-session cap, idle expiry, revoked-cookie rejection, private saved-post
 isolation, export credential exclusion, password/confirmation rejection,
 engagement-counter reconciliation, account cascades, physical media cleanup,
-follow idempotency, relationship lists, following-feed isolation, bidirectional
-block filtering, and blocked-message rejection against canary processes. Both a
+follow idempotency, private follow requests, audience revocation, relationship
+lists, following-feed isolation, private search/saved filtering, protected media,
+bidirectional block filtering, and blocked-message rejection against canary
+processes. Both a
 separate-port production-database canary and a Cloudflare Tunnel canary removed
 their disposable accounts; the database returned to zero users, sessions, posts,
-relationships, blocks, messages, saved rows, managed uploads, and queued
+relationships, pending requests, blocks, messages, saved rows, managed uploads, and queued
 deletions afterward. A staging environment remains absent, so IDOR for every
 object and future privilege boundary is not yet broadly covered end to end. No
 evidence of compromise was found, but absence of evidence is not evidence of
@@ -73,6 +76,14 @@ edge write budget. A block removes follows in both directions and is enforced on
 authenticated feeds, search, profile/posts, follower lists, comments,
 interactions, and message reads/writes. Relationship data is included in account
 exports and removed by account cascades.
+Private accounts keep accepted followers while routing new follows through a
+bounded request inbox. The same audience rule filters feed, profile, search,
+saved, connection, comment, like, save, and media paths. Nginx uses an internal
+authorization subrequest for post files, denies stale opaque paths without an
+existence oracle, and prevents browser/CDN storage with `private, no-store`.
+An isolated three-account matrix and a Cloudflare Tunnel canary verified pending,
+accepted, revoked, blocked, public-transition, export-v3, and physical-cleanup
+states. The canary returned the production database to zero application rows.
 Centralized authorization tests, privacy governance, metrics/alerting, and tested
 recovery remain open. One-time links now
 keep secrets in URL fragments, scrub them from browser history, and exchange them
@@ -341,8 +352,9 @@ media.
   database snapshot, and returns only explicit DTOs. Password hashes, session
   token hashes, and one-time token values are excluded. Export generation is
   recorded in the private security timeline and responses are `no-store`.
-- Export format version 2 includes followers, followed accounts, and accounts
-  blocked by the exporter without exposing credential or token material.
+- Export format version 3 includes followers, followed accounts, incoming and
+  outgoing requests, privacy state, and blocked accounts without exposing
+  credential or token material.
 - Synchronous export is bounded at 10,000 related records to protect the API;
   an asynchronous, encrypted delivery flow is still required for larger accounts.
 - Deletion requires the current password, the exact `STERGE CONTUL` phrase, the
@@ -366,6 +378,22 @@ of GDPR compliance.
 data, add asynchronous export and retention jobs, define deletion behavior for
 backups/legal holds, document lawful bases and processors, publish the privacy
 policy, and test the GDPR incident workflow.
+
+#### SEC-018 — Production email delivery is unavailable
+
+**Status (2026-10-29): open, P1 operational incident.** Registration can still
+create accounts, but both isolated and production canaries received permanent
+Brevo SMTP `535 Authentication failed` responses. The production service journal
+shows the same failure. Verification, password-reset delivery, email-change
+confirmation, and any future email notification cannot be relied on until the
+credential is repaired. No SMTP secret was printed, copied into Git, or replaced
+with a guessed value during this review.
+
+**Remediation:** rotate the Brevo SMTP credential in the protected environment,
+revoke the rejected credential, send verification and password-reset messages to
+an owner-controlled test mailbox, confirm TLS/sender-domain configuration, and
+add delivery-failure metrics plus an alert. Do not claim recovery availability
+until the end-to-end mailbox test passes.
 
 ### Medium
 
@@ -446,11 +474,13 @@ same bidirectional block rule. Disposable two-account canaries verified these
 paths both on a separate backend port and through Cloudflare/Nginx.
 
 Blocking remains an authenticated account-level control, not a network-level
-privacy boundary: content that is intentionally public can still be requested
-without a session. Existing likes, comments, saves, and historical messages are
-retained; they are hidden or made inaccessible between the two accounts rather
-than erased. Private profiles/audiences, retention choices, centralized policy
-tests, mute/restrict/report, and abuse telemetry remain required.
+privacy boundary for content the author intentionally leaves public. Private
+accounts now require owner or accepted-follower access across content and media
+paths; public profile identity metadata remains discoverable by design. Existing
+likes, comments, saves, and historical messages are retained; they are hidden or
+made inaccessible between blocked accounts rather than erased. Retention choices,
+centralized policy tests, granular audiences, mute/restrict/report, and abuse
+telemetry remain required.
 
 **Remediation:** add authorization matrix tests, transactions, nonnegative counter
 guards or derived counts, content length constraints, normalized email/username
@@ -478,14 +508,22 @@ messages; keep detailed causes only in redacted server logs.
 
 ### Threat model (STRIDE)
 
-1. **Spoofing / elevation of privilege — medium likelihood, high impact:**
-   credential stuffing, stolen opaque-session replay, or an untested authorization bypass.
-2. **Information disclosure / tampering — medium likelihood, high impact:**
-   token leakage, IDOR, an incomplete future authorization path, or public-content
-   access being mistaken for the stronger privacy of a private account.
-3. **Denial of service — medium likelihood, medium impact:** memory-hard password
-   work is concurrency-bounded and edge-limited, while recovery email, upload,
-   and database endpoints still need broader application-aware budgets.
+1. **Information disclosure / authorization bypass — high impact:** alternate
+   feed, search, comment, saved, connection, interaction, or static-media paths
+   could have bypassed a profile-only privacy check. One shared audience rule and
+   an Nginx media authorization subrequest now cover the observed surfaces.
+2. **Spoofing / elevation of privilege — medium likelihood, high impact:**
+   credential stuffing, stolen opaque-session replay, or a future untested IDOR.
+3. **Abuse / denial of service — medium likelihood, medium impact:** follow-request
+   spam and relationship growth are bounded per account and edge-limited, while
+   recovery email, upload, and database endpoints still need account-aware budgets.
+
+**Private-account review verdict:** mitigate then ship. Release gates were
+transactional request/block races, 5,000 outgoing and 1,000 incoming pending
+limits, server-side audience checks, non-cacheable protected media, export and
+deletion coverage, isolated three-account tests, a Tunnel canary, rollback
+artifacts, and zero application-row residue. SMTP recovery remains a separate
+open P1 and is not accepted by this verdict.
 
 ### Blast radius
 

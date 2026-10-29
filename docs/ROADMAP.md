@@ -44,7 +44,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-29: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 34 API
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 38 API
 binary unit tests plus 5 seed-binary tests, embedded versioned MySQL migrations,
 a validated canary flow, and deployed
 rollback artifacts. The frontend has
@@ -118,9 +118,11 @@ Follow/unfollow and block/unblock now use transactional, FK-backed records with
 self-relation checks, bounded lists, a per-account cap, and edge throttling.
 Blocking removes follow edges in both directions and is applied server-side to
 authenticated feeds, search, profiles/posts, comments, interactions, and message
-reads/writes. Account exports include relationship data. The control does not
-make otherwise public content private to anonymous visitors; private profiles and
-audience policy remain separate roadmap work.
+reads/writes. Private accounts and bounded follow requests are also deployed.
+Audience checks cover anonymous/authenticated feeds, profile posts, search,
+saved results, connection lists, comments, likes, saves, and post media; removing
+a follow revokes access immediately. Account exports include accepted and pending
+relationship data. Central policy tests and more granular audiences remain open.
 
 - Central authorization policy for every object and action.
 - IDOR/BOLA tests for profiles, posts, comments, messages, uploads, and admin APIs.
@@ -148,8 +150,10 @@ budget and at most five unattached post images. Post-image claim/replacement and
 post writes are transactional; stale pending files expire after 24 hours,
 interrupted writes after one hour, and a bounded worker plus upload-time cleanup
 retries deletions every 15 minutes. Historical files are deliberately not
-bulk-deleted. Responsive post derivatives, deduplication, and a cookieless media
-origin remain open.
+bulk-deleted. Nginx now authorizes every post-media read against the author's
+current audience and returns `private, no-store`; avatars remain public profile
+metadata. Responsive post derivatives, deduplication, orphan reconciliation,
+and a cookieless media origin remain open.
 
 - JPEG/PNG/WebP allowlist; magic-byte and decoder validation; re-encoding. ✅
 - Byte, pixel, frame, compression-ratio, CPU, memory, and account quota limits. ✅
@@ -212,14 +216,15 @@ The collection is explicitly `noindex`, is not exposed to other accounts, and
 was visually checked at 1440, 390, and 320 px. Follow/unfollow, bounded
 followers/following lists, a chronological following feed, and bidirectional
 blocking are also deployed with responsive controls and private-route `noindex`
-headers. Private accounts, notifications, moderation, richer publishing, and
-multiple named collections remain open.
+headers. Private accounts, approval/cancellation flows, protected post media,
+and a responsive request inbox are deployed. Notifications, moderation, richer
+publishing, and multiple named collections remain open.
 
 ### Profiles and relationships
 
 - Unique handles, display names, pronouns, bio, links, avatar, cover, and badges.
-- Follow/unfollow and followers/following lists. ✅ Add private accounts and
-  follow requests.
+- Follow/unfollow, followers/following lists, private accounts, and bounded
+  follow-request approval/cancellation. ✅ Add close-friends/custom audiences.
 - Account-level block across authenticated surfaces. ✅ Add mute, restrict,
   report, hide counts, and audience controls.
 - Profile completion, QR/share card, pinned posts, and profile search.
@@ -304,11 +309,13 @@ content.
 
 ## Phase 6 — Reliability, observability, and operations
 
-**Progress (2026-10-28):** public liveness and dependency-aware readiness routes
+**Progress (2026-10-29):** public liveness and dependency-aware readiness routes
 are deployed and used after each release. Privacy-redacted JSON request logs
 carry request IDs, methods, paths, status codes, and latency; query strings and
 bodies are excluded. Metrics, alerts, retention policy, restore drills, and
-release automation remain open.
+release automation remain open. SMTP authentication is currently rejected by
+Brevo with `535`; rotating and verifying that credential is an immediate P1
+operational task because verification and password-recovery delivery are down.
 
 - `/health/live`, `/health/ready`, and dependency-specific readiness checks.
 - Structured JSON logs with request IDs and privacy redaction; define and enforce
