@@ -3618,11 +3618,14 @@ pub async fn authorize_post_media(
         tracing::error!(error = %error, "failed to resolve protected post media");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let author_id = author_id.ok_or(StatusCode::NOT_FOUND)?;
+    // Nginx auth_request forwards 401/403 but maps other authorization
+    // statuses (including 404) to 500. A missing or stale opaque media path is
+    // therefore denied without confirming whether it ever existed.
+    let author_id = author_id.ok_or(StatusCode::FORBIDDEN)?;
     let viewer_id = get_current_user(&pool, &headers).await.ok();
     let access = user_content_access(&pool, viewer_id.as_deref(), &author_id)
         .await?
-        .ok_or(StatusCode::NOT_FOUND)?;
+        .ok_or(StatusCode::FORBIDDEN)?;
     if !access.can_view(viewer_id.as_deref() == Some(author_id.as_str())) {
         return Err(StatusCode::FORBIDDEN);
     }
