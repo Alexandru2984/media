@@ -61,7 +61,7 @@ server {
 
     # Private application routes must not enter a search index. Serve the SPA
     # directly so the route keeps this response policy.
-    location ~ ^/(login|register|forgot-password|search|salvate|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
+    location ~ ^/(login|register|forgot-password|search|salvate|cereri|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
         try_files /index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
@@ -186,6 +186,18 @@ server {
         include snippets/media-api-proxy.conf;
     }
 
+    location ~ ^/api/users/me/(privacy|follow-requests(?:/[^/]+)?)$ {
+        limit_req zone=media_api burst=60 nodelay;
+        limit_req zone=media_social_write burst=8 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    # This backend authorization probe is reachable only through the internal
+    # subrequest below; public callers receive no media-existence oracle.
+    location = /api/media/post-access {
+        return 404;
+    }
+
     location = /api/users/me/avatar {
         # Multipart framing must fit in addition to the 5 MiB file itself.
         client_max_body_size 6m;
@@ -203,6 +215,47 @@ server {
         limit_req zone=media_api burst=60 nodelay;
         limit_req zone=media_write burst=15 nodelay;
         include snippets/media-api-proxy.conf;
+    }
+
+    # Post media inherits its author's current audience. Authorization is
+    # re-evaluated on every request so a privacy toggle or removed follow takes
+    # effect immediately; these responses must never enter browser/CDN caches.
+    location ^~ /uploads/posts/ {
+        set $media_original_path $uri;
+        auth_request /_media_post_access;
+
+        alias /var/www/media.micutu.com/backend/uploads/posts/;
+        autoindex off;
+        limit_except GET HEAD { deny all; }
+
+        types {
+            image/jpeg jpg jpeg;
+            image/png png;
+            image/webp webp;
+        }
+        default_type application/octet-stream;
+
+        add_header Cache-Control "private, no-store" always;
+        add_header Content-Security-Policy "default-src 'none'; sandbox" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    location = /_media_post_access {
+        internal;
+        proxy_pass http://127.0.0.1:8083/api/media/post-access;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header X-Media-Path $media_original_path;
+        proxy_set_header X-Request-ID $request_id;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     location /uploads/ {

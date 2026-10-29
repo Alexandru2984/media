@@ -12,6 +12,7 @@ pub struct User {
     pub email_verified: Option<i64>,
     pub bio: Option<String>,
     pub avatar_url: Option<String>,
+    pub is_private: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -66,6 +67,11 @@ pub struct UpdateUser {
     pub username: Option<String>,
     pub bio: Option<String>,
     pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdatePrivacy {
+    pub is_private: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -155,7 +161,11 @@ pub struct ProfileDetail {
     pub followers_count: i64,
     pub following_count: i64,
     pub is_following: bool,
+    pub follow_request_pending: bool,
     pub is_blocked: bool,
+    pub is_private: bool,
+    pub can_view_content: bool,
+    pub pending_follow_requests_count: i64,
     pub created_at: DateTime<Utc>,
 }
 
@@ -167,7 +177,20 @@ pub struct ConnectionProfile {
     pub avatar_url: Option<String>,
     pub posts_count: i64,
     pub is_following: bool,
+    pub follow_request_pending: bool,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct FollowRequestProfile {
+    pub id: String,
+    pub username: String,
+    pub bio: Option<String>,
+    pub avatar_url: Option<String>,
+    pub posts_count: i64,
+    pub is_following: bool,
+    pub is_private: bool,
+    pub requested_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

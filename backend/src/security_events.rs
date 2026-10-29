@@ -21,6 +21,7 @@ pub enum SecurityEventKind {
     EmailChanged,
     EmailVerified,
     AccountDataExported,
+    PrivacyChanged,
 }
 
 impl SecurityEventKind {
@@ -37,6 +38,7 @@ impl SecurityEventKind {
             Self::EmailChanged => "email_changed",
             Self::EmailVerified => "email_verified",
             Self::AccountDataExported => "account_data_exported",
+            Self::PrivacyChanged => "privacy_changed",
         }
     }
 }
@@ -161,6 +163,7 @@ mod tests {
             SecurityEventKind::EmailChanged,
             SecurityEventKind::EmailVerified,
             SecurityEventKind::AccountDataExported,
+            SecurityEventKind::PrivacyChanged,
         ];
 
         for kind in kinds {

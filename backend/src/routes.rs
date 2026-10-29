@@ -44,6 +44,15 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         )
         .route("/users/:id/followers", get(handlers::get_followers))
         .route("/users/:id/following", get(handlers::get_following))
+        .route("/users/me/privacy", put(handlers::update_privacy))
+        .route(
+            "/users/me/follow-requests",
+            get(handlers::get_follow_requests),
+        )
+        .route(
+            "/users/me/follow-requests/:id",
+            put(handlers::accept_follow_request).delete(handlers::reject_follow_request),
+        )
         .route("/users/me", delete(handlers::delete_account))
         .route("/users/me/export", post(handlers::export_account_data))
         .route("/users/me/profile", put(handlers::update_profile))
@@ -81,6 +90,8 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/messages", get(handlers::get_messages))
         // Discovery routes
         .route("/search", get(handlers::search))
+        // Nginx exposes this only as an internal auth subrequest for post media.
+        .route("/media/post-access", get(handlers::authorize_post_media))
         .with_state(pool)
         .layer(middleware::from_fn_with_state(
             expected_origin,
