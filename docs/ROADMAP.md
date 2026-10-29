@@ -114,6 +114,14 @@ media before the account FK cascade. Central policy, broad IDOR/concurrency
 tests, asynchronous large-account exports, retention, and legal-hold policy
 remain open.
 
+Follow/unfollow and block/unblock now use transactional, FK-backed records with
+self-relation checks, bounded lists, a per-account cap, and edge throttling.
+Blocking removes follow edges in both directions and is applied server-side to
+authenticated feeds, search, profiles/posts, comments, interactions, and message
+reads/writes. Account exports include relationship data. The control does not
+make otherwise public content private to anonymous visitors; private profiles and
+audience policy remain separate roadmap work.
+
 - Central authorization policy for every object and action.
 - IDOR/BOLA tests for profiles, posts, comments, messages, uploads, and admin APIs.
 - Roles and scopes for user, moderator, support, and administrator.
@@ -154,7 +162,7 @@ origin remain open.
 
 ## Phase 3 — Massive design and responsive rebuild
 
-**Progress (2026-10-28):** a light/dark token system, responsive public landing,
+**Progress (2026-10-29):** a light/dark token system, responsive public landing,
 authenticated three-column feed, navigation, composer, post/comment cards,
 profiles, account settings, recovery/verification flows, skeletons, empty/error
 states, accessible SVG controls, reduced-motion handling, and mobile layouts are
@@ -163,8 +171,10 @@ public about/community pages, footer, and branded 404 state are also live. The
 landing now explains the real product flow and exposes session, security-history,
 and upload controls without promising unimplemented relationship features. Its
 light desktop, light mobile, dark mobile, and 320 px layouts were visually checked
-in Chromium. Automated visual regression, toasts, dialogs, accessibility CI, and
-the remaining product pages are open.
+in Chromium. Responsive feed tabs, profile relationship controls, and paginated
+connection pages are now deployed and build-checked; this host no longer has a
+headless browser, so automated visual regression for the new screens remains
+open alongside toasts, dialogs, and accessibility CI.
 
 ### Design system
 
@@ -199,14 +209,19 @@ the remaining product pages are open.
 paginated API, per-session `is_saved` state across feed/profile/search results,
 transactional toggles, foreign-key cleanup, and a dedicated responsive page.
 The collection is explicitly `noindex`, is not exposed to other accounts, and
-was visually checked at 1440, 390, and 320 px. Relationships, notifications,
-moderation, richer publishing, and multiple named collections remain open.
+was visually checked at 1440, 390, and 320 px. Follow/unfollow, bounded
+followers/following lists, a chronological following feed, and bidirectional
+blocking are also deployed with responsive controls and private-route `noindex`
+headers. Private accounts, notifications, moderation, richer publishing, and
+multiple named collections remain open.
 
 ### Profiles and relationships
 
 - Unique handles, display names, pronouns, bio, links, avatar, cover, and badges.
-- Follow/unfollow, private accounts, follow requests, followers/following lists.
-- Block, mute, restrict, report, hide counts, and audience controls.
+- Follow/unfollow and followers/following lists. ✅ Add private accounts and
+  follow requests.
+- Account-level block across authenticated surfaces. ✅ Add mute, restrict,
+  report, hide counts, and audience controls.
 - Profile completion, QR/share card, pinned posts, and profile search.
 
 ### Publishing
@@ -221,7 +236,8 @@ moderation, richer publishing, and multiple named collections remain open.
 
 ### Feed and discovery
 
-- Private saved feed. ✅ Add following, chronological, and recommended feeds.
+- Private saved and chronological following feeds. ✅ Add recommendations and
+  user-selectable ranking controls.
 - Cursor pagination, relevance signals, deduplication, and explainable suggestions.
 - Search across people/posts/hashtags; trends and explore topics.
 - User controls for recommendations, muted words, language, and sensitive media.

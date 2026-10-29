@@ -10,6 +10,10 @@ quotas with automatic cleanup of abandoned images. Authenticated members can
 also keep a private, paginated collection of saved posts, download a
 password-confirmed JSON copy of their account data, and permanently delete their
 account through a double-confirmed flow with retryable media cleanup.
+Members can follow or unfollow one another, browse bounded follower/following
+lists, switch to a dedicated following feed, and block unwanted accounts. Block
+policy is enforced across authenticated discovery, profiles, interactions,
+comments, and direct-message APIs rather than only in the interface.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -78,8 +82,9 @@ The next project goals are:
    quota, ownership, and abandoned-upload lifecycle.
 4. Add metrics, alerts, retention policy, and restore drills around the deployed
    health endpoints and privacy-redacted JSON request logs.
-5. Expand the responsive product with relationships, notifications, moderation,
-   privacy controls, cursor pagination, and richer discovery.
+5. Expand the responsive product with private accounts and follow requests,
+   mute/report/moderation controls, notifications, cursor pagination, and richer
+   discovery.
 6. Complete the privacy program with a data inventory, retention schedule,
    asynchronous large-account exports, DPIA screening, processor records, and
    privacy/terms/help content.

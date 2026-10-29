@@ -7,8 +7,9 @@
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
 **Verdict:** 🟠 Core containment, revocable sessions, versioned migrations,
-bounded image re-encoding, and user-facing export/deletion controls are deployed;
-broader authorization, privacy governance, alerting, and recovery work remain
+bounded image re-encoding, user-facing export/deletion controls, and block-aware
+social relationships are deployed; broader authorization, privacy governance,
+alerting, and recovery work remain
 
 ## Scope and limitations
 
@@ -25,14 +26,16 @@ deployed from the tracked source. Disposable accounts exercised login, session
 lookup, individual/bulk remote logout, cross-account IDOR rejection, the
 20-session cap, idle expiry, revoked-cookie rejection, private saved-post
 isolation, export credential exclusion, password/confirmation rejection,
-engagement-counter reconciliation, account cascades, and physical media cleanup
-against canary processes; the production database returned to zero users,
-sessions, posts, saved rows, managed uploads, and queued deletions afterward.
-A staging environment remains absent, so IDOR for other objects, privilege
-boundaries, and message privacy are not yet broadly covered end to end. The new
-destructive account flow received a focused two-account production canary, but
-general staging coverage remains absent. No evidence of compromise was found,
-but absence of evidence is not evidence of absence.
+engagement-counter reconciliation, account cascades, physical media cleanup,
+follow idempotency, relationship lists, following-feed isolation, bidirectional
+block filtering, and blocked-message rejection against canary processes. Both a
+separate-port production-database canary and a Cloudflare Tunnel canary removed
+their disposable accounts; the database returned to zero users, sessions, posts,
+relationships, blocks, messages, saved rows, managed uploads, and queued
+deletions afterward. A staging environment remains absent, so IDOR for every
+object and future privilege boundary is not yet broadly covered end to end. No
+evidence of compromise was found, but absence of evidence is not evidence of
+absence.
 
 ## Executive summary
 
@@ -64,6 +67,12 @@ two-account production canary verified that saved state does not cross account
 boundaries. Password-confirmed JSON export and double-confirmed account deletion
 are deployed with strict-origin enforcement, edge throttling, secret-free export
 DTOs, transactional counter repair, and a durable upload-deletion queue.
+Follow/block writes now use FK-backed, self-relation-constrained tables,
+deterministic transactional locks, a per-account following cap, and a dedicated
+edge write budget. A block removes follows in both directions and is enforced on
+authenticated feeds, search, profile/posts, follower lists, comments,
+interactions, and message reads/writes. Relationship data is included in account
+exports and removed by account cascades.
 Centralized authorization tests, privacy governance, metrics/alerting, and tested
 recovery remain open. One-time links now
 keep secrets in URL fragments, scrub them from browser history, and exchange them
@@ -174,7 +183,8 @@ code/styles and deploy a nonce- or hash-based CSP.
 **Status (2026-10-28): partially mitigated at the origin.** Nginx now rejects
 direct external origin traffic, preserves loopback access for Cloudflare Tunnel,
 and applies separate connection, auth, write, upload, and general API limits.
-The backend still needs account-aware throttling and abuse telemetry.
+Relationship mutations now receive a stricter dedicated write budget. The
+backend still needs account-aware throttling and abuse telemetry.
 
 - At initial review, direct-origin HTTP/TLS requests returned the application.
 - The Nginx Cloudflare-origin variable existed but was not enforced by the vhost.
@@ -331,6 +341,8 @@ media.
   database snapshot, and returns only explicit DTOs. Password hashes, session
   token hashes, and one-time token values are excluded. Export generation is
   recorded in the private security timeline and responses are `no-store`.
+- Export format version 2 includes followers, followed accounts, and accounts
+  blocked by the exporter without exposing credential or token material.
 - Synchronous export is bounded at 10,000 related records to protect the API;
   an asynchronous, encrypted delivery flow is still required for larger accounts.
 - Deletion requires the current password, the exact `STERGE CONTUL` phrase, the
@@ -408,7 +420,8 @@ revalidation for HTML, and one-year immutable caching for content-hashed assets.
 
 #### SEC-015 — Data consistency and indexing need source-level review
 
-**Status (2026-10-28): core response, consistency, and query issues mitigated; integration coverage remains open.**
+**Status (2026-10-29): core response, consistency, relationship authorization,
+and query issues mitigated; broad integration coverage remains open.**
 The database-only `User` type is no longer serializable, and profile-update
 responses explicitly select safe fields, preventing accidental password-hash
 serialization. Like/comment row and counter changes now share transactions,
@@ -423,6 +436,21 @@ Post like/comment counters remain denormalized, and database-level text length
 constraints are not yet encoded in versioned migrations. Ownership checks exist
 in handlers but still need a centralized authorization matrix and end-to-end IDOR
 tests.
+
+Follow and block records now use cascading foreign keys, self-relation checks,
+composite indexes, bounded pagination, and a 5,000-following cap. Follow is
+idempotent and serialized with block changes; block atomically removes follow
+edges in both directions. Authenticated feed, saved content, search, profiles,
+profile posts, connection lists, comments, likes, saves, and messages apply the
+same bidirectional block rule. Disposable two-account canaries verified these
+paths both on a separate backend port and through Cloudflare/Nginx.
+
+Blocking remains an authenticated account-level control, not a network-level
+privacy boundary: content that is intentionally public can still be requested
+without a session. Existing likes, comments, saves, and historical messages are
+retained; they are hidden or made inaccessible between the two accounts rather
+than erased. Private profiles/audiences, retention choices, centralized policy
+tests, mute/restrict/report, and abuse telemetry remain required.
 
 **Remediation:** add authorization matrix tests, transactions, nonnegative counter
 guards or derived counts, content length constraints, normalized email/username
@@ -453,7 +481,8 @@ messages; keep detailed causes only in redacted server logs.
 1. **Spoofing / elevation of privilege — medium likelihood, high impact:**
    credential stuffing, stolen opaque-session replay, or an untested authorization bypass.
 2. **Information disclosure / tampering — medium likelihood, high impact:**
-   unsafe upload handling, token leakage, IDOR, or a compromised unsandboxed API.
+   token leakage, IDOR, an incomplete future authorization path, or public-content
+   access being mistaken for the stronger privacy of a private account.
 3. **Denial of service — medium likelihood, medium impact:** memory-hard password
    work is concurrency-bounded and edge-limited, while recovery email, upload,
    and database endpoints still need broader application-aware budgets.
@@ -473,8 +502,9 @@ revenue, incident cost, and control frequency before assigning an ALE.
   export, or upload abuse; 5 minutes for outage/resource exhaustion.
 - **Current MTTD:** unknown and potentially unbounded.
 - **Required detections:** auth failure velocity, session anomalies, recovery
-  bursts, upload rejects, 4xx/5xx shifts, DB error/latency, process restarts,
-  privilege changes, high egress, and integrity changes to release/config files.
+  bursts, follow/block velocity, blocked-action denials, upload rejects, 4xx/5xx
+  shifts, DB error/latency, process restarts, privilege changes, high egress, and
+  integrity changes to release/config files.
 
 ### Response
 
