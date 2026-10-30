@@ -103,8 +103,15 @@ Pentru notificări, canarul cu două conturi trebuie să verifice:
 - deduplicarea cererilor, aprecierilor și comentariilor repetate;
 - respingerea IDOR la citire/ștergere și filtrarea bidirecțională la block;
 - eliminarea notificării la anularea acțiunii și cascadele la post/cont;
-- contorul necitit, citirea individuală/globală și exportul explicit v4;
+- contorul necitit, citirea individuală/globală și exportul explicit v7;
+- valorile implicite ale preferințelor, refuzul payloadurilor parțiale sau cu
+  câmpuri necunoscute și suprimarea/reactivarea fiecărui tip de eveniment;
 - maximum 500 de înregistrări per destinatar și zero rânduri canary la final.
+
+Canarul public poate consuma bugetul de mutații înaintea ștergerii conturilor.
+În acest caz, nu se relaxează limita: se identifică exact conturile `.invalid`,
+se curăță tranzacțional numai ID-urile lor și se reconfirmă la zero toate
+tabelele dependente.
 
 Nu afișa cookie-uri, parole, hashuri, environmentul sau URL-ul bazei în outputul
 CI/jurnal.

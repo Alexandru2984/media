@@ -53,7 +53,11 @@ is not evidence of absence.
 The notification-preference release additionally exercised strict full-payload
 validation, all-enabled defaults, suppression and re-enablement for follower,
 like, and comment events, export v7 coverage, and account-delete cascades against
-a disposable isolated database before its public canary.
+a disposable isolated database. Its public Cloudflare Tunnel canary then
+reconfirmed defaults, strict `422` rejection, suppression and re-enablement for
+new-follower events, and export v7. One account deletion completed before the
+edge mutation budget returned `429`; exact canary-only database cleanup removed
+the remaining account and every checked application table returned to zero.
 
 ## Executive summary
 
@@ -631,6 +635,18 @@ RustSec scan with no findings, and npm build/audit with zero findings passed.
 The host has no browser, so this screen was build/API/route tested but did not
 receive a new visual-regression pass on the VPS. Brevo SMTP `535` remains an
 independent open P1 incident.
+
+### Notification-preference production checkpoint
+
+The 2026-10-30 release applied migration `20261030000000`, deployed backend
+SHA-256 `2ff86f22319d94f0cf5aae26aece2fe88a2d172e04ba838b1a28c7a1c102db0f`,
+and activated frontend release `20261030T005331Z-94bb5a6`. Root-only rollback
+artifacts are `media-binary-pre-notification-preferences-20261030T005331Z-94bb5a6`
+and `media-db-pre-notification-preferences-20261030T005331Z-94bb5a6.sql` under
+`/var/backups`, with a separate checksum manifest. Direct Nginx and public
+Tunnel health checks returned `200`, the new anonymous endpoint boundary
+returned `401`, immutable asset caching remained active, and the API service
+retained zero unexpected restarts. Brevo still returned the known SMTP `535`.
 
 ### Blast radius
 

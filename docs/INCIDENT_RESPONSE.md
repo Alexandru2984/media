@@ -336,6 +336,14 @@ in the subsequent 2026-10-30 release. Automated abuse/privacy alerts, quiet
 hours/digests, a multi-person tabletop, and a tested restore remain follow-ups;
 the independent SMTP P1 is not accepted by this verdict.
 
+The preference rollout applied migration `20261030000000` and retained root-only
+pre-release binary/database artifacts named with
+`20261030T005331Z-94bb5a6`. Its Tunnel canary reached the edge mutation limit
+after one of two account deletions; the remaining `.invalid` account was resolved
+exactly and deleted transactionally, followed by zero-row checks across users,
+sessions, tokens, security events, social relationships, notifications,
+preferences, content, trust-and-safety, moderation, and upload lifecycle tables.
+
 ## CISO review record — least-privilege moderation
 
 **Date:** 2026-10-30
