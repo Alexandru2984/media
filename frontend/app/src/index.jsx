@@ -1,5 +1,5 @@
 /* @refresh reload */
-import { lazy, Suspense } from 'solid-js';
+import { createSignal, ErrorBoundary, lazy, onCleanup, onMount, Show, Suspense } from 'solid-js';
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import { AuthProvider } from './AuthContext';
@@ -28,19 +28,80 @@ const SafetyCenter = lazy(() => import('./pages/SafetyCenter'));
 const Moderation = lazy(() => import('./pages/Moderation'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
+function RouteLoading() {
+  return (
+    <main id="route-content" class="route-loading" role="status" aria-live="polite" aria-busy="true" tabindex="-1">
+      <svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" opacity="0.24" />
+        <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      </svg>
+      <span>Se încarcă pagina…</span>
+    </main>
+  );
+}
+
+function RouteFailure() {
+  let recoveryPage;
+  const reload = () => window.location.reload();
+
+  onMount(() => recoveryPage?.focus({ preventScroll: true }));
+
+  return (
+    <main ref={recoveryPage} id="route-content" class="route-error" tabindex="-1">
+      <section class="surface route-error-card" role="alert" aria-labelledby="route-error-title">
+        <span class="route-error-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 8v5m0 3.5v.01M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+        <p class="sidebar-eyebrow">Recuperare sigură</p>
+        <h1 id="route-error-title">Pagina nu s-a putut încărca.</h1>
+        <p>Conexiunea poate fi întreruptă sau aplicația tocmai a primit o actualizare. Datele introduse nu au fost trimise din nou.</p>
+        <div class="route-error-actions">
+          <button type="button" class="btn btn-primary" onClick={reload}>Reîncarcă pagina</button>
+          <a href="/" class="btn btn-secondary">Înapoi la Media</a>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function ConnectionStatus() {
+  const [offline, setOffline] = createSignal(typeof navigator !== 'undefined' && !navigator.onLine);
+
+  onMount(() => {
+    const markOffline = () => setOffline(true);
+    const markOnline = () => setOffline(false);
+    window.addEventListener('offline', markOffline);
+    window.addEventListener('online', markOnline);
+    onCleanup(() => {
+      window.removeEventListener('offline', markOffline);
+      window.removeEventListener('online', markOnline);
+    });
+  });
+
+  return (
+    <Show when={offline()}>
+      <aside class="connection-banner" role="status" aria-live="polite">
+        <span aria-hidden="true" />
+        <strong>Ești offline.</strong>
+        <span>Unele acțiuni vor funcționa după reconectare.</span>
+      </aside>
+    </Show>
+  );
+}
+
 function RouteRoot(props) {
   return (
-    <Suspense fallback={(
-      <main class="route-loading" role="status" aria-live="polite" aria-busy="true">
-        <svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" opacity="0.24" />
-          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg>
-        <span>Se încarcă pagina…</span>
-      </main>
-    )}>
-      {props.children}
-    </Suspense>
+    <>
+      <a class="skip-link" href="#route-content">Sari la conținut</a>
+      <ConnectionStatus />
+      <ErrorBoundary fallback={() => <RouteFailure />}>
+        <Suspense fallback={<RouteLoading />}>
+          <div id="route-content" class="route-content" tabindex="-1">{props.children}</div>
+        </Suspense>
+      </ErrorBoundary>
+    </>
   );
 }
 

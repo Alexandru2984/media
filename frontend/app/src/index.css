@@ -118,6 +118,31 @@ a {
   min-height: 100vh;
 }
 
+.skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: 12px;
+  left: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 800;
+  transform: translateY(calc(-100% - 20px));
+  transition: transform 150ms ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.route-content {
+  min-height: 100vh;
+}
+
 .route-loading {
   display: grid;
   min-height: 100vh;
@@ -133,6 +158,88 @@ a {
   width: 28px;
   height: 28px;
   color: var(--brand);
+}
+
+.route-error {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 32px 16px;
+}
+
+.route-error-card {
+  width: min(100%, 620px);
+  padding: clamp(28px, 6vw, 52px);
+  text-align: center;
+}
+
+.route-error-icon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
+  place-items: center;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--warning) 12%, var(--bg-elevated));
+  color: var(--warning);
+}
+
+.route-error-icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.route-error-card h1 {
+  margin: 6px 0 12px;
+  font-size: clamp(1.65rem, 5vw, 2.35rem);
+  letter-spacing: -0.035em;
+}
+
+.route-error-card > p:not(.sidebar-eyebrow) {
+  max-width: 500px;
+  margin: 0 auto;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.route-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.connection-banner {
+  position: fixed;
+  z-index: 900;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  max-width: min(440px, calc(100% - 32px));
+  align-items: center;
+  gap: 8px;
+  padding: 12px 15px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-elevated) 96%, transparent);
+  box-shadow: var(--shadow-lg);
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.connection-banner > span:first-child {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--warning);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warning) 14%, transparent);
+}
+
+.connection-banner strong {
+  color: var(--text);
 }
 
 .sr-only {
@@ -4052,6 +4159,19 @@ a {
 }
 
 @media (max-width: 460px) {
+  .route-error-actions,
+  .route-error-actions .btn {
+    width: 100%;
+  }
+
+  .connection-banner {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    max-width: none;
+    flex-wrap: wrap;
+  }
+
   .moderation-card-head,
   .moderation-card-actions {
     align-items: stretch;

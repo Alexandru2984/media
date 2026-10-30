@@ -42,6 +42,13 @@ const javaScriptSizes = await Promise.all(
 const entrySize = (await stat(resolve(assetsRoot, entryName))).size;
 const stylesheetSize = (await stat(resolve(assetsRoot, stylesheetName))).size;
 const totalJavaScriptSize = javaScriptSizes.reduce((total, size) => total + size, 0);
+const entryJavaScript = await readFile(resolve(assetsRoot, entryName), 'utf8');
+
+for (const runtimeMarker of ['skip-link', 'connection-banner', 'route-error']) {
+  if (!entryJavaScript.includes(runtimeMarker)) {
+    throw new Error(`Missing global recovery feature in entry chunk: ${runtimeMarker}`);
+  }
+}
 
 if (entrySize > budgets.entryJavaScript) {
   throw new Error(`Entry JavaScript exceeds ${budgets.entryJavaScript} bytes: ${entrySize}`);

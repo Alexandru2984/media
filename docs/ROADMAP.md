@@ -181,7 +181,10 @@ light desktop, light mobile, dark mobile, and 320 px layouts were visually check
 in Chromium. Responsive feed tabs, profile relationship controls, and paginated
 connection pages are now deployed and build-checked; this host no longer has a
 headless browser, so automated visual regression for the new screens remains
-open alongside toasts, dialogs, and accessibility CI.
+open alongside toasts, dialogs, and accessibility CI. A global error boundary
+now replaces blank screens after lazy-chunk or render failures with an
+auto-focused recovery view, while every route exposes a keyboard skip link and
+a responsive live offline indicator.
 
 ### Design system
 
@@ -204,7 +207,7 @@ open alongside toasts, dialogs, and accessibility CI.
 
 ### Accessibility
 
-- Semantic landmarks and headings, skip link, keyboard-visible focus, logical
+- Semantic landmarks and headings, skip link ✅, keyboard-visible focus, logical
   tab order, labeled controls, status announcements, and dialog focus trapping.
 - Alt-text workflow, captions/transcripts for media, reduced motion, contrast,
   error summaries, and screen-reader regression tests.
