@@ -157,6 +157,7 @@ struct ExportCounts {
     incoming_follow_requests: i64,
     outgoing_follow_requests: i64,
     notifications: i64,
+    notification_preferences: i64,
 }
 
 impl ExportCounts {
@@ -183,6 +184,7 @@ impl ExportCounts {
             self.incoming_follow_requests,
             self.outgoing_follow_requests,
             self.notifications,
+            self.notification_preferences,
         ]
         .into_iter()
         .try_fold(0_i64, i64::checked_add)
@@ -229,6 +231,16 @@ struct ExportNotification {
     post_id: Option<String>,
     read_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportNotificationPreferences {
+    follow_requests: bool,
+    follow_acceptances: bool,
+    new_followers: bool,
+    post_likes: bool,
+    post_comments: bool,
+    updated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -336,6 +348,7 @@ pub(crate) struct AccountDataExport {
     incoming_follow_requests: Vec<ExportRelationship>,
     outgoing_follow_requests: Vec<ExportRelationship>,
     notifications: Vec<ExportNotification>,
+    notification_preferences: ExportNotificationPreferences,
 }
 
 fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
@@ -1857,8 +1870,10 @@ pub async fn export_account_data(
             (SELECT COUNT(*) FROM moderation_role_events WHERE user_reference = ?) AS moderation_role_events,
             (SELECT COUNT(*) FROM follow_requests WHERE target_id = ?) AS incoming_follow_requests,
             (SELECT COUNT(*) FROM follow_requests WHERE requester_id = ?) AS outgoing_follow_requests,
-            (SELECT COUNT(*) FROM notifications WHERE recipient_id = ?) AS notifications",
+            (SELECT COUNT(*) FROM notifications WHERE recipient_id = ?) AS notifications,
+            (SELECT COUNT(*) FROM notification_preferences WHERE user_id = ?) AS notification_preferences",
     )
+    .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
@@ -2101,6 +2116,23 @@ pub async fn export_account_data(
     .fetch_all(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let notification_preferences = query_as::<_, ExportNotificationPreferences>(
+        "SELECT
+            COALESCE(preference.notify_follow_requests, TRUE) AS follow_requests,
+            COALESCE(preference.notify_follow_acceptances, TRUE) AS follow_acceptances,
+            COALESCE(preference.notify_new_followers, TRUE) AS new_followers,
+            COALESCE(preference.notify_post_likes, TRUE) AS post_likes,
+            COALESCE(preference.notify_post_comments, TRUE) AS post_comments,
+            preference.updated_at
+         FROM users account_user
+         LEFT JOIN notification_preferences preference
+            ON preference.user_id = account_user.id
+         WHERE account_user.id = ?",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let exported_at = Utc::now();
     transaction.commit().await.map_err(|error| {
@@ -2130,7 +2162,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 6,
+            format_version: 7,
             exported_at,
             profile,
             counts,
@@ -2155,6 +2187,7 @@ pub async fn export_account_data(
             incoming_follow_requests,
             outgoing_follow_requests,
             notifications,
+            notification_preferences,
         }),
     ))
 }
@@ -4252,7 +4285,7 @@ pub async fn reset_password(
 mod tests {
     use super::{
         account_deletion_confirmation_is_valid, post_media_path_is_valid, AccountDataExport,
-        ExportCounts, ExportProfile,
+        ExportCounts, ExportNotificationPreferences, ExportProfile,
     };
     use chrono::Utc;
 
@@ -4279,7 +4312,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 6,
+            format_version: 7,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),
@@ -4315,6 +4348,7 @@ mod tests {
                 incoming_follow_requests: 0,
                 outgoing_follow_requests: 0,
                 notifications: 0,
+                notification_preferences: 0,
             },
             posts: vec![],
             comments: vec![],
@@ -4337,6 +4371,14 @@ mod tests {
             incoming_follow_requests: vec![],
             outgoing_follow_requests: vec![],
             notifications: vec![],
+            notification_preferences: ExportNotificationPreferences {
+                follow_requests: true,
+                follow_acceptances: true,
+                new_followers: true,
+                post_likes: true,
+                post_comments: true,
+                updated_at: None,
+            },
         };
 
         let serialized = serde_json::to_string(&export).unwrap();

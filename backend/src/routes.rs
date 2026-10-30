@@ -49,6 +49,11 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/users/:id/followers", get(handlers::get_followers))
         .route("/users/:id/following", get(handlers::get_following))
         .route("/users/me/privacy", put(handlers::update_privacy))
+        .route(
+            "/users/me/notification-preferences",
+            get(notifications::get_notification_preferences)
+                .put(notifications::update_notification_preferences),
+        )
         .route("/users/me/mutes", get(safety::list_muted_users))
         .route(
             "/users/me/follow-requests",

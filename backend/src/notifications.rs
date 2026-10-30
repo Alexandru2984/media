@@ -4,7 +4,7 @@ use axum::{
     response::Json,
 };
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{query, query_as, query_scalar, MySql, MySqlPool, Transaction};
 use std::collections::HashMap;
@@ -39,6 +39,66 @@ impl NotificationKind {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, sqlx::FromRow)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NotificationPreferences {
+    follow_requests: bool,
+    follow_acceptances: bool,
+    new_followers: bool,
+    post_likes: bool,
+    post_comments: bool,
+}
+
+impl Default for NotificationPreferences {
+    fn default() -> Self {
+        Self {
+            follow_requests: true,
+            follow_acceptances: true,
+            new_followers: true,
+            post_likes: true,
+            post_comments: true,
+        }
+    }
+}
+
+impl NotificationPreferences {
+    fn allows(self, kind: NotificationKind) -> bool {
+        match kind {
+            NotificationKind::FollowRequest => self.follow_requests,
+            NotificationKind::FollowAccepted => self.follow_acceptances,
+            NotificationKind::NewFollower => self.new_followers,
+            NotificationKind::PostLike => self.post_likes,
+            NotificationKind::PostComment => self.post_comments,
+        }
+    }
+}
+
+async fn effective_notification_preferences(
+    transaction: &mut Transaction<'_, MySql>,
+    user_id: &str,
+) -> Result<NotificationPreferences, StatusCode> {
+    query_as::<_, NotificationPreferences>(
+        "SELECT
+            COALESCE(preference.notify_follow_requests, TRUE) AS follow_requests,
+            COALESCE(preference.notify_follow_acceptances, TRUE) AS follow_acceptances,
+            COALESCE(preference.notify_new_followers, TRUE) AS new_followers,
+            COALESCE(preference.notify_post_likes, TRUE) AS post_likes,
+            COALESCE(preference.notify_post_comments, TRUE) AS post_comments
+         FROM users recipient_user
+         LEFT JOIN notification_preferences preference
+            ON preference.user_id = recipient_user.id
+         WHERE recipient_user.id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut **transaction)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to load notification preferences");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .ok_or(StatusCode::INTERNAL_SERVER_ERROR)
+}
+
 fn notification_event_key(
     kind: NotificationKind,
     actor_id: &str,
@@ -64,6 +124,11 @@ pub(crate) async fn upsert_notification(
     post_id: Option<&str>,
 ) -> Result<(), StatusCode> {
     if recipient_id == actor_id {
+        return Ok(());
+    }
+
+    let preferences = effective_notification_preferences(transaction, recipient_id).await?;
+    if !preferences.allows(kind) {
         return Ok(());
     }
 
@@ -184,6 +249,68 @@ pub(crate) struct NotificationResponse {
     is_read: bool,
     created_at: DateTime<Utc>,
     actor: NotificationActor,
+}
+
+pub async fn get_notification_preferences(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+) -> Result<Json<NotificationPreferences>, StatusCode> {
+    let user_id = get_current_user(&pool, &headers).await?;
+    let preferences = query_as::<_, NotificationPreferences>(
+        "SELECT
+            COALESCE(preference.notify_follow_requests, TRUE) AS follow_requests,
+            COALESCE(preference.notify_follow_acceptances, TRUE) AS follow_acceptances,
+            COALESCE(preference.notify_new_followers, TRUE) AS new_followers,
+            COALESCE(preference.notify_post_likes, TRUE) AS post_likes,
+            COALESCE(preference.notify_post_comments, TRUE) AS post_comments
+         FROM users recipient_user
+         LEFT JOIN notification_preferences preference
+            ON preference.user_id = recipient_user.id
+         WHERE recipient_user.id = ?",
+    )
+    .bind(&user_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to fetch notification preferences");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(preferences))
+}
+
+pub async fn update_notification_preferences(
+    State(pool): State<MySqlPool>,
+    headers: HeaderMap,
+    Json(payload): Json<NotificationPreferences>,
+) -> Result<Json<NotificationPreferences>, StatusCode> {
+    let user_id = get_current_user(&pool, &headers).await?;
+    query(
+        "INSERT INTO notification_preferences
+            (user_id, notify_follow_requests, notify_follow_acceptances,
+             notify_new_followers, notify_post_likes, notify_post_comments, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+            notify_follow_requests = VALUES(notify_follow_requests),
+            notify_follow_acceptances = VALUES(notify_follow_acceptances),
+            notify_new_followers = VALUES(notify_new_followers),
+            notify_post_likes = VALUES(notify_post_likes),
+            notify_post_comments = VALUES(notify_post_comments),
+            updated_at = VALUES(updated_at)",
+    )
+    .bind(&user_id)
+    .bind(payload.follow_requests)
+    .bind(payload.follow_acceptances)
+    .bind(payload.new_followers)
+    .bind(payload.post_likes)
+    .bind(payload.post_comments)
+    .bind(Utc::now())
+    .execute(&pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to update notification preferences");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(payload))
 }
 
 pub async fn list_notifications(
@@ -354,7 +481,8 @@ pub async fn delete_notification(
 
 #[cfg(test)]
 mod tests {
-    use super::{notification_event_key, NotificationKind};
+    use super::{notification_event_key, NotificationKind, NotificationPreferences};
+    use serde_json::json;
 
     #[test]
     fn event_keys_group_repeated_interactions() {
@@ -374,5 +502,56 @@ mod tests {
         assert!(
             notification_event_key(NotificationKind::NewFollower, "actor", Some("post")).is_err()
         );
+    }
+
+    #[test]
+    fn notification_preferences_default_to_every_category_enabled() {
+        let preferences = NotificationPreferences::default();
+        assert!(preferences.allows(NotificationKind::FollowRequest));
+        assert!(preferences.allows(NotificationKind::FollowAccepted));
+        assert!(preferences.allows(NotificationKind::NewFollower));
+        assert!(preferences.allows(NotificationKind::PostLike));
+        assert!(preferences.allows(NotificationKind::PostComment));
+    }
+
+    #[test]
+    fn notification_preferences_map_each_kind_independently() {
+        let preferences = NotificationPreferences {
+            follow_requests: false,
+            follow_acceptances: true,
+            new_followers: false,
+            post_likes: true,
+            post_comments: false,
+        };
+        assert!(!preferences.allows(NotificationKind::FollowRequest));
+        assert!(preferences.allows(NotificationKind::FollowAccepted));
+        assert!(!preferences.allows(NotificationKind::NewFollower));
+        assert!(preferences.allows(NotificationKind::PostLike));
+        assert!(!preferences.allows(NotificationKind::PostComment));
+    }
+
+    #[test]
+    fn notification_preference_payload_is_complete_and_strict() {
+        assert!(serde_json::from_value::<NotificationPreferences>(json!({
+            "follow_requests": true,
+            "follow_acceptances": true,
+            "new_followers": true,
+            "post_likes": false,
+            "post_comments": false
+        }))
+        .is_ok());
+        assert!(serde_json::from_value::<NotificationPreferences>(json!({
+            "follow_requests": true
+        }))
+        .is_err());
+        assert!(serde_json::from_value::<NotificationPreferences>(json!({
+            "follow_requests": true,
+            "follow_acceptances": true,
+            "new_followers": true,
+            "post_likes": true,
+            "post_comments": true,
+            "email_digest": true
+        }))
+        .is_err());
     }
 }

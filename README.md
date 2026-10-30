@@ -19,6 +19,9 @@ across discovery, profiles, interactions, comments, and direct-message APIs
 rather than only in the interface. A private, responsive notification inbox
 groups follow requests, accepted requests, new followers, likes, and comments;
 the navbar exposes a bounded unread counter without relying on SMTP delivery.
+Granular account settings let members independently disable future follow-request,
+follow-acceptance, new-follower, like, or comment notifications without rewriting
+their existing notification history.
 Members can also silence accounts without notifying them, hide individual posts
 from personal discovery surfaces, and submit private reports for accounts,
 posts, or comments. A responsive, non-indexable safety center lets each member
@@ -105,8 +108,8 @@ The next project goals are:
 5. Extend the deployed least-privilege moderation workflow with appeals,
    transparent notices, approved retention/legal-hold policy, workload alerts,
    repeat-abuse signals, and carefully separated enforcement actions; continue
-   with restrict controls, notification preferences, cursor pagination, richer
-   discovery, and granular audiences.
+   with restrict controls, notification quiet hours/digests, cursor pagination,
+   richer discovery, and granular audiences.
 6. Complete the privacy program with a data inventory, retention schedule,
    asynchronous large-account exports, DPIA screening, processor records, and
    privacy/terms/help content.

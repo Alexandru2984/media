@@ -267,6 +267,17 @@ class ApiService {
     });
   }
 
+  async getNotificationPreferences() {
+    return this.request('/users/me/notification-preferences');
+  }
+
+  async updateNotificationPreferences(preferences) {
+    return this.request('/users/me/notification-preferences', {
+      method: 'PUT',
+      body: JSON.stringify(preferences),
+    });
+  }
+
   // Comments
   async getComments(postId) {
     return this.request(`/posts/${postId}/comments`);

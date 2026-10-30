@@ -3182,6 +3182,65 @@ a {
   background: var(--brand-soft);
 }
 
+.notification-preferences-list {
+  display: grid;
+  max-width: 620px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-soft);
+}
+
+.notification-preference-row {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 15px 18px;
+}
+
+.notification-preference-row + .notification-preference-row {
+  border-top: 1px solid var(--border);
+}
+
+.notification-preference-copy {
+  min-width: 0;
+}
+
+.notification-preference-copy strong {
+  font-size: 0.9rem;
+}
+
+.notification-preference-copy p,
+.notification-preferences-note,
+.notification-preferences-unavailable p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.notification-preferences-note {
+  max-width: 620px;
+  margin-top: 13px;
+}
+
+.notification-preferences-unavailable {
+  display: grid;
+  max-width: 620px;
+  justify-items: start;
+  gap: 13px;
+  padding: 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+
+.notification-preferences-unavailable p {
+  margin: 0;
+}
+
 .avatar-editor {
   display: flex;
   align-items: center;
@@ -4065,6 +4124,11 @@ a {
   .privacy-control {
     align-items: flex-start;
     padding: 16px;
+  }
+
+  .notification-preference-row {
+    align-items: flex-start;
+    padding: 14px 15px;
   }
 
   .avatar-editor-copy {

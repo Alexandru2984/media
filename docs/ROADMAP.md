@@ -44,7 +44,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-30: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 48 API
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 51 API
 binary unit tests plus 5 seed-binary tests, embedded versioned MySQL migrations,
 a validated canary flow, and deployed
 rollback artifacts. The frontend has
@@ -228,8 +228,9 @@ also deployed. A responsive, non-indexable moderation workspace now provides
 role-gated queues, evidence snapshots, assignment, release, resolution/dismissal,
 internal notes, password step-up, reporter pseudonymity, action audit, and an
 administrator-only role-change history. Role grants are offline-only and
-resolving a report deliberately performs no automatic enforcement. Notification
-preferences/digests, appeals, user notices, richer publishing, and multiple named
+resolving a report deliberately performs no automatic enforcement. Granular
+future-notification preferences are also deployed and enforced server-side;
+quiet hours/digests, appeals, user notices, richer publishing, and multiple named
 collections remain open.
 
 ### Profiles and relationships
@@ -266,8 +267,9 @@ collections remain open.
   attachment safety; groups only after abuse controls are ready.
 - In-app and optional email/push notifications with granular preferences,
   quiet hours, digests, grouping, and per-event unsubscribe. ✅ The bounded
-  in-app foundation, grouping, read state, and responsive inbox are complete;
-  preferences and external delivery remain open.
+  in-app foundation, grouping, read state, responsive inbox, and five independent
+  future-event preferences are complete; quiet hours, digests, per-event
+  unsubscribe, and external delivery remain open.
 
 ### Trust and safety
 

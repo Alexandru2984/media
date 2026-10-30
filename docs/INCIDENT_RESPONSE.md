@@ -331,8 +331,9 @@ audiences, and a restore drill remain required.
   notifications reduce dependence on email for social activity but do not
   restore verification or password-recovery delivery.
 
-**Verdict:** ship with monitoring. Automated abuse/privacy alerts, notification
-preferences, a multi-person tabletop, and a tested restore remain follow-ups;
+**Verdict:** ship with monitoring. Granular notification preferences were added
+in the subsequent 2026-10-30 release. Automated abuse/privacy alerts, quiet
+hours/digests, a multi-person tabletop, and a tested restore remain follow-ups;
 the independent SMTP P1 is not accepted by this verdict.
 
 ## CISO review record — least-privilege moderation

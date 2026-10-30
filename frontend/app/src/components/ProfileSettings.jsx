@@ -6,6 +6,20 @@ import { getPasswordPolicyError } from '../utils/passwords';
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
+  follow_requests: true,
+  follow_acceptances: true,
+  new_followers: true,
+  post_likes: true,
+  post_comments: true,
+});
+const NOTIFICATION_PREFERENCE_OPTIONS = Object.freeze([
+  { key: 'follow_requests', label: 'Cereri de urmărire', description: 'Când cineva solicită acces la profilul tău privat.' },
+  { key: 'follow_acceptances', label: 'Cereri acceptate', description: 'Când o cerere de urmărire trimisă de tine este aprobată.' },
+  { key: 'new_followers', label: 'Urmăritori noi', description: 'Când cineva începe să te urmărească direct.' },
+  { key: 'post_likes', label: 'Aprecieri', description: 'Când cineva apreciază una dintre postările tale.' },
+  { key: 'post_comments', label: 'Comentarii', description: 'Când cineva comentează la una dintre postările tale.' },
+]);
 const SECURITY_EVENT_COPY = Object.freeze({
   account_created: ['Cont creat', 'Contul și prima sesiune au fost create.'],
   login_succeeded: ['Autentificare reușită', 'O sesiune nouă a fost deschisă.'],
@@ -34,6 +48,16 @@ function securityEventCopy(eventType) {
   return SECURITY_EVENT_COPY[eventType] || ['Activitate de securitate', 'A fost înregistrată o acțiune de protecție a contului.'];
 }
 
+function normalizedNotificationPreferences(value) {
+  return Object.fromEntries(
+    Object.keys(DEFAULT_NOTIFICATION_PREFERENCES)
+      .map((key) => [
+        key,
+        typeof value?.[key] === 'boolean' ? value[key] : DEFAULT_NOTIFICATION_PREFERENCES[key],
+      ]),
+  );
+}
+
 export default function ProfileSettings(props) {
   const auth = useAuth();
   const [activeTab, setActiveTab] = createSignal('privacy');
@@ -56,6 +80,10 @@ export default function ProfileSettings(props) {
   const [securityEventsLoaded, setSecurityEventsLoaded] = createSignal(false);
   const [loadingSecurityEvents, setLoadingSecurityEvents] = createSignal(false);
   const [securityEventRetentionDays, setSecurityEventRetentionDays] = createSignal(90);
+  const [notificationPreferences, setNotificationPreferences] = createSignal({ ...DEFAULT_NOTIFICATION_PREFERENCES });
+  const [notificationPreferencesLoaded, setNotificationPreferencesLoaded] = createSignal(false);
+  const [loadingNotificationPreferences, setLoadingNotificationPreferences] = createSignal(false);
+  const [savingNotificationPreferences, setSavingNotificationPreferences] = createSignal(false);
   const [exportPassword, setExportPassword] = createSignal('');
   const [exportingData, setExportingData] = createSignal(false);
   const [deletePassword, setDeletePassword] = createSignal('');
@@ -102,10 +130,46 @@ export default function ProfileSettings(props) {
     }
   };
 
+  const loadNotificationPreferences = async () => {
+    if (loadingNotificationPreferences()) return;
+    setLoadingNotificationPreferences(true);
+    try {
+      const data = await api.getNotificationPreferences();
+      setNotificationPreferences(normalizedNotificationPreferences(data));
+      setNotificationPreferencesLoaded(true);
+    } catch (requestError) {
+      console.error('Failed to load notification preferences:', requestError);
+      setNotificationPreferencesLoaded(false);
+      showMessage('error', 'Preferințele de notificare nu au putut fi încărcate.');
+    } finally {
+      setLoadingNotificationPreferences(false);
+    }
+  };
+
   const selectTab = (tab) => {
     setActiveTab(tab);
+    if (tab === 'notifications' && !notificationPreferencesLoaded()) loadNotificationPreferences();
     if (tab === 'sessions' && !sessionsLoaded()) loadSessions();
     if (tab === 'security' && !securityEventsLoaded()) loadSecurityEvents();
+  };
+
+  const handleNotificationPreferenceChange = async (key) => {
+    if (!notificationPreferencesLoaded() || savingNotificationPreferences()) return;
+    const nextPreferences = {
+      ...notificationPreferences(),
+      [key]: !notificationPreferences()[key],
+    };
+    setSavingNotificationPreferences(true);
+    try {
+      const saved = await api.updateNotificationPreferences(nextPreferences);
+      setNotificationPreferences(normalizedNotificationPreferences(saved));
+      showMessage('success', 'Preferințele de notificare au fost salvate.');
+    } catch (requestError) {
+      console.error('Failed to update notification preferences:', requestError);
+      showMessage('error', 'Preferințele nu au putut fi salvate. Încearcă din nou.');
+    } finally {
+      setSavingNotificationPreferences(false);
+    }
   };
 
   const handleSessionRevoke = async (session) => {
@@ -341,6 +405,10 @@ export default function ProfileSettings(props) {
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" /></svg>
             <span><strong>Confidențialitate</strong><small>Cont public sau privat</small></span>
           </button>
+          <button type="button" role="tab" aria-selected={activeTab() === 'notifications'} class={activeTab() === 'notifications' ? 'is-active' : ''} onClick={() => selectTab('notifications')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /><path d="M10 21h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+            <span><strong>Notificări</strong><small>Alege ce primești</small></span>
+          </button>
           <button type="button" role="tab" aria-selected={activeTab() === 'avatar'} class={activeTab() === 'avatar' ? 'is-active' : ''} onClick={() => selectTab('avatar')}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" /><path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" /></svg>
             <span><strong>Avatar</strong><small>Poza profilului</small></span>
@@ -408,6 +476,53 @@ export default function ProfileSettings(props) {
                     <a href="/cereri" class="btn btn-secondary">Administrează cererile</a>
                   </Show>
                 </div>
+              </Show>
+            </div>
+          </Show>
+
+          <Show when={activeTab() === 'notifications'}>
+            <div class="settings-section">
+              <h3>Preferințe de notificare</h3>
+              <p class="settings-description">Alege evenimentele sociale care apar în inbox și în contorul din navigare.</p>
+
+              <Show
+                when={!loadingNotificationPreferences()}
+                fallback={<div class="sessions-loading" role="status"><span class="spinner" aria-hidden="true" /> Se încarcă preferințele…</div>}
+              >
+                <Show
+                  when={notificationPreferencesLoaded()}
+                  fallback={(
+                    <div class="notification-preferences-unavailable">
+                      <p>Setările nu sunt disponibile momentan. Nu am modificat nicio preferință.</p>
+                      <button type="button" class="btn btn-secondary" onClick={loadNotificationPreferences}>Încearcă din nou</button>
+                    </div>
+                  )}
+                >
+                  <div class="notification-preferences-list" aria-busy={savingNotificationPreferences()}>
+                    <For each={NOTIFICATION_PREFERENCE_OPTIONS}>
+                      {(option) => (
+                        <div class="notification-preference-row">
+                          <div class="notification-preference-copy">
+                            <strong>{option.label}</strong>
+                            <p>{option.description}</p>
+                          </div>
+                          <button
+                            type="button"
+                            class={`privacy-switch ${notificationPreferences()[option.key] ? 'is-active' : ''}`}
+                            role="switch"
+                            aria-checked={notificationPreferences()[option.key]}
+                            aria-label={`${option.label}: ${notificationPreferences()[option.key] ? 'activată' : 'dezactivată'}`}
+                            onClick={() => handleNotificationPreferenceChange(option.key)}
+                            disabled={savingNotificationPreferences()}
+                          >
+                            <span />
+                          </button>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                  <p class="notification-preferences-note">Schimbările se aplică evenimentelor viitoare. Notificările existente rămân în istoric până le ștergi.</p>
+                </Show>
               </Show>
             </div>
           </Show>

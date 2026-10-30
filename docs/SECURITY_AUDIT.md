@@ -50,6 +50,11 @@ absent, so IDOR for every object and future privilege boundary is not yet broadl
 covered end to end. No evidence of compromise was found, but absence of evidence
 is not evidence of absence.
 
+The notification-preference release additionally exercised strict full-payload
+validation, all-enabled defaults, suppression and re-enablement for follower,
+like, and comment events, export v7 coverage, and account-delete cascades against
+a disposable isolated database before its public canary.
+
 ## Executive summary
 
 The service has a useful baseline: TLS 1.0/1.1 are rejected, the API and database
@@ -511,6 +516,12 @@ maximum. Source actions remove stale like/follow/comment events, post/account
 foreign keys cascade, and blocking deletes both directions atomically. List,
 count, read, read-all, and delete operations authorize the recipient server-side;
 the two-account canary confirmed cross-account mutation returns `404`.
+Five owner-only preferences now independently gate future follow-request,
+follow-acceptance, new-follower, like, and comment events at the server-side
+write boundary. Missing or unknown fields are rejected, every category defaults
+to enabled for backward compatibility, existing history is left unchanged, and
+the preference row follows the account deletion cascade. Account export format
+v7 includes the effective settings even when no explicit row has yet been stored.
 
 Mute removes an actor from feeds, people/post search, saved results, comments,
 and both stored/future notifications, while explicit profile access remains
@@ -584,7 +595,8 @@ foreign-key schema, unique event grouping, transactional source-action updates,
 the 500-record cap, bidirectional block cleanup, recipient-only mutations,
 export-v4 coverage, isolated and Tunnel canaries, rollback artifacts, and zero
 residual application rows. Automated notification-velocity/cap alerts and
-granular preferences remain required.
+quiet hours/digests remain required; granular preferences are now enforced at
+notification creation and covered by export/deletion tests.
 
 **Trust-and-safety review verdict:** mitigate then ship for private user controls
 and non-destructive moderation triage. Release gates were reporter-scoped
