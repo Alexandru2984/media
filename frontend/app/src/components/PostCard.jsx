@@ -2,7 +2,7 @@ import { For, Show, createSignal } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
-import { getImageUrl } from '../utils/urls';
+import { getImageUrl, profilePath } from '../utils/urls';
 import ReportDialog from './ReportDialog';
 
 const MAX_CONTENT_LENGTH = 500;
@@ -55,7 +55,7 @@ export default function PostCard(props) {
   let editFileInput;
 
   const isOwn = () => auth.user()?.id === props.post.user.id;
-  const openProfile = (userId) => navigate(`/profile/${userId}`);
+  const openProfile = (userId) => navigate(profilePath(userId));
 
   const reloadComments = async () => {
     const data = await api.getComments(props.post.id);

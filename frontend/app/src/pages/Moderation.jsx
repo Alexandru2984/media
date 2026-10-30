@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
+import { profilePath } from '../utils/urls';
 
 const PAGE_SIZE = 20;
 const privilegedRoles = ['moderator', 'admin'];
@@ -269,7 +270,7 @@ export default function Moderation() {
                         <p class="moderation-card-kicker">{targetLabels[report.target_type] || 'Conținut'} · {reasonLabels[report.reason] || report.reason}</p>
                         <h2>
                           <Show when={report.target_type === 'user'} fallback={report.target_label}>
-                            <A href={`/profile/${report.target_id}`}>{report.target_label}</A>
+                            <A href={profilePath(report.target_id)}>{report.target_label}</A>
                           </Show>
                         </h2>
                       </div>

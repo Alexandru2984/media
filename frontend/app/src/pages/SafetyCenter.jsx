@@ -4,7 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
-import { getImageUrl } from '../utils/urls';
+import { getImageUrl, profilePath } from '../utils/urls';
 
 const PAGE_SIZE = 20;
 const dateFormatter = new Intl.DateTimeFormat('ro-RO', { dateStyle: 'medium', timeStyle: 'short' });
@@ -237,14 +237,14 @@ export default function SafetyCenter() {
               <div class="safety-list">
                 <For each={mutedUsers()}>{(user) => (
                   <article class="surface safety-card">
-                    <A href={`/profile/${user.id}`} class="safety-avatar-link" aria-label={`Deschide profilul ${user.username}`}>
+                    <A href={profilePath(user.id)} class="safety-avatar-link" aria-label={`Deschide profilul ${user.username}`}>
                       <Show when={user.avatar_url} fallback={<span class="safety-avatar avatar-fallback">{user.username.charAt(0).toUpperCase()}</span>}>
                         <img class="safety-avatar avatar" src={getImageUrl(user.avatar_url)} alt="" loading="lazy" decoding="async" />
                       </Show>
                     </A>
                     <div class="safety-card-copy">
                       <p class="safety-card-kicker">Cont silențiat</p>
-                      <h2><A href={`/profile/${user.id}`}>{user.username}</A></h2>
+                      <h2><A href={profilePath(user.id)}>{user.username}</A></h2>
                       <p>{user.bio || 'Conținutul acestui cont este eliminat din fluxurile tale.'}</p>
                       <time datetime={user.muted_at}>Din {dateFormatter.format(new Date(user.muted_at))}</time>
                     </div>
@@ -263,7 +263,7 @@ export default function SafetyCenter() {
                 <For each={hiddenPosts()}>{(post) => (
                   <article class="surface safety-card">
                     <Show when={post.author} fallback={<span class="safety-avatar avatar-fallback">?</span>}>
-                      <A href={`/profile/${post.author.id}`} class="safety-avatar-link">
+                      <A href={profilePath(post.author.id)} class="safety-avatar-link">
                         <Show when={post.author.avatar_url} fallback={<span class="safety-avatar avatar-fallback">{post.author.username.charAt(0).toUpperCase()}</span>}>
                           <img class="safety-avatar avatar" src={getImageUrl(post.author.avatar_url)} alt="" loading="lazy" decoding="async" />
                         </Show>

@@ -5,7 +5,7 @@ import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
 import PostCard from '../components/PostCard';
-import { getImageUrl } from '../utils/urls';
+import { getImageUrl, profilePath } from '../utils/urls';
 
 const MAX_SEARCH_LENGTH = 64;
 
@@ -128,7 +128,7 @@ export default function Search() {
                 <div class="people-results">
                   <For each={results().users}>
                     {(user) => (
-                      <A href={`/profile/${user.id}`} class="surface person-result">
+                      <A href={profilePath(user.id)} class="surface person-result">
                         <Show
                           when={user.avatar_url}
                           fallback={<span class="search-avatar avatar-fallback">{user.username.charAt(0).toUpperCase()}</span>}

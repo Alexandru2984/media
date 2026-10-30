@@ -4,7 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
-import { getImageUrl } from '../utils/urls';
+import { getImageUrl, profilePath } from '../utils/urls';
 
 const PAGE_SIZE = 20;
 
@@ -81,7 +81,7 @@ export default function FollowRequests() {
       <Navbar />
       <main class="connections-page app-container">
         <header class="connections-header">
-          <A href={`/profile/${auth.user()?.id}`} class="icon-button" aria-label="Înapoi la profil" title="Înapoi la profil">
+          <A href={profilePath(auth.user()?.id)} class="icon-button" aria-label="Înapoi la profil" title="Înapoi la profil">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" /></svg>
           </A>
           <div>
@@ -109,7 +109,7 @@ export default function FollowRequests() {
               <For each={requests()}>
                 {(request) => (
                   <article class="surface connection-card request-card">
-                    <A href={`/profile/${request.id}`} class="connection-person">
+                    <A href={profilePath(request.id)} class="connection-person">
                       <Show
                         when={request.avatar_url}
                         fallback={<span class="connection-avatar avatar-fallback">{request.username.charAt(0).toUpperCase()}</span>}

@@ -105,8 +105,9 @@ and protected against attacker-sized stored parameters.
 **Progress (2026-10-29):** user response DTOs exclude password hashes, content
 and identity inputs have server-side limits, image paths are owner-bound,
 like/comment counters are transactional and nonnegative, pagination is bounded
-and strictly validated through one shared parser,
-and major N+1 query paths were replaced with indexed joins. A password-confirmed
+and strictly validated through one shared parser, all dynamic client URL segments
+and query values are encoded through shared builders, and major N+1 query paths
+were replaced with indexed joins. A password-confirmed
 JSON export now covers profile data, content, interactions, messages, session
 metadata, security events, pending-action metadata, and upload metadata without
 credential or token material. Double-confirmed account deletion cascades private

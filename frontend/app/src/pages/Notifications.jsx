@@ -4,7 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
-import { getImageUrl } from '../utils/urls';
+import { getImageUrl, profilePath } from '../utils/urls';
 
 const PAGE_SIZE = 20;
 
@@ -28,9 +28,9 @@ function announceNotificationChange() {
 function notificationDestination(notification, currentUserId) {
   if (notification.kind === 'follow_request') return '/cereri';
   if (notification.kind === 'post_like' || notification.kind === 'post_comment') {
-    return `/profile/${currentUserId}`;
+    return profilePath(currentUserId);
   }
-  return `/profile/${notification.actor.id}`;
+  return profilePath(notification.actor.id);
 }
 
 export default function Notifications() {
@@ -199,7 +199,7 @@ export default function Notifications() {
                   <article class={`surface notification-card ${notification.is_read ? '' : 'is-unread'}`}>
                     <Show when={!notification.is_read}><span class="notification-unread-dot" aria-label="Necitită" /></Show>
                     <A
-                      href={`/profile/${notification.actor.id}`}
+                      href={profilePath(notification.actor.id)}
                       class="notification-avatar-link"
                       onClick={() => void markRead(notification)}
                       aria-label={`Deschide profilul ${notification.actor.username}`}
@@ -212,7 +212,7 @@ export default function Notifications() {
                       </Show>
                     </A>
                     <div class="notification-copy">
-                      <p><A href={`/profile/${notification.actor.id}`} onClick={() => void markRead(notification)}>{notification.actor.username}</A> {notificationCopy[notification.kind] || 'are o actualizare pentru tine'}.</p>
+                      <p><A href={profilePath(notification.actor.id)} onClick={() => void markRead(notification)}>{notification.actor.username}</A> {notificationCopy[notification.kind] || 'are o actualizare pentru tine'}.</p>
                       <time datetime={notification.created_at}>{dateFormatter.format(new Date(notification.created_at))}</time>
                     </div>
                     <div class="notification-actions">

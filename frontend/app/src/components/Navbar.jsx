@@ -3,7 +3,7 @@ import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
-import { getImageUrl } from '../utils/urls';
+import { getImageUrl, profilePath } from '../utils/urls';
 
 function BrandIcon() {
   return (
@@ -115,7 +115,7 @@ export default function Navbar() {
               </svg>
               Salvate
             </A>
-            <A href={`/profile/${auth.user()?.id}`} class={`nav-link ${location.pathname.startsWith('/profile/') ? 'is-active' : ''}`}>
+            <A href={profilePath(auth.user()?.id)} class={`nav-link ${location.pathname.startsWith('/profile/') ? 'is-active' : ''}`}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" />
                 <path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
@@ -180,7 +180,7 @@ export default function Navbar() {
               </Show>
             }
           >
-            <A href={`/profile/${auth.user()?.id}`} class="nav-user" aria-label="Deschide profilul">
+            <A href={profilePath(auth.user()?.id)} class="nav-user" aria-label="Deschide profilul">
               <Show
                 when={auth.user()?.avatar_url}
                 fallback={<span class="avatar-fallback">{auth.user()?.username?.charAt(0).toUpperCase()}</span>}
@@ -229,7 +229,7 @@ export default function Navbar() {
             </svg>
             <span>Salvate</span>
           </A>
-          <A href={`/profile/${auth.user()?.id}`} class={location.pathname.startsWith('/profile/') ? 'is-active' : ''}>
+          <A href={profilePath(auth.user()?.id)} class={location.pathname.startsWith('/profile/') ? 'is-active' : ''}>
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8" />
               <path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />

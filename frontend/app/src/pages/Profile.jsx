@@ -7,7 +7,7 @@ import PostCard from '../components/PostCard';
 import ProfileSettings from '../components/ProfileSettings';
 import PageMeta from '../components/PageMeta';
 import ReportDialog from '../components/ReportDialog';
-import { getImageUrl } from '../utils/urls';
+import { getImageUrl, profilePath } from '../utils/urls';
 
 function joinedDate(dateString) {
   const date = new Date(dateString);
@@ -178,7 +178,7 @@ export default function Profile() {
       <PageMeta
         title={profile()?.username ? `${profile().username} — Media` : 'Profil — Media'}
         description="Profil de utilizator pe Media."
-        canonicalPath={`/profile/${params.id}`}
+        canonicalPath={profilePath(params.id)}
         noIndex
       />
       <Navbar />
@@ -309,10 +309,10 @@ export default function Profile() {
                     <div class="profile-meta">
                       <span><strong>{profile()?.posts_count ?? posts().length}</strong> {Number(profile()?.posts_count ?? posts().length) === 1 ? 'postare' : 'postări'}</span>
                       <Show when={!profile()?.is_blocked && profile()?.can_view_content}>
-                        <A href={`/profile/${params.id}/urmaritori`} class="profile-meta-link">
+                        <A href={`${profilePath(params.id)}/urmaritori`} class="profile-meta-link">
                           <strong>{profile()?.followers_count ?? 0}</strong> urmăritori
                         </A>
-                        <A href={`/profile/${params.id}/urmariri`} class="profile-meta-link">
+                        <A href={`${profilePath(params.id)}/urmariri`} class="profile-meta-link">
                           <strong>{profile()?.following_count ?? 0}</strong> urmăriri
                         </A>
                       </Show>

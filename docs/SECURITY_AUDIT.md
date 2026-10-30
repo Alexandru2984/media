@@ -501,6 +501,12 @@ instead of being silently coerced. General feed/profile offsets are capped at
 and hidden posts use their smaller storage budgets. This reduces deep-scan DoS
 exposure while cursor pagination remains the long-term replacement.
 
+The browser client now constructs dynamic API and profile URLs through shared
+segment and query encoders. UUID-like values remain server-validated, but a
+malformed route parameter or compromised response can no longer introduce a
+slash, query parameter, or fragment into the intended navigation target. URL
+contract tests run before every production build.
+
 Post like/comment counters remain denormalized, and database-level text length
 constraints are not yet encoded in versioned migrations. Ownership checks exist
 in handlers but still need a centralized authorization matrix and end-to-end IDOR

@@ -1,7 +1,21 @@
 // Prefer same-origin URLs in production; the development server proxies these.
-const BASE_URL = import.meta.env.VITE_API_URL
-  ? import.meta.env.VITE_API_URL.replace(/\/api\/?$/, '')
+const VITE_API_URL = import.meta.env?.VITE_API_URL || '';
+const BASE_URL = VITE_API_URL
+  ? VITE_API_URL.replace(/\/api\/?$/, '')
   : '';
+
+export const encodePathSegment = (value) => encodeURIComponent(String(value));
+
+export const withQuery = (path, parameters) => {
+  const query = new URLSearchParams();
+  for (const [name, value] of Object.entries(parameters)) {
+    if (value !== undefined && value !== null) query.set(name, String(value));
+  }
+  const encoded = query.toString();
+  return encoded ? `${path}?${encoded}` : path;
+};
+
+export const profilePath = (userId) => `/profile/${encodePathSegment(userId)}`;
 
 export const getImageUrl = (path) => {
   if (!path) return null;

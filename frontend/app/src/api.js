@@ -1,4 +1,5 @@
 import { requestJson, UPLOAD_REQUEST_TIMEOUT_MS } from './http';
+import { encodePathSegment, withQuery } from './utils/urls';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -44,7 +45,7 @@ class ApiService {
   }
 
   async revokeSession(sessionId) {
-    return this.request(`/auth/sessions/${encodeURIComponent(sessionId)}`, {
+    return this.request(`/auth/sessions/${encodePathSegment(sessionId)}`, {
       method: 'DELETE',
     });
   }
@@ -57,43 +58,43 @@ class ApiService {
 
   // Users
   async getProfile(userId) {
-    return this.request(`/users/${userId}`);
+    return this.request(`/users/${encodePathSegment(userId)}`);
   }
 
   async followUser(userId) {
-    return this.request(`/users/${userId}/follow`, { method: 'PUT' });
+    return this.request(`/users/${encodePathSegment(userId)}/follow`, { method: 'PUT' });
   }
 
   async unfollowUser(userId) {
-    return this.request(`/users/${userId}/follow`, { method: 'DELETE' });
+    return this.request(`/users/${encodePathSegment(userId)}/follow`, { method: 'DELETE' });
   }
 
   async blockUser(userId) {
-    return this.request(`/users/${userId}/block`, { method: 'PUT' });
+    return this.request(`/users/${encodePathSegment(userId)}/block`, { method: 'PUT' });
   }
 
   async unblockUser(userId) {
-    return this.request(`/users/${userId}/block`, { method: 'DELETE' });
+    return this.request(`/users/${encodePathSegment(userId)}/block`, { method: 'DELETE' });
   }
 
   async muteUser(userId) {
-    return this.request(`/users/${encodeURIComponent(userId)}/mute`, { method: 'PUT' });
+    return this.request(`/users/${encodePathSegment(userId)}/mute`, { method: 'PUT' });
   }
 
   async unmuteUser(userId) {
-    return this.request(`/users/${encodeURIComponent(userId)}/mute`, { method: 'DELETE' });
+    return this.request(`/users/${encodePathSegment(userId)}/mute`, { method: 'DELETE' });
   }
 
   async getMutedUsers(limit = 20, offset = 0) {
-    return this.request(`/users/me/mutes?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/users/me/mutes', { limit, offset }));
   }
 
   async getFollowers(userId, limit = 20, offset = 0) {
-    return this.request(`/users/${userId}/followers?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery(`/users/${encodePathSegment(userId)}/followers`, { limit, offset }));
   }
 
   async getFollowing(userId, limit = 20, offset = 0) {
-    return this.request(`/users/${userId}/following?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery(`/users/${encodePathSegment(userId)}/following`, { limit, offset }));
   }
 
   async updatePrivacy(isPrivate) {
@@ -104,24 +105,24 @@ class ApiService {
   }
 
   async getFollowRequests(limit = 20, offset = 0) {
-    return this.request(`/users/me/follow-requests?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/users/me/follow-requests', { limit, offset }));
   }
 
   async acceptFollowRequest(userId) {
-    return this.request(`/users/me/follow-requests/${userId}`, { method: 'PUT' });
+    return this.request(`/users/me/follow-requests/${encodePathSegment(userId)}`, { method: 'PUT' });
   }
 
   async rejectFollowRequest(userId) {
-    return this.request(`/users/me/follow-requests/${userId}`, { method: 'DELETE' });
+    return this.request(`/users/me/follow-requests/${encodePathSegment(userId)}`, { method: 'DELETE' });
   }
 
   // Posts
   async getPosts(limit = 10, offset = 0) {
-    return this.request(`/posts?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/posts', { limit, offset }));
   }
 
   async getFollowingFeed(limit = 10, offset = 0) {
-    return this.request(`/feed/following?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/feed/following', { limit, offset }));
   }
 
   async createPost(content, imageUrl = null) {
@@ -132,31 +133,31 @@ class ApiService {
   }
 
   async likePost(postId) {
-    return this.request(`/posts/${postId}/like`, {
+    return this.request(`/posts/${encodePathSegment(postId)}/like`, {
       method: 'POST',
     });
   }
 
   async savePost(postId) {
-    return this.request(`/posts/${postId}/save`, {
+    return this.request(`/posts/${encodePathSegment(postId)}/save`, {
       method: 'POST',
     });
   }
 
   async getSavedPosts(limit = 10, offset = 0) {
-    return this.request(`/saved-posts?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/saved-posts', { limit, offset }));
   }
 
   async hidePost(postId) {
-    return this.request(`/posts/${encodeURIComponent(postId)}/hide`, { method: 'PUT' });
+    return this.request(`/posts/${encodePathSegment(postId)}/hide`, { method: 'PUT' });
   }
 
   async unhidePost(postId) {
-    return this.request(`/posts/${encodeURIComponent(postId)}/hide`, { method: 'DELETE' });
+    return this.request(`/posts/${encodePathSegment(postId)}/hide`, { method: 'DELETE' });
   }
 
   async getHiddenPosts(limit = 20, offset = 0) {
-    return this.request(`/hidden-posts?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/hidden-posts', { limit, offset }));
   }
 
   // Reporter-private trust and safety records
@@ -173,42 +174,42 @@ class ApiService {
   }
 
   async getReports(limit = 20, offset = 0) {
-    return this.request(`/reports?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/reports', { limit, offset }));
   }
 
   async withdrawReport(reportId) {
-    return this.request(`/reports/${encodeURIComponent(reportId)}`, { method: 'DELETE' });
+    return this.request(`/reports/${encodePathSegment(reportId)}`, { method: 'DELETE' });
   }
 
   // Least-privilege moderation
   async getModerationReports(status = 'open', limit = 20, offset = 0) {
-    return this.request(`/moderation/reports?status=${encodeURIComponent(status)}&limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/moderation/reports', { status, limit, offset }));
   }
 
   async getModerationAudit(limit = 20, offset = 0) {
-    return this.request(`/moderation/audit?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/moderation/audit', { limit, offset }));
   }
 
   async getModerationRoleAudit(limit = 20, offset = 0) {
-    return this.request(`/moderation/role-audit?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/moderation/role-audit', { limit, offset }));
   }
 
   async claimModerationReport(reportId, password) {
-    return this.request(`/moderation/reports/${encodeURIComponent(reportId)}/claim`, {
+    return this.request(`/moderation/reports/${encodePathSegment(reportId)}/claim`, {
       method: 'PUT',
       body: JSON.stringify({ password }),
     });
   }
 
   async releaseModerationReport(reportId, password) {
-    return this.request(`/moderation/reports/${encodeURIComponent(reportId)}/release`, {
+    return this.request(`/moderation/reports/${encodePathSegment(reportId)}/release`, {
       method: 'PUT',
       body: JSON.stringify({ password }),
     });
   }
 
   async decideModerationReport(reportId, password, decision, note) {
-    return this.request(`/moderation/reports/${encodeURIComponent(reportId)}/decision`, {
+    return this.request(`/moderation/reports/${encodePathSegment(reportId)}/decision`, {
       method: 'PUT',
       body: JSON.stringify({ password, decision, note }),
     });
@@ -216,7 +217,7 @@ class ApiService {
 
   // Notifications
   async getNotifications(limit = 20, offset = 0) {
-    return this.request(`/notifications?limit=${limit}&offset=${offset}`);
+    return this.request(withQuery('/notifications', { limit, offset }));
   }
 
   async getUnreadNotificationCount() {
@@ -224,7 +225,7 @@ class ApiService {
   }
 
   async markNotificationRead(notificationId) {
-    return this.request(`/notifications/${encodeURIComponent(notificationId)}/read`, {
+    return this.request(`/notifications/${encodePathSegment(notificationId)}/read`, {
       method: 'PUT',
     });
   }
@@ -234,7 +235,7 @@ class ApiService {
   }
 
   async deleteNotification(notificationId) {
-    return this.request(`/notifications/${encodeURIComponent(notificationId)}`, {
+    return this.request(`/notifications/${encodePathSegment(notificationId)}`, {
       method: 'DELETE',
     });
   }
@@ -252,25 +253,25 @@ class ApiService {
 
   // Comments
   async getComments(postId) {
-    return this.request(`/posts/${postId}/comments`);
+    return this.request(`/posts/${encodePathSegment(postId)}/comments`);
   }
 
   async createComment(postId, content) {
-    return this.request(`/posts/${postId}/comments`, {
+    return this.request(`/posts/${encodePathSegment(postId)}/comments`, {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
   }
 
   async updateComment(commentId, content) {
-    return this.request(`/comments/${commentId}`, {
+    return this.request(`/comments/${encodePathSegment(commentId)}`, {
       method: 'PUT',
       body: JSON.stringify({ content }),
     });
   }
 
   async deleteComment(commentId) {
-    return this.request(`/comments/${commentId}`, {
+    return this.request(`/comments/${encodePathSegment(commentId)}`, {
       method: 'DELETE',
     });
   }
@@ -285,24 +286,24 @@ class ApiService {
 
   // Post Management
   async updatePost(postId, content, imageUrl) {
-    return this.request(`/posts/${postId}`, {
+    return this.request(`/posts/${encodePathSegment(postId)}`, {
       method: 'PUT',
       body: JSON.stringify({ content, image_url: imageUrl }),
     });
   }
 
   async deletePost(postId) {
-    return this.request(`/posts/${postId}`, {
+    return this.request(`/posts/${encodePathSegment(postId)}`, {
       method: 'DELETE',
     });
   }
 
   async getUserPosts(userId) {
-    return this.request(`/users/${userId}/posts`);
+    return this.request(`/users/${encodePathSegment(userId)}/posts`);
   }
 
   async search(query) {
-    return this.request(`/search?q=${encodeURIComponent(query)}`);
+    return this.request(withQuery('/search', { q: query }));
   }
 
   // Messages
@@ -314,7 +315,7 @@ class ApiService {
   }
 
   async getMessages(userId) {
-    return this.request(`/messages?user_id=${userId}`);
+    return this.request(withQuery('/messages', { user_id: userId }));
   }
 
   // Email verification and password reset

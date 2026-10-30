@@ -7,7 +7,7 @@ import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import PageMeta from '../components/PageMeta';
 import SiteFooter from '../components/SiteFooter';
-import { getImageUrl } from '../utils/urls';
+import { getImageUrl, profilePath } from '../utils/urls';
 
 const FEED_PAGE_SIZE = 10;
 
@@ -325,7 +325,7 @@ export default function Home() {
                       <h2 class="sidebar-title">{auth.user()?.username}</h2>
                     </div>
                   </div>
-                  <A href={`/profile/${auth.user()?.id}`} class="btn btn-secondary" style={{ width: '100%', 'margin-top': '16px' }}>
+                  <A href={profilePath(auth.user()?.id)} class="btn btn-secondary" style={{ width: '100%', 'margin-top': '16px' }}>
                     Vezi profilul
                   </A>
                 </div>

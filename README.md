@@ -176,7 +176,9 @@ public page, canonical URL, sitemap entry, and global recovery marker.
 The shared HTTP transport applies a 15-second request budget (45 seconds for
 bounded image uploads), keeps browser-generated multipart boundaries intact,
 distinguishes timeout/cancellation/network failures without exposing internal
-details, and is covered by Node contract tests that run before every build.
+details. Dynamic API segments, query values, and profile links use shared URL
+encoders so untrusted values cannot create a second path or parameter. Node
+contract tests cover both layers and run before every build.
 
 ## Git workflow
 
