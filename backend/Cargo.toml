@@ -23,3 +23,6 @@ dotenvy = "0.15"
 url = "2.5"
 sha2 = "0.10"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

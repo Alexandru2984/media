@@ -545,11 +545,17 @@ while retaining an auditable SBOM and symbol artifact in restricted storage.
 
 #### SEC-017 — Framework errors are returned verbatim
 
-Malformed JSON returns an Axum deserialization message with internal target-field
-detail. Other failures often return empty bodies, making clients inconsistent.
+**Status (2026-10-30): mitigated and regression-tested.** Every API `4xx`/`5xx`
+response is replaced by a bounded `application/problem+json` document containing
+only the generic status title/code and a validated or server-generated request
+ID. Responses are `no-store`; `HEAD` failures carry no body; successful JSON is
+not rewritten. Nginx owns the final API cache policy and suppresses the backend
+field before adding one canonical `Cache-Control: no-store` value.
 
-**Remediation:** use a stable JSON problem format with request IDs and safe public
-messages; keep detailed causes only in redacted server logs.
+Malformed JSON, internal failure, invalid request-ID, `HEAD`, and successful JSON
+regressions cover the middleware. A public malformed-login canary confirmed that
+Axum deserialization detail and submitted field names do not reach the client.
+Detailed causes remain confined to privacy-redacted server logs.
 
 ## CISO review
 

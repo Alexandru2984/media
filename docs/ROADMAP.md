@@ -44,7 +44,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-30: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 44 API
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 48 API
 binary unit tests plus 5 seed-binary tests, embedded versioned MySQL migrations,
 a validated canary flow, and deployed
 rollback artifacts. The frontend has

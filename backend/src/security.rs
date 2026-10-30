@@ -147,11 +147,36 @@ pub async fn request_observability(request: Request, next: Next) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use super::{origin_is_allowed, request_id, valid_request_id, REQUEST_ID_HEADER};
-    use axum::http::{header, HeaderMap, HeaderValue, Method};
+    use super::{
+        api_response_policy, origin_is_allowed, request_id, valid_request_id, REQUEST_ID_HEADER,
+    };
+    use axum::{
+        body::{to_bytes, Body},
+        http::{header, HeaderMap, HeaderValue, Method, Request, StatusCode},
+        middleware,
+        routing::{get, post},
+        Json, Router,
+    };
+    use serde_json::{json, Value};
+    use tower::ServiceExt;
 
     fn expected_origin() -> HeaderValue {
         HeaderValue::from_static("https://media.example.com")
+    }
+
+    fn response_policy_app() -> Router {
+        Router::new()
+            .route(
+                "/json",
+                post(|Json(payload): Json<Value>| async move { Json(payload) }),
+            )
+            .route(
+                "/error",
+                get(|| async { StatusCode::INTERNAL_SERVER_ERROR }),
+            )
+            .route("/missing", get(|| async { StatusCode::NOT_FOUND }))
+            .route("/ok", get(|| async { Json(json!({ "ok": true })) }))
+            .layer(middleware::from_fn(api_response_policy))
     }
 
     #[test]
@@ -217,5 +242,125 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(REQUEST_ID_HEADER, HeaderValue::from_static("proxy-123"));
         assert_eq!(request_id(&headers), "proxy-123");
+    }
+
+    #[tokio::test]
+    async fn malformed_json_is_replaced_with_a_safe_problem_response() {
+        let response = response_policy_app()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/json")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header(REQUEST_ID_HEADER, "proxy-123")
+                    .body(Body::from(r#"{"private_field":"unterminated"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/problem+json"
+        );
+        assert_eq!(
+            response.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-store"
+        );
+        assert_eq!(
+            response.headers().get(REQUEST_ID_HEADER).unwrap(),
+            "proxy-123"
+        );
+        let declared_length = response
+            .headers()
+            .get(header::CONTENT_LENGTH)
+            .map(|value| value.to_str().unwrap().parse::<usize>().unwrap());
+
+        let body = to_bytes(response.into_body(), 8_192).await.unwrap();
+        if let Some(declared_length) = declared_length {
+            assert_eq!(declared_length, body.len());
+        }
+        let problem: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            problem,
+            json!({
+                "type": "about:blank",
+                "title": "Bad Request",
+                "status": 400,
+                "request_id": "proxy-123"
+            })
+        );
+        assert!(!String::from_utf8_lossy(&body).contains("private_field"));
+    }
+
+    #[tokio::test]
+    async fn server_errors_are_replaced_with_a_safe_problem_response() {
+        let response = response_policy_app()
+            .oneshot(
+                Request::builder()
+                    .uri("/error")
+                    .header(REQUEST_ID_HEADER, "server-error-123")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = to_bytes(response.into_body(), 8_192).await.unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&body).unwrap(),
+            json!({
+                "type": "about:blank",
+                "title": "Internal Server Error",
+                "status": 500,
+                "request_id": "server-error-123"
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn head_errors_have_no_body_and_regenerate_an_invalid_request_id() {
+        let response = response_policy_app()
+            .oneshot(
+                Request::builder()
+                    .method(Method::HEAD)
+                    .uri("/missing")
+                    .header(REQUEST_ID_HEADER, "invalid/value")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        let generated = response.headers().get(REQUEST_ID_HEADER).unwrap();
+        assert_ne!(generated, "invalid/value");
+        assert!(valid_request_id(generated));
+        let body = to_bytes(response.into_body(), 8_192).await.unwrap();
+        assert!(body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn successful_json_is_not_rewritten() {
+        let response = response_policy_app()
+            .oneshot(Request::builder().uri("/ok").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/json"
+        );
+        assert!(valid_request_id(
+            response.headers().get(REQUEST_ID_HEADER).unwrap()
+        ));
+        let body = to_bytes(response.into_body(), 8_192).await.unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&body).unwrap(),
+            json!({ "ok": true })
+        );
     }
 }
