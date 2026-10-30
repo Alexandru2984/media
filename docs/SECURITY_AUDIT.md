@@ -760,6 +760,24 @@ rollback release is `20261030T112630Z-4aa95ac`; no schema, data, service restart
 or configuration change was required. Browser interaction testing remains open
 because the VPS has no browser runtime.
 
+### Dynamic URL encoding checkpoint
+
+Frontend release `20261030T113145Z-065e29e` applies shared encoding to every
+dynamic API path segment and query value plus every profile navigation target.
+Eleven mandatory Node contracts include path traversal, injected query
+delimiters, nullish query handling, transport limits, and safe error behavior.
+The production build and low-threshold npm audit passed with no findings; entry
+JavaScript remained within budget at 106,071 bytes.
+
+Direct and public Tunnel canaries verified the new entry, profile chunk, prior
+entry compatibility, immutable JavaScript, and health. A percent-encoded `&`
+remained part of one invalid pagination value and returned generic `400` rather
+than introducing an `offset`; a percent-encoded slash in a user identifier
+remained in the intended route and returned `404`. All services retained zero
+unexpected restarts and no warning-or-higher journal events. The atomic rollback
+release is `20261030T112913Z-bcdfdc7`; no backend, database, Nginx, or Tunnel
+mutation was required.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
