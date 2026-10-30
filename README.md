@@ -109,7 +109,9 @@ The next project goals are:
 See the [security audit](docs/SECURITY_AUDIT.md) and the
 [implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,
 and planned product work. Operational security events use the
-[incident-response runbook](docs/INCIDENT_RESPONSE.md).
+[incident-response runbook](docs/INCIDENT_RESPONSE.md). Privileged grants,
+revocations, queue handling, and moderation retention use the
+[moderation operations runbook](docs/MODERATION_OPERATIONS.md).
 
 ## Configuration
 
