@@ -134,6 +134,19 @@ export default function Navbar() {
 
         <div class="nav-actions">
           <Show when={auth.isAuthenticated()}>
+            <Show when={['moderator', 'admin'].includes(auth.user()?.role)}>
+              <A
+                href="/moderare"
+                class={`icon-button moderation-nav-button ${location.pathname === '/moderare' ? 'is-active' : ''}`}
+                aria-label="Coadă de moderare"
+                title="Moderare"
+              >
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 3 4.5 6v5.5c0 4.8 3 7.9 7.5 9.5 4.5-1.6 7.5-4.7 7.5-9.5V6L12 3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                  <path d="M9 12h6M12 9v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                </svg>
+              </A>
+            </Show>
             <A
               href="/notificari"
               class={`icon-button notification-nav-button ${location.pathname === '/notificari' ? 'is-active' : ''}`}

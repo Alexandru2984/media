@@ -41,6 +41,7 @@ pub(crate) struct ModerationReportResponse {
     target_excerpt: Option<String>,
     reason: String,
     details: Option<String>,
+    resolution_note: Option<String>,
     status: String,
     assigned_to_me: bool,
     assigned_moderator_username: Option<String>,
@@ -260,7 +261,7 @@ pub async fn list_reports(
                 SUBSTRING_INDEX(report.target_key, ':', -1) AS target_id,
                 report.target_label_snapshot AS target_label,
                 report.target_excerpt_snapshot AS target_excerpt,
-                report.reason, report.details, report.status,
+                report.reason, report.details, report.resolution_note, report.status,
                 COALESCE(report.assigned_moderator_id = ?, 0) AS assigned_to_me,
                 assigned_moderator.username AS assigned_moderator_username,
                 report.created_at, report.updated_at, report.reviewed_at

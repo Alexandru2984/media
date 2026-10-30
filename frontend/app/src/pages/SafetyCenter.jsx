@@ -21,6 +21,13 @@ const reasonLabels = {
   other: 'Alt motiv',
 };
 const targetLabels = { user: 'Cont', post: 'Postare', comment: 'Comentariu' };
+const statusLabels = {
+  open: 'În așteptare',
+  reviewing: 'În analiză',
+  resolved: 'Rezolvată',
+  dismissed: 'Închisă',
+  withdrawn: 'Retrasă',
+};
 
 export default function SafetyCenter() {
   const auth = useAuth();
@@ -93,11 +100,17 @@ export default function SafetyCenter() {
     setError('');
     try {
       await api.withdrawReport(report.id);
-      setReports((current) => current.filter((item) => item.id !== report.id));
+      setReports((current) => current.map((item) => (
+        item.id === report.id
+          ? { ...item, status: 'withdrawn', updated_at: new Date().toISOString() }
+          : item
+      )));
     } catch (requestError) {
       console.error('Failed to withdraw report:', requestError);
       if (requestError.status === 404) {
         setReports((current) => current.filter((item) => item.id !== report.id));
+      } else if (requestError.status === 409) {
+        setError('Raportarea este deja în analiză sau a fost închisă și nu mai poate fi retrasă.');
       } else {
         setError('Raportarea nu a putut fi retrasă.');
       }
@@ -203,14 +216,16 @@ export default function SafetyCenter() {
                   <article class="surface safety-card safety-report-card">
                     <span class="safety-card-icon" aria-hidden="true">!</span>
                     <div class="safety-card-copy">
-                      <p class="safety-card-kicker">{targetLabels[report.target_type] || 'Conținut'} raportat</p>
+                      <p class="safety-card-kicker">{targetLabels[report.target_type] || 'Conținut'} raportat · <span class={`report-status report-status-${report.status}`}>{statusLabels[report.status] || report.status}</span></p>
                       <h2>{report.target_label || 'Element indisponibil'}</h2>
                       <p>{reasonLabels[report.reason] || 'Alt motiv'}<Show when={report.details}> · {report.details}</Show></p>
                       <time datetime={report.created_at}>{dateFormatter.format(new Date(report.created_at))}</time>
                     </div>
-                    <button type="button" class="btn btn-danger-ghost" onClick={() => withdrawReport(report)} disabled={Boolean(pendingAction())}>
-                      {pendingAction() === `report:${report.id}` ? 'Se retrage…' : 'Retrage'}
-                    </button>
+                    <Show when={report.status === 'open'}>
+                      <button type="button" class="btn btn-danger-ghost" onClick={() => withdrawReport(report)} disabled={Boolean(pendingAction())}>
+                        {pendingAction() === `report:${report.id}` ? 'Se retrage…' : 'Retrage'}
+                      </button>
+                    </Show>
                   </article>
                 )}</For>
               </div>

@@ -208,6 +208,36 @@ class ApiService {
     return this.request(`/reports/${encodeURIComponent(reportId)}`, { method: 'DELETE' });
   }
 
+  // Least-privilege moderation
+  async getModerationReports(status = 'open', limit = 20, offset = 0) {
+    return this.request(`/moderation/reports?status=${encodeURIComponent(status)}&limit=${limit}&offset=${offset}`);
+  }
+
+  async getModerationAudit(limit = 20, offset = 0) {
+    return this.request(`/moderation/audit?limit=${limit}&offset=${offset}`);
+  }
+
+  async claimModerationReport(reportId, password) {
+    return this.request(`/moderation/reports/${encodeURIComponent(reportId)}/claim`, {
+      method: 'PUT',
+      body: JSON.stringify({ password }),
+    });
+  }
+
+  async releaseModerationReport(reportId, password) {
+    return this.request(`/moderation/reports/${encodeURIComponent(reportId)}/release`, {
+      method: 'PUT',
+      body: JSON.stringify({ password }),
+    });
+  }
+
+  async decideModerationReport(reportId, password, decision, note) {
+    return this.request(`/moderation/reports/${encodeURIComponent(reportId)}/decision`, {
+      method: 'PUT',
+      body: JSON.stringify({ password, decision, note }),
+    });
+  }
+
   // Notifications
   async getNotifications(limit = 20, offset = 0) {
     return this.request(`/notifications?limit=${limit}&offset=${offset}`);

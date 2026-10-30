@@ -61,7 +61,7 @@ server {
 
     # Private application routes must not enter a search index. Serve the SPA
     # directly so the route keeps this response policy.
-    location ~ ^/(login|register|forgot-password|search|salvate|cereri|notificari|siguranta|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
+    location ~ ^/(login|register|forgot-password|search|salvate|cereri|notificari|siguranta|moderare|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
         try_files /index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;
@@ -205,6 +205,16 @@ server {
     location ~ ^/api/(reports(?:/[^/]+)?|hidden-posts|posts/[^/]+/hide)$ {
         limit_req zone=media_api burst=60 nodelay;
         limit_req zone=media_social_write burst=8 nodelay;
+        include snippets/media-api-proxy.conf;
+    }
+
+    # Moderator reads keep the ordinary API budget. Password-confirmed writes
+    # also consume a narrow step-up budget because Argon2 verification is
+    # deliberately expensive and the actions change privileged workflow state.
+    location ~ ^/api/moderation(?:/.*)?$ {
+        limit_req zone=media_api burst=60 nodelay;
+        limit_req zone=media_social_write burst=8 nodelay;
+        limit_req zone=media_step_up burst=3 nodelay;
         include snippets/media-api-proxy.conf;
     }
 

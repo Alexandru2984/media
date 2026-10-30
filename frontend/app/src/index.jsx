@@ -19,6 +19,7 @@ import Connections from './pages/Connections';
 import FollowRequests from './pages/FollowRequests';
 import Notifications from './pages/Notifications';
 import SafetyCenter from './pages/SafetyCenter';
+import Moderation from './pages/Moderation';
 import NotFound from './pages/NotFound';
 import './index.css';
 
@@ -38,6 +39,7 @@ render(
           <Route path="/cereri" component={FollowRequests} />
           <Route path="/notificari" component={Notifications} />
           <Route path="/siguranta" component={SafetyCenter} />
+          <Route path="/moderare" component={Moderation} />
           <Route path="/search" component={Search} />
           <Route path="/salvate" component={SavedPosts} />
           <Route path="/despre" component={About} />
