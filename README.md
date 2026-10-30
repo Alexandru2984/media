@@ -173,6 +173,10 @@ failed chunks or render errors. A live offline indicator and keyboard skip link
 cover every route. The production build also enforces entry-JavaScript,
 stylesheet, and total-JavaScript budgets; rejects source maps; and verifies every
 public page, canonical URL, sitemap entry, and global recovery marker.
+The shared HTTP transport applies a 15-second request budget (45 seconds for
+bounded image uploads), keeps browser-generated multipart boundaries intact,
+distinguishes timeout/cancellation/network failures without exposing internal
+details, and is covered by Node contract tests that run before every build.
 
 ## Git workflow
 

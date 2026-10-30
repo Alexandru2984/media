@@ -354,10 +354,13 @@ are deployed and used after each release. Privacy-redacted JSON request logs
 carry request IDs, methods, paths, status codes, and latency; query strings and
 bodies are excluded. Strict pagination budgets now reject malformed inputs and
 deep scans consistently, with a production Tunnel boundary canary and root-only
-binary rollback artifact. Metrics, alerts, retention policy, restore drills, and
-release automation remain open. SMTP authentication is currently rejected by
-Brevo with `535`; rotating and verifying that credential is an immediate P1
-operational task because verification and password-recovery delivery are down.
+binary rollback artifact. Browser requests now use one tested transport with
+bounded 15-second normal and 45-second upload timeouts, caller cancellation,
+generic network errors, and correct body-specific headers. Metrics, alerts,
+retention policy, restore drills, and release automation remain open. SMTP
+authentication is currently rejected by Brevo with `535`; rotating and verifying
+that credential is an immediate P1 operational task because verification and
+password-recovery delivery are down.
 
 - `/health/live`, `/health/ready`, and dependency-specific readiness checks.
 - Structured JSON logs with request IDs and privacy redaction; define and enforce

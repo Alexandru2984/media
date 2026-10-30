@@ -1,19 +1,6 @@
+import { requestJson, UPLOAD_REQUEST_TIMEOUT_MS } from './http';
+
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-
-async function apiError(response) {
-  let payload;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
-
-  const requestId = payload?.request_id || response.headers.get('x-request-id');
-  const error = new Error(payload?.title || `HTTP error! status: ${response.status}`);
-  error.status = response.status;
-  error.requestId = requestId;
-  return error;
-}
 
 class ApiService {
   constructor() {
@@ -22,22 +9,7 @@ class ApiService {
   }
 
   async request(endpoint, options = {}) {
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
-
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers,
-      credentials: 'same-origin',
-    });
-
-    if (!response.ok) {
-      throw await apiError(response);
-    }
-
-    return response.json();
+    return requestJson(`${API_URL}${endpoint}`, options);
   }
 
   // Auth
@@ -415,17 +387,11 @@ class ApiService {
     const formData = new FormData();
     formData.append('avatar', file);
 
-    const response = await fetch(`${API_URL}/users/me/avatar`, {
+    return requestJson(`${API_URL}/users/me/avatar`, {
       method: 'POST',
       body: formData, // Don't set Content-Type, browser will set it with boundary
-      credentials: 'same-origin',
+      timeoutMs: UPLOAD_REQUEST_TIMEOUT_MS,
     });
-
-    if (!response.ok) {
-      throw await apiError(response);
-    }
-
-    return response.json();
   }
 
   // Upload post image
@@ -433,17 +399,11 @@ class ApiService {
     const formData = new FormData();
     formData.append('image', file);
 
-    const response = await fetch(`${API_URL}/posts/upload-image`, {
+    return requestJson(`${API_URL}/posts/upload-image`, {
       method: 'POST',
       body: formData,
-      credentials: 'same-origin',
+      timeoutMs: UPLOAD_REQUEST_TIMEOUT_MS,
     });
-
-    if (!response.ok) {
-      throw await apiError(response);
-    }
-
-    return response.json();
   }
 }
 

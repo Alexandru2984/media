@@ -44,9 +44,16 @@ const stylesheetSize = (await stat(resolve(assetsRoot, stylesheetName))).size;
 const totalJavaScriptSize = javaScriptSizes.reduce((total, size) => total + size, 0);
 const entryJavaScript = await readFile(resolve(assetsRoot, entryName), 'utf8');
 
-for (const runtimeMarker of ['skip-link', 'connection-banner', 'route-error']) {
+for (const runtimeMarker of [
+  'skip-link',
+  'connection-banner',
+  'route-error',
+  'REQUEST_TIMEOUT',
+  'NETWORK_ERROR',
+  'INVALID_RESPONSE',
+]) {
   if (!entryJavaScript.includes(runtimeMarker)) {
-    throw new Error(`Missing global recovery feature in entry chunk: ${runtimeMarker}`);
+    throw new Error(`Missing required runtime marker in entry chunk: ${runtimeMarker}`);
   }
 }
 
