@@ -42,9 +42,9 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 ## Phase 1 — Recover a maintainable application
 
-Progress on 2026-10-29: the sanitized legacy history, backend and frontend
+Progress on 2026-10-30: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 42 API
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 44 API
 binary unit tests plus 5 seed-binary tests, embedded versioned MySQL migrations,
 a validated canary flow, and deployed
 rollback artifacts. The frontend has
@@ -126,7 +126,9 @@ relationship data. Central policy tests and more granular audiences remain open.
 
 - Central authorization policy for every object and action.
 - IDOR/BOLA tests for profiles, posts, comments, messages, uploads, and admin APIs.
-- Roles and scopes for user, moderator, support, and administrator.
+- Offline-granted `user`, `moderator`, and `admin` roles, database-enforced role
+  audit, per-request authorization, and password step-up for moderator writes. ✅
+  Add support-specific scopes, dual-control grants, and periodic access review.
 - Transactions for likes/comments/counters and idempotency keys for writes.
 - Input schemas with Unicode normalization, length caps, safe rendering, and
   consistent RFC 9457-style errors.
@@ -209,7 +211,7 @@ open alongside toasts, dialogs, and accessibility CI.
 
 ## Phase 4 — Core social product features
 
-**Progress (2026-10-29):** private saved posts are deployed with an authenticated
+**Progress (2026-10-30):** private saved posts are deployed with an authenticated
 paginated API, per-session `is_saved` state across feed/profile/search results,
 transactional toggles, foreign-key cleanup, and a dedicated responsive page.
 The collection is explicitly `noindex`, is not exposed to other accounts, and
@@ -222,8 +224,13 @@ inbox is also implemented for follow requests/acceptances, new followers, likes,
 and comments, with grouping, read state, a navbar badge, block cleanup, and
 bounded retention. Private report intake for accounts, posts, and comments,
 discreet account mute, personal post hide, and a responsive safety center are
-also deployed. Notification preferences/digests, moderator workflows, richer
-publishing, and multiple named collections remain open.
+also deployed. A responsive, non-indexable moderation workspace now provides
+role-gated queues, evidence snapshots, assignment, release, resolution/dismissal,
+internal notes, password step-up, reporter pseudonymity, action audit, and an
+administrator-only role-change history. Role grants are offline-only and
+resolving a report deliberately performs no automatic enforcement. Notification
+preferences/digests, appeals, user notices, richer publishing, and multiple named
+collections remain open.
 
 ### Profiles and relationships
 
@@ -266,11 +273,15 @@ publishing, and multiple named collections remain open.
 
 - Private report intake, an allowlisted reason taxonomy, duplicate prevention,
   rolling submission limits, owner-only withdrawal, account mute, and personal
-  post hide. ✅ Add a least-privilege moderation queue, evidence snapshots,
-  moderator notes/actions, appeals, repeat-abuse signals, and transparent user
-  notices.
+  post hide. ✅
+- Least-privilege moderation queues, evidence snapshots, assignment ownership,
+  moderator notes, step-up authentication, durable action/role audit, and
+  self-moderation prevention. ✅ Add appeals, repeat-abuse signals, transparent
+  user notices, and separately authorized enforcement actions.
 - Spam controls, link/domain reputation, new-account limits, and content quotas.
-- Admin dashboard with least privilege, step-up authentication, and audit logs.
+- Moderation workspace with least privilege, step-up authentication, and audit
+  logs. ✅ Add operational metrics/alerts and a broader admin surface only after
+  defining narrower scopes and dual-control high-risk actions.
 
 ## Phase 5 — SEO and shareability
 
@@ -320,7 +331,7 @@ content.
 
 ## Phase 6 — Reliability, observability, and operations
 
-**Progress (2026-10-29):** public liveness and dependency-aware readiness routes
+**Progress (2026-10-30):** public liveness and dependency-aware readiness routes
 are deployed and used after each release. Privacy-redacted JSON request logs
 carry request IDs, methods, paths, status codes, and latency; query strings and
 bodies are excluded. Metrics, alerts, retention policy, restore drills, and

@@ -23,6 +23,12 @@ Members can also silence accounts without notifying them, hide individual posts
 from personal discovery surfaces, and submit private reports for accounts,
 posts, or comments. A responsive, non-indexable safety center lets each member
 review or withdraw open reports and reverse mute/hide choices.
+Least-privilege moderators can triage those reports in a separate responsive,
+non-indexable workspace. Grants remain offline-only; report mutations require a
+fresh password confirmation, assignments and decisions are transactional, and
+both moderation actions and role changes have durable audit histories. Reporter
+identity and internal resolution notes are excluded from responses where they
+are not required.
 
 > [!IMPORTANT]
 > The application source and its original history were recovered from the
@@ -53,7 +59,7 @@ Browser
 - Edge and origin: Cloudflare Tunnel, Nginx, and a systemd-managed API process
 
 > [!WARNING]
-> The 2026-10-29 production canary confirmed that the configured SMTP provider
+> The 2026-10-30 production canary reconfirmed that the configured SMTP provider
 > currently rejects authentication with `535`. Verification and recovery email
 > delivery remain unavailable until the Brevo credential is rotated and tested.
 
@@ -96,10 +102,11 @@ The next project goals are:
    quota, ownership, and abandoned-upload lifecycle.
 4. Add metrics, alerts, retention policy, and restore drills around the deployed
    health endpoints and privacy-redacted JSON request logs.
-5. Add a least-privilege moderator workflow with evidence retention, appeals,
-   auditable actions, and step-up authentication on top of the deployed private
-   report intake; continue with restrict controls, notification preferences,
-   cursor pagination, richer discovery, and granular audiences.
+5. Extend the deployed least-privilege moderation workflow with appeals,
+   transparent notices, approved retention/legal-hold policy, workload alerts,
+   repeat-abuse signals, and carefully separated enforcement actions; continue
+   with restrict controls, notification preferences, cursor pagination, richer
+   discovery, and granular audiences.
 6. Complete the privacy program with a data inventory, retention schedule,
    asynchronous large-account exports, DPIA screening, processor records, and
    privacy/terms/help content.

@@ -2,16 +2,19 @@
 
 **System:** Media (`media.micutu.com`)
 
-**Audit date:** 2026-10-29
+**Audit date:** 2026-10-30
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
 **Verdict:** 🟠 Core containment, revocable sessions, versioned migrations,
 bounded image re-encoding, user-facing export/deletion controls, private-account
 audiences, block-aware social relationships, bounded in-app notifications, and
-bounded private trust-and-safety controls are deployed; SMTP delivery is
-currently broken, while privileged moderation, broader authorization, privacy
-governance, alerting, and recovery work remain
+bounded private trust-and-safety controls are deployed. Least-privilege report
+moderation is also deployed with offline grants, password step-up, reporter
+pseudonymity, self-moderation prevention, transactional transitions, and durable
+action/role audit. SMTP delivery is currently broken, while broader
+authorization, appeals/enforcement policy, privacy governance, alerting, and
+recovery work remain
 
 ## Scope and limitations
 
@@ -34,12 +37,15 @@ lists, following-feed isolation, private search/saved filtering, protected media
 bidirectional block filtering, blocked-message rejection, notification IDOR,
 deduplication, read state, 500-row retention, source-action cleanup, account
 mute, post hide, reporter-only access, duplicate-report rejection, and export v5
-against canary processes. Both a
+against canary processes. The moderation release additionally exercised regular
+user rejection, offline role grants, pseudonymous queue reads, password-confirmed
+claim, administrator override, reporter-safe terminal state, action audit,
+administrator-only role audit, and export v6. Both a
 separate-port production-database canary and a Cloudflare Tunnel canary removed
 their disposable accounts; the database returned to zero users, sessions, posts,
 relationships, pending requests, blocks, mutes, hidden posts, reports, report
-rate events, messages, saved rows, managed uploads, queued deletions, and
-notifications afterward. A staging environment remains
+rate events, moderation action/role events, messages, saved rows, managed
+uploads, queued deletions, and notifications afterward. A staging environment remains
 absent, so IDOR for every object and future privilege boundary is not yet broadly
 covered end to end. No evidence of compromise was found, but absence of evidence
 is not evidence of absence.
@@ -93,9 +99,14 @@ across discovery surfaces; muting also suppresses notification creation. Private
 report intake uses an allowlisted target/reason shape, reporter-only reads and
 withdrawals, one open report per reporter/target, a 100-record open cap, and a
 separate seven-day event ledger that enforces 20 submissions per rolling day
-even if reports are withdrawn. No privileged moderation endpoint exists yet.
-Centralized authorization tests, privacy governance, metrics/alerting, and tested
-recovery remain open. One-time links now
+even if reports are withdrawn. Privileged moderation now uses explicit
+`moderator`/`admin` roles, offline-only grants, database role-change audit,
+per-request role checks, password-confirmed writes, row locks, assignment rules,
+evidence snapshots, and transactional action audit. Reporter identity is omitted
+from moderator DTOs, self-moderation remains forbidden after target deletion,
+and terminal report decisions do not silently delete or suspend anything.
+Appeals, user notices, enforcement actions, centralized authorization tests,
+privacy governance, metrics/alerting, and tested recovery remain open. One-time links now
 keep secrets in URL fragments, scrub them from browser history, and exchange them
 through POST bodies. API requests emit redacted JSON events with request IDs,
 status, path, and latency.
@@ -505,12 +516,18 @@ Mute removes an actor from feeds, people/post search, saved results, comments,
 and both stored/future notifications, while explicit profile access remains
 available by design. Personal hide removes a post from feed/profile/search/saved
 lists and is reversible from a private safety center. Reports store target
-metadata and reporter-supplied context without copying target content. All
-report list/delete queries scope by reporter; a cross-account deletion canary
+labels plus bounded evidence excerpts and reporter-supplied context. All reporter
+list/withdraw queries scope by reporter; a cross-account withdrawal canary
 returned `404`, duplicate open reports returned `409`, and FK cascades returned
-the safety tables to zero rows. A moderation queue, immutable evidence snapshots,
-appeals, moderator roles, step-up authentication, and action audit logs remain
-explicitly out of scope for this release.
+the safety tables to zero rows. The deployed moderation queue uses offline-granted
+roles, current-role checks on every request, password step-up for every mutation,
+row-locked state transitions, assignment ownership, administrator override, and
+self-moderation checks against both reporter and snapshotted target actor. Queue
+DTOs never include reporter identity. Resolution notes stay internal, while the
+reporter sees only lifecycle state. Action events commit with transitions, and a
+database trigger records every role change even when it occurs outside the API.
+Role events survive account deletion for accountability; retention approval and
+legal/privacy review remain open.
 
 **Remediation:** add authorization matrix tests, transactions, nonnegative counter
 guards or derived counts, content length constraints, normalized email/username
@@ -563,14 +580,39 @@ export-v4 coverage, isolated and Tunnel canaries, rollback artifacts, and zero
 residual application rows. Automated notification-velocity/cap alerts and
 granular preferences remain required.
 
-**Trust-and-safety review verdict:** mitigate then ship for private user controls,
-not for moderation. Release gates were reporter-scoped authorization, strict
-target/reason validation, duplicate prevention, independent rolling anti-abuse
-events, hard per-account caps, consistent mute/hide filtering, export-v5 and
+**Trust-and-safety review verdict:** mitigate then ship for private user controls
+and non-destructive moderation triage. Release gates were reporter-scoped
+authorization, strict target/reason validation, independent rolling anti-abuse
+events, offline-granted roles, per-request authorization, password step-up,
+row-locked transitions, reporter pseudonymity, evidence snapshots,
+self-moderation prevention, database role audit, action audit, export-v6 and
 deletion coverage, edge write limits, isolated/Tunnel canaries, rollback
-artifacts, and zero residual application rows. A moderator surface remains
-blocked on real roles/scopes, step-up authentication, evidence retention,
-tamper-resistant action logs, and an appeals policy.
+artifacts, and zero residual application rows. Automated enforcement, appeals,
+transparent notices, dual-control grants, approved retention/legal-hold policy,
+and operational alerts remain outside this verdict.
+
+### Moderation production checkpoint
+
+The 2026-10-30 release applied migration `20261029007000`, deployed backend
+SHA-256 `f80be03717a37f89aff0ee69171dc7c1ad82ee83252cdf845eee938a71a74b60`,
+and activated frontend release `20261030T000952Z-b7bb7e7`. The public
+Cloudflare Tunnel canary returned expected `403/200` role boundaries, excluded
+reporter identity and internal notes, recorded claim/decision and role events,
+and left users, sessions, tokens, reports, submission events, and both audit
+tables at zero after scoped cleanup. Nginx produced no recent `5xx`, the service
+retained zero unexpected restarts, and public liveness/readiness returned `200`.
+
+Root-only rollback artifacts are
+`media-binary-pre-moderation-20261030T000952Z-b7bb7e7`,
+`media-nginx-pre-moderation-20261030T000952Z-b7bb7e7/`, and
+`media-db-pre-moderation-20261030T000952Z-b7bb7e7.sql`. The old binary is not a
+safe long-term target after real terminal moderation data exists; prefer a
+forward fix unless a documented restore/data-loss decision is made. Strict
+Clippy, 44 backend tests plus five seed tests, a release build, a 265-crate
+RustSec scan with no findings, and npm build/audit with zero findings passed.
+The host has no browser, so this screen was build/API/route tested but did not
+receive a new visual-regression pass on the VPS. Brevo SMTP `535` remains an
+independent open P1 incident.
 
 ### Blast radius
 

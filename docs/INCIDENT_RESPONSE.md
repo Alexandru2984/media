@@ -13,6 +13,8 @@ Declare an incident when any of these occurs:
 - a sustained rise in upload `5xx`, latency, memory, CPU, or rejected files;
 - sustained notification writes, repeated cap pruning, or notifications visible
   between accounts after either account blocks the other;
+- an unexpected moderator/admin grant, bulk moderation access, reporter identity
+  exposure, self-moderation, or a report transition without its audit event;
 - an uploaded file is served with an unexpected type or retains private metadata;
 - evidence suggests unauthorized access, data export, secret exposure, or code
   execution in the API process.
@@ -97,6 +99,38 @@ spam, unexpected growth, cross-account access, or block leakage is suspected:
 5. Recovery requires recipient-only mutation checks, unlike/unfollow/comment
    cleanup, block cleanup in both directions, cap enforcement, and a zero-residue
    disposable-account canary through the public Tunnel path.
+
+## Moderation privilege or privacy containment
+
+Treat an unexplained role change, missing transition audit, reporter identity
+leak, or unauthorized moderation action as at least SEV-2 and as SEV-1 when
+personal-data exposure or active account takeover is credible.
+
+1. Preserve the exact role/action event IDs, report references, request IDs,
+   timestamps, release hashes, and relevant database actor. Do not copy report
+   bodies, reporter identity, passwords, cookies, or unrelated account data into
+   the incident log.
+2. Revoke the affected role and active sessions using the emergency procedure in
+   `MODERATION_OPERATIONS.md`. Reopen that account's assigned reports and append
+   release events in the same transaction. Stop the API if role integrity or
+   queue confidentiality cannot be trusted.
+3. Compare `users.role`, `moderation_role_events`, `content_reports`, and
+   `moderation_audit_events`. Every claim, release, resolution, or dismissal must
+   have the corresponding state transition and event; every role update must
+   have a trigger-produced role event.
+4. If exposure occurred, determine whether reporter identity, evidence excerpts,
+   internal notes, or role history were accessed. Start GDPR assessment
+   immediately; the possible 72-hour supervisory-notification window runs from
+   organizational awareness, not from completion of the investigation.
+5. Recover with the least-privilege matrix: ordinary user `403`, moderator sees
+   no reporter identity, wrong step-up secret `401`, assignment ownership holds,
+   admin override is audited, reporter cannot see internal notes, and role audit
+   is admin-only. Use disposable accounts and remove every canary row afterward.
+
+Binary rollback alone does not reverse the additive schema or safely interpret
+new terminal report states. After real moderation data exists, prefer a forward
+fix. Restore the pre-release database only after an explicit data-loss decision,
+preserved evidence, and incident-owner approval.
 
 ## Scope, recovery, and closure
 
@@ -300,3 +334,58 @@ audiences, and a restore drill remain required.
 **Verdict:** ship with monitoring. Automated abuse/privacy alerts, notification
 preferences, a multi-person tabletop, and a tested restore remain follow-ups;
 the independent SMTP P1 is not accepted by this verdict.
+
+## CISO review record — least-privilege moderation
+
+**Date:** 2026-10-30
+
+- Top threats: unauthorized elevation through a role grant (high/high), reporter
+  identity or internal-note disclosure (medium/high), and tampered or repudiated
+  report transitions (medium/high).
+- Blast radius: a compromised moderator can inspect the bounded report queue and
+  evidence available to that role but cannot grant roles or trigger content/user
+  enforcement. An administrator can override assignments and inspect role
+  history. Full API/database compromise retains the broader all-application-data
+  and credential blast radius. Production returned to zero persistent users at
+  the checkpoint, so a defensible FAIR ALE still cannot be calculated.
+- Controls: no HTTP role grant, offline exact-UUID grants, a database role-change
+  trigger, current-role checks on every request, password step-up and row locks
+  for mutations, assignment ownership, self-moderation prevention, reporter-safe
+  DTOs, evidence snapshots, transactional action events, admin-only role audit,
+  and no automatic enforcement on resolution.
+- Detection: privacy-redacted request logs and both audit tables exist; target
+  MTTD is 15 minutes for unexpected grants, bulk queue access, repeated failed
+  step-up, or stuck reports. Automated alerts do not yet exist, so current MTTD
+  remains unknown and manual review is required.
+- Response: the moderation containment section and
+  `MODERATION_OPERATIONS.md` cover emergency revocation, session invalidation,
+  report release, evidence preservation, verification, and forward recovery. A
+  multi-person tabletop and database restore drill remain open.
+- Regulatory: reports, evidence excerpts, role events, and internal notes can be
+  personal data. Suspected exposure requires immediate GDPR assessment and may
+  require supervisory-authority notification within 72 hours after awareness.
+  Retention/legal-hold policy and appeal/user-notice design are not yet approved.
+- Vendors/supply chain: no dependency, vendor, processor, or externally hosted
+  moderation service was added. Existing VPS, Cloudflare, MariaDB, GitHub,
+  certificate-provider, and broken Brevo SMTP governance remains in scope.
+- Validation: strict Clippy, 44 backend tests plus five seed tests, release build,
+  a no-finding 265-crate RustSec scan, npm build/audit with zero findings, clean
+  fresh migration, role-trigger checks, isolated authorization/privacy matrices,
+  and a public Cloudflare Tunnel canary passed. The canary verified ordinary-user
+  rejection, reporter pseudonymity, claim, admin override, reporter-safe state,
+  action audit, and role audit; all canary rows returned to zero. The host has no
+  browser, so a new visual-regression pass was not performed there.
+- Rollback: root-only artifacts are
+  `media-binary-pre-moderation-20261030T000952Z-b7bb7e7`,
+  `media-nginx-pre-moderation-20261030T000952Z-b7bb7e7/`, and
+  `media-db-pre-moderation-20261030T000952Z-b7bb7e7.sql`. Frontend release
+  `20261030T000952Z-b7bb7e7` is active. Prefer a forward fix after real terminal
+  report data exists.
+- Open incident: Brevo again returned permanent SMTP `535` during this canary.
+  Verification and recovery delivery remain unavailable.
+
+**Verdict:** mitigate then ship for non-destructive moderation triage. Appeals,
+transparent notices, dual-control grants, approved retention/legal holds,
+automated alerting, separately authorized enforcement, a visual browser pass,
+tabletop testing, and restore testing remain follow-ups. SMTP P1 remains outside
+and unaccepted by this verdict.
