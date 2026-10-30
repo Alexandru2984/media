@@ -507,6 +507,12 @@ malformed route parameter or compromised response can no longer introduce a
 slash, query parameter, or fragment into the intended navigation target. URL
 contract tests run before every production build.
 
+Browser storage access is isolated behind fail-safe helpers. A browser policy,
+privacy mode, unavailable storage implementation, or quota exception can no
+longer crash module initialization or theme mounting before the global recovery
+boundary exists. Only `light` and `dark` are accepted from persistence, and the
+legacy cleanup removes only the obsolete `token` key.
+
 Post like/comment counters remain denormalized, and database-level text length
 constraints are not yet encoded in versioned migrations. Ownership checks exist
 in handlers but still need a centralized authorization matrix and end-to-end IDOR

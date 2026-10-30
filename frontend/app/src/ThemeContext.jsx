@@ -1,30 +1,28 @@
 import { createContext, useContext, createSignal, onMount } from 'solid-js';
+import { resolveInitialTheme, storeTheme } from './storage';
 
 const ThemeContext = createContext();
 
 export function ThemeProvider(props) {
   const [theme, setTheme] = createSignal('light');
 
+  const applyTheme = (nextTheme) => {
+    const dark = nextTheme === 'dark';
+    document.documentElement.classList.toggle('dark', dark);
+    document.body.classList.toggle('dark', dark);
+  };
+
   onMount(() => {
-    // Check localStorage or system preference
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
-      document.body.classList.toggle('dark', savedTheme === 'dark');
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
-      document.documentElement.classList.add('dark');
-      document.body.classList.add('dark');
-    }
+    const initialTheme = resolveInitialTheme(window);
+    setTheme(initialTheme);
+    applyTheme(initialTheme);
   });
 
   const toggleTheme = () => {
     const newTheme = theme() === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-    document.body.classList.toggle('dark', newTheme === 'dark');
+    storeTheme(newTheme, window);
+    applyTheme(newTheme);
   };
 
   return (

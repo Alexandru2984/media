@@ -179,6 +179,9 @@ distinguishes timeout/cancellation/network failures without exposing internal
 details. Dynamic API segments, query values, and profile links use shared URL
 encoders so untrusted values cannot create a second path or parameter. Node
 contract tests cover both layers and run before every build.
+Theme persistence and removal of obsolete browser-readable tokens are also
+fail-safe: blocked or unavailable Web Storage cannot crash application startup,
+and stored theme values are allowlisted before they reach the document.
 
 ## Git workflow
 

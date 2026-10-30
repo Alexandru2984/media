@@ -1,4 +1,5 @@
 import { requestJson, UPLOAD_REQUEST_TIMEOUT_MS } from './http';
+import { removeLegacyToken } from './storage';
 import { encodePathSegment, withQuery } from './utils/urls';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -6,7 +7,7 @@ const API_URL = import.meta.env.VITE_API_URL || '/api';
 class ApiService {
   constructor() {
     // Remove browser-readable credentials left by releases predating HttpOnly sessions.
-    localStorage.removeItem('token');
+    removeLegacyToken();
   }
 
   async request(endpoint, options = {}) {

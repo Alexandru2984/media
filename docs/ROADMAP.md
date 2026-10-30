@@ -185,7 +185,9 @@ headless browser, so automated visual regression for the new screens remains
 open alongside toasts, dialogs, and accessibility CI. A global error boundary
 now replaces blank screens after lazy-chunk or render failures with an
 auto-focused recovery view, while every route exposes a keyboard skip link and
-a responsive live offline indicator.
+a responsive live offline indicator. Theme persistence and legacy-token cleanup
+now tolerate unavailable, policy-blocked, or quota-failing Web Storage instead
+of aborting application bootstrap.
 
 ### Design system
 
