@@ -494,6 +494,13 @@ comment, and message N+1 queries were replaced with joins, and composite comment
 and conversation indexes were deployed. Authenticated concurrency and query-plan
 regression tests remain open.
 
+All list handlers now share a strict pagination parser. Malformed, fractional,
+negative, zero-limit, over-limit, and over-offset values return a generic `400`
+instead of being silently coerced. General feed/profile offsets are capped at
+10,000 rather than 1,000,000; notifications, follow requests, reports, mutes,
+and hidden posts use their smaller storage budgets. This reduces deep-scan DoS
+exposure while cursor pagination remains the long-term replacement.
+
 Post like/comment counters remain denormalized, and database-level text length
 constraints are not yet encoded in versioned migrations. Ownership checks exist
 in handlers but still need a centralized authorization matrix and end-to-end IDOR

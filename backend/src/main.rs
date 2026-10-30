@@ -6,6 +6,7 @@ mod health;
 mod models;
 mod moderation;
 mod notifications;
+mod pagination;
 mod passwords;
 mod routes;
 mod safety;

@@ -44,7 +44,7 @@ drills, owned alert routing, and scripted release/rollback remain open.
 
 Progress on 2026-10-30: the sanitized legacy history, backend and frontend
 source, manifests, lockfiles, and recovered migrations are present. The backend
-has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 51 API
+has a locked SQLx 0.9 build, zero known RustSec findings, strict linting, 55 API
 binary unit tests plus 5 seed-binary tests, embedded versioned MySQL migrations,
 a validated canary flow, and deployed
 rollback artifacts. The frontend has
@@ -104,7 +104,8 @@ and protected against attacker-sized stored parameters.
 
 **Progress (2026-10-29):** user response DTOs exclude password hashes, content
 and identity inputs have server-side limits, image paths are owner-bound,
-like/comment counters are transactional and nonnegative, pagination is bounded,
+like/comment counters are transactional and nonnegative, pagination is bounded
+and strictly validated through one shared parser,
 and major N+1 query paths were replaced with indexed joins. A password-confirmed
 JSON export now covers profile data, content, interactions, messages, session
 metadata, security events, pending-action metadata, and upload metadata without

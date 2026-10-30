@@ -10,7 +10,10 @@ use sqlx::{query, query_as, query_scalar, MySqlPool};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::handlers::get_current_user;
+use crate::{
+    handlers::get_current_user,
+    pagination::{bounded_pagination, MAXIMUM_PAGE_SIZE},
+};
 
 const MAXIMUM_MUTED_USERS: i64 = 5_000;
 const MAXIMUM_HIDDEN_POSTS: i64 = 5_000;
@@ -85,20 +88,6 @@ struct ReportTarget {
     audience_author_id: Option<String>,
     label: String,
     excerpt: Option<String>,
-}
-
-fn pagination(params: &HashMap<String, String>, default_limit: i64, max_offset: i64) -> (i64, i64) {
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(default_limit)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, max_offset);
-    (limit, offset)
 }
 
 fn report_reason_is_valid(reason: &str) -> bool {
@@ -268,7 +257,7 @@ pub async fn list_muted_users(
     headers: HeaderMap,
 ) -> Result<Json<Vec<MutedUserResponse>>, StatusCode> {
     let user_id = get_current_user(&pool, &headers).await?;
-    let (limit, offset) = pagination(&params, 20, MAXIMUM_MUTED_USERS);
+    let (limit, offset) = bounded_pagination(&params, 20, MAXIMUM_PAGE_SIZE, MAXIMUM_MUTED_USERS)?;
     let users = query_as::<_, MutedUserResponse>(
         "SELECT u.id, u.username, u.bio, u.avatar_url, relationship.created_at AS muted_at
          FROM user_mutes relationship
@@ -382,7 +371,7 @@ pub async fn list_hidden_posts(
     headers: HeaderMap,
 ) -> Result<Json<Vec<HiddenPostResponse>>, StatusCode> {
     let user_id = get_current_user(&pool, &headers).await?;
-    let (limit, offset) = pagination(&params, 20, MAXIMUM_HIDDEN_POSTS);
+    let (limit, offset) = bounded_pagination(&params, 20, MAXIMUM_PAGE_SIZE, MAXIMUM_HIDDEN_POSTS)?;
     let rows = query_as::<_, HiddenPostRow>(
         "SELECT hidden.post_id, hidden.created_at AS hidden_at,
                 NOT EXISTS(
@@ -664,7 +653,8 @@ pub async fn list_reports(
     headers: HeaderMap,
 ) -> Result<Json<Vec<ReportResponse>>, StatusCode> {
     let reporter_id = get_current_user(&pool, &headers).await?;
-    let (limit, offset) = pagination(&params, 20, MAXIMUM_STORED_REPORTS);
+    let (limit, offset) =
+        bounded_pagination(&params, 20, MAXIMUM_PAGE_SIZE, MAXIMUM_STORED_REPORTS)?;
     let reports = query_as::<_, ReportResponse>(
         "SELECT report.id, report.target_type,
                 SUBSTRING_INDEX(report.target_key, ':', -1) AS target_id,

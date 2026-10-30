@@ -398,3 +398,45 @@ transparent notices, dual-control grants, approved retention/legal holds,
 automated alerting, separately authorized enforcement, a visual browser pass,
 tabletop testing, and restore testing remain follow-ups. SMTP P1 remains outside
 and unaccepted by this verdict.
+
+## CISO review record — strict bounded pagination
+
+**Date:** 2026-10-30
+
+- Top threats: availability loss from deliberately deep database scans
+  (medium/high), inconsistent coercion of malformed query values
+  (medium/medium), and a future authorization bypass hidden by divergent list
+  implementations (low/high).
+- Blast radius: repeated expensive scans can degrade the database-backed API for
+  every user. The release checkpoint has no persistent production users, but
+  user-count, revenue, recovery-cost, and loss-frequency inputs are unavailable,
+  so a defensible FAIR annualized-loss estimate cannot be calculated.
+- Controls: one fail-closed parser now rejects malformed, fractional, negative,
+  zero-limit, over-limit, and collection-over-budget values. The general offset
+  ceiling falls from 1,000,000 to 10,000; smaller collections retain lower caps.
+  Authentication and ownership checks still run before pagination on protected
+  resources.
+- Detection: privacy-redacted request logs retain route, status, latency, and
+  request ID without query values. Target MTTD is five minutes for sustained
+  `400` shifts or database latency, but no owned automatic alert exists, so
+  current automated MTTD remains unknown.
+- Response: the main runbook provides exact-route containment, evidence capture,
+  binary rollback, readiness checks, and credential-independent public canaries.
+  A multi-person tabletop and a database restore exercise remain open.
+- Regulatory: an availability event alone does not automatically establish a
+  reportable breach. Any incident affecting the confidentiality, integrity, or
+  availability of personal data starts immediate GDPR assessment and may trigger
+  the 72-hour supervisory-authority window after awareness.
+- Vendors/supply chain: no dependency, secret, processor, vendor, or external
+  service was added. Existing Cloudflare, VPS, MariaDB, and logging governance
+  remains in scope.
+- Validation: 55 backend tests plus five seed-binary tests, strict Clippy,
+  release compilation, and an isolated production-database candidate passed.
+  The candidate accepted exact boundaries, rejected seven malformed/over-budget
+  cases with generic responses, omitted query strings from logs, and was stopped
+  before deployment.
+
+**Verdict:** mitigate then ship. The shared parser, collection-specific budgets,
+generic errors, candidate matrix, health gates, root-only rollback binary, and
+public Tunnel canary are release requirements. Cursor pagination, database
+latency metrics, owned alerts, a tabletop, and restore testing remain follow-ups.

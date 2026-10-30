@@ -12,12 +12,13 @@ use uuid::Uuid;
 
 use crate::{
     handlers::get_current_user,
+    pagination::{bounded_pagination, MAXIMUM_PAGE_SIZE},
     passwords::verify_password,
     validation::{bounded_text_is_valid, password_is_safe_to_verify},
 };
 
 const MAXIMUM_RESOLUTION_NOTE_CHARACTERS: usize = 1_000;
-const MAXIMUM_QUEUE_OFFSET: i64 = 100_000;
+const MAXIMUM_QUEUE_OFFSET: i64 = 10_000;
 
 #[derive(Clone)]
 struct ModeratorIdentity {
@@ -101,20 +102,6 @@ fn queue_status_is_valid(status: &str) -> bool {
 
 fn decision_is_valid(decision: &str) -> bool {
     matches!(decision, "resolved" | "dismissed")
-}
-
-fn pagination(params: &HashMap<String, String>) -> (i64, i64) {
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(20)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, MAXIMUM_QUEUE_OFFSET);
-    (limit, offset)
 }
 
 async fn require_moderator(
@@ -265,7 +252,7 @@ pub async fn list_reports(
     if !queue_status_is_valid(status) {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let (limit, offset) = pagination(&params);
+    let (limit, offset) = bounded_pagination(&params, 20, MAXIMUM_PAGE_SIZE, MAXIMUM_QUEUE_OFFSET)?;
     let reports = query_as::<_, ModerationReportResponse>(
         "SELECT report.id, report.target_type,
                 SUBSTRING_INDEX(report.target_key, ':', -1) AS target_id,
@@ -309,7 +296,7 @@ pub async fn list_audit_events(
     headers: HeaderMap,
 ) -> Result<Json<Vec<ModerationAuditResponse>>, StatusCode> {
     let moderator = require_moderator(&pool, &headers).await?;
-    let (limit, offset) = pagination(&params);
+    let (limit, offset) = bounded_pagination(&params, 20, MAXIMUM_PAGE_SIZE, MAXIMUM_QUEUE_OFFSET)?;
     let events = query_as::<_, ModerationAuditResponse>(
         "SELECT event.id, event.report_reference, actor.username AS moderator_username,
                 event.action, event.previous_status, event.new_status, event.created_at
@@ -341,7 +328,7 @@ pub async fn list_role_audit_events(
     if moderator.role != "admin" {
         return Err(StatusCode::FORBIDDEN);
     }
-    let (limit, offset) = pagination(&params);
+    let (limit, offset) = bounded_pagination(&params, 20, MAXIMUM_PAGE_SIZE, MAXIMUM_QUEUE_OFFSET)?;
     let events = query_as::<_, ModerationRoleAuditResponse>(
         "SELECT id, user_reference, username_snapshot, previous_role, new_role, created_at
          FROM moderation_role_events

@@ -18,6 +18,7 @@ use crate::{
     email::EmailService,
     models::*,
     notifications::{delete_notification_event, upsert_notification, NotificationKind},
+    pagination::{bounded_pagination, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET},
     passwords::{hash_password, spend_password_work, verify_password},
     security_events::{
         recent_security_events, record_security_event, SecurityEventKind,
@@ -1357,16 +1358,12 @@ pub async fn get_follow_requests(
     headers: HeaderMap,
 ) -> Result<Json<Vec<FollowRequestProfile>>, StatusCode> {
     let user_id = get_current_user(&pool, &headers).await?;
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(20)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, 1_000_000);
+    let (limit, offset) = bounded_pagination(
+        &params,
+        20,
+        MAXIMUM_PAGE_SIZE,
+        MAXIMUM_PENDING_FOLLOW_REQUESTS_PER_ACCOUNT,
+    )?;
 
     let requests = query_as::<_, FollowRequestProfile>(
         "SELECT u.id, u.username, u.bio, u.avatar_url,
@@ -1699,16 +1696,8 @@ pub async fn get_followers(
     if !access.can_view(target_user_id == current_user_id) {
         return Err(StatusCode::FORBIDDEN);
     }
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(20)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, 1_000_000);
+    let (limit, offset) =
+        bounded_pagination(&params, 20, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let users = query_as::<_, ConnectionProfile>(
         "SELECT u.id, u.username, u.bio, u.avatar_url,
@@ -1770,16 +1759,8 @@ pub async fn get_following(
     if !access.can_view(target_user_id == current_user_id) {
         return Err(StatusCode::FORBIDDEN);
     }
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(20)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, 1_000_000);
+    let (limit, offset) =
+        bounded_pagination(&params, 20, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let users = query_as::<_, ConnectionProfile>(
         "SELECT u.id, u.username, u.bio, u.avatar_url,
@@ -2393,16 +2374,8 @@ pub async fn get_posts(
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
     let current_user_id = get_current_user(&pool, &headers).await.ok();
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(10)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, 1_000_000);
+    let (limit, offset) =
+        bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
         "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
@@ -2472,16 +2445,8 @@ pub async fn get_following_feed(
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
     let current_user_id = get_current_user(&pool, &headers).await?;
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(10)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, 1_000_000);
+    let (limit, offset) =
+        bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
         "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
@@ -2716,16 +2681,8 @@ pub async fn get_saved_posts(
     headers: HeaderMap,
 ) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
     let user_id = get_current_user(&pool, &headers).await?;
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(10)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, 1_000_000);
+    let (limit, offset) =
+        bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
         "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
@@ -3842,16 +3799,8 @@ pub async fn get_user_posts(
     if !access.can_view(current_user_id.as_deref() == Some(user_id.as_str())) {
         return Err(StatusCode::FORBIDDEN);
     }
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(50)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, 1_000_000);
+    let (limit, offset) =
+        bounded_pagination(&params, 50, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
         "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,

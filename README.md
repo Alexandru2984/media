@@ -8,7 +8,9 @@ navigation, active-session controls, a private security-activity timeline,
 public project/community/privacy/terms/help pages, real HTTP 404 handling, and
 account-bound upload quotas with automatic cleanup of abandoned images. The
 editorial routes ship crawlable build-time HTML in addition to route-specific
-metadata. Authenticated members can
+metadata. Every list endpoint uses one strict pagination contract with bounded
+collection-specific offsets instead of permitting deep database scans.
+Authenticated members can
 also keep a private, paginated collection of saved posts, download a
 password-confirmed JSON copy of their account data, and permanently delete their
 account through a double-confirmed flow with retryable media cleanup.

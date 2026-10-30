@@ -10,7 +10,10 @@ use sqlx::{query, query_as, query_scalar, MySql, MySqlPool, Transaction};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::handlers::get_current_user;
+use crate::{
+    handlers::get_current_user,
+    pagination::{bounded_pagination, MAXIMUM_PAGE_SIZE},
+};
 
 const MAXIMUM_NOTIFICATIONS_PER_ACCOUNT: i64 = 500;
 
@@ -319,16 +322,12 @@ pub async fn list_notifications(
     headers: HeaderMap,
 ) -> Result<Json<Vec<NotificationResponse>>, StatusCode> {
     let user_id = get_current_user(&pool, &headers).await?;
-    let limit = params
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(20)
-        .clamp(1, 50);
-    let offset = params
-        .get("offset")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(0)
-        .clamp(0, MAXIMUM_NOTIFICATIONS_PER_ACCOUNT);
+    let (limit, offset) = bounded_pagination(
+        &params,
+        20,
+        MAXIMUM_PAGE_SIZE,
+        MAXIMUM_NOTIFICATIONS_PER_ACCOUNT,
+    )?;
 
     let rows = query_as::<_, NotificationRow>(
         "SELECT n.id, n.kind, n.post_id, (n.read_at IS NOT NULL) AS is_read,
