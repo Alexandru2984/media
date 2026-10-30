@@ -13,6 +13,7 @@ pub struct User {
     pub bio: Option<String>,
     pub avatar_url: Option<String>,
     pub is_private: bool,
+    pub role: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

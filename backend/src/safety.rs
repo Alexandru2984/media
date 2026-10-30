@@ -15,9 +15,11 @@ use crate::handlers::get_current_user;
 const MAXIMUM_MUTED_USERS: i64 = 5_000;
 const MAXIMUM_HIDDEN_POSTS: i64 = 5_000;
 const MAXIMUM_OPEN_REPORTS: i64 = 100;
+const MAXIMUM_STORED_REPORTS: i64 = 2_000;
 const MAXIMUM_REPORTS_PER_DAY: i64 = 20;
 const MAXIMUM_REPORT_DETAILS_CHARACTERS: usize = 1_000;
 const REPORT_EVENT_RETENTION_DAYS: i64 = 7;
+const FINAL_REPORT_RETENTION_DAYS: i64 = 365;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub(crate) struct MutedUserResponse {
@@ -69,7 +71,20 @@ pub(crate) struct ReportResponse {
     target_label: Option<String>,
     reason: String,
     details: Option<String>,
+    status: String,
     created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    reviewed_at: Option<DateTime<Utc>>,
+}
+
+struct ReportTarget {
+    user_id: Option<String>,
+    post_id: Option<String>,
+    comment_id: Option<String>,
+    actor_id: String,
+    audience_author_id: Option<String>,
+    label: String,
+    excerpt: Option<String>,
 }
 
 fn pagination(params: &HashMap<String, String>, default_limit: i64, max_offset: i64) -> (i64, i64) {
@@ -446,67 +461,77 @@ pub async fn create_report(
     let details = normalized_report_details(payload.details.as_deref())?;
     let target_key = format!("{}:{}", payload.target_type, payload.target_id);
 
-    let (target_user_id, target_post_id, target_comment_id, target_actor_id, audience_author_id) =
-        match payload.target_type.as_str() {
-            "user" => {
-                let exists: bool = query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)")
+    let target = match payload.target_type.as_str() {
+        "user" => {
+            let user: Option<(String, Option<String>)> =
+                query_as("SELECT username, bio FROM users WHERE id = ?")
                     .bind(&payload.target_id)
-                    .fetch_one(&pool)
+                    .fetch_optional(&pool)
                     .await
                     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                if !exists {
-                    return Err(StatusCode::NOT_FOUND);
-                }
-                (
-                    Some(payload.target_id.clone()),
-                    None,
-                    None,
-                    payload.target_id.clone(),
-                    None,
-                )
+            let (username, bio) = user.ok_or(StatusCode::NOT_FOUND)?;
+            ReportTarget {
+                user_id: Some(payload.target_id.clone()),
+                post_id: None,
+                comment_id: None,
+                actor_id: payload.target_id.clone(),
+                audience_author_id: None,
+                label: username,
+                excerpt: bio,
             }
-            "post" => {
-                let author_id: Option<String> =
-                    query_scalar("SELECT user_id FROM posts WHERE id = ?")
-                        .bind(&payload.target_id)
-                        .fetch_optional(&pool)
-                        .await
-                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                let author_id = author_id.ok_or(StatusCode::NOT_FOUND)?;
-                (
-                    None,
-                    Some(payload.target_id.clone()),
-                    None,
-                    author_id.clone(),
-                    Some(author_id),
-                )
+        }
+        "post" => {
+            let post: Option<(String, String, String)> = query_as(
+                "SELECT post.user_id, author.username, post.content
+                     FROM posts post INNER JOIN users author ON author.id = post.user_id
+                     WHERE post.id = ?",
+            )
+            .bind(&payload.target_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let (author_id, author_username, content) = post.ok_or(StatusCode::NOT_FOUND)?;
+            ReportTarget {
+                user_id: None,
+                post_id: Some(payload.target_id.clone()),
+                comment_id: None,
+                actor_id: author_id.clone(),
+                audience_author_id: Some(author_id),
+                label: author_username,
+                excerpt: Some(content),
             }
-            "comment" => {
-                let target: Option<(String, String)> = query_as(
-                    "SELECT c.user_id, p.user_id
-                     FROM comments c INNER JOIN posts p ON p.id = c.post_id
+        }
+        "comment" => {
+            let comment: Option<(String, String, String, String)> = query_as(
+                "SELECT c.user_id, comment_author.username, c.content, p.user_id
+                     FROM comments c
+                     INNER JOIN users comment_author ON comment_author.id = c.user_id
+                     INNER JOIN posts p ON p.id = c.post_id
                      WHERE c.id = ?",
-                )
-                .bind(&payload.target_id)
-                .fetch_optional(&pool)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-                let (comment_author_id, post_author_id) = target.ok_or(StatusCode::NOT_FOUND)?;
-                (
-                    None,
-                    None,
-                    Some(payload.target_id.clone()),
-                    comment_author_id,
-                    Some(post_author_id),
-                )
+            )
+            .bind(&payload.target_id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let (comment_author_id, comment_author_username, content, post_author_id) =
+                comment.ok_or(StatusCode::NOT_FOUND)?;
+            ReportTarget {
+                user_id: None,
+                post_id: None,
+                comment_id: Some(payload.target_id.clone()),
+                actor_id: comment_author_id,
+                audience_author_id: Some(post_author_id),
+                label: comment_author_username,
+                excerpt: Some(content),
             }
-            _ => return Err(StatusCode::BAD_REQUEST),
-        };
+        }
+        _ => return Err(StatusCode::BAD_REQUEST),
+    };
 
-    if target_actor_id == reporter_id {
+    if target.actor_id == reporter_id {
         return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(author_id) = audience_author_id.as_deref() {
+    if let Some(author_id) = target.audience_author_id.as_deref() {
         if !target_is_visible(&pool, &reporter_id, author_id).await? {
             return Err(StatusCode::FORBIDDEN);
         }
@@ -524,7 +549,8 @@ pub async fn create_report(
 
     let existing: bool = query_scalar(
         "SELECT EXISTS(
-            SELECT 1 FROM content_reports WHERE reporter_id = ? AND target_key = ?
+            SELECT 1 FROM content_reports
+            WHERE reporter_id = ? AND target_key = ? AND active_marker = 1
          )",
     )
     .bind(&reporter_id)
@@ -536,17 +562,38 @@ pub async fn create_report(
         return Err(StatusCode::CONFLICT);
     }
 
-    let open_reports: i64 =
+    let now = Utc::now();
+    query(
+        "DELETE FROM content_reports
+         WHERE reporter_id = ? AND active_marker IS NULL AND updated_at < ?
+         LIMIT 500",
+    )
+    .bind(&reporter_id)
+    .bind(now - Duration::days(FINAL_REPORT_RETENTION_DAYS))
+    .execute(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let stored_reports: i64 =
         query_scalar("SELECT COUNT(*) FROM content_reports WHERE reporter_id = ?")
             .bind(&reporter_id)
             .fetch_one(&mut *transaction)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if stored_reports >= MAXIMUM_STORED_REPORTS {
+        return Err(StatusCode::INSUFFICIENT_STORAGE);
+    }
+    let open_reports: i64 = query_scalar(
+        "SELECT COUNT(*) FROM content_reports WHERE reporter_id = ? AND active_marker = 1",
+    )
+    .bind(&reporter_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if open_reports >= MAXIMUM_OPEN_REPORTS {
         return Err(StatusCode::INSUFFICIENT_STORAGE);
     }
 
-    let now = Utc::now();
     query("DELETE FROM report_submission_events WHERE reporter_id = ? AND created_at < ?")
         .bind(&reporter_id)
         .bind(now - Duration::days(REPORT_EVENT_RETENTION_DAYS))
@@ -569,19 +616,26 @@ pub async fn create_report(
     let report_id = Uuid::new_v4().to_string();
     query(
         "INSERT INTO content_reports
-            (id, reporter_id, target_type, target_key, target_user_id,
-             target_post_id, target_comment_id, reason, details, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (id, reporter_id, target_type, target_key, target_label_snapshot,
+             target_excerpt_snapshot, target_actor_reference,
+             target_user_id, target_post_id,
+             target_comment_id, reason, details, status, active_marker,
+             created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', 1, ?, ?)",
     )
     .bind(&report_id)
     .bind(&reporter_id)
     .bind(&payload.target_type)
     .bind(&target_key)
-    .bind(target_user_id)
-    .bind(target_post_id)
-    .bind(target_comment_id)
+    .bind(&target.label)
+    .bind(&target.excerpt)
+    .bind(&target.actor_id)
+    .bind(target.user_id)
+    .bind(target.post_id)
+    .bind(target.comment_id)
     .bind(&payload.reason)
     .bind(details)
+    .bind(now)
     .bind(now)
     .execute(&mut *transaction)
     .await
@@ -610,20 +664,14 @@ pub async fn list_reports(
     headers: HeaderMap,
 ) -> Result<Json<Vec<ReportResponse>>, StatusCode> {
     let reporter_id = get_current_user(&pool, &headers).await?;
-    let (limit, offset) = pagination(&params, 20, MAXIMUM_OPEN_REPORTS);
+    let (limit, offset) = pagination(&params, 20, MAXIMUM_STORED_REPORTS);
     let reports = query_as::<_, ReportResponse>(
         "SELECT report.id, report.target_type,
-                COALESCE(report.target_user_id, report.target_post_id, report.target_comment_id)
-                    AS target_id,
-                COALESCE(target_user.username, post_author.username, comment_author.username)
-                    AS target_label,
-                report.reason, report.details, report.created_at
+                SUBSTRING_INDEX(report.target_key, ':', -1) AS target_id,
+                report.target_label_snapshot AS target_label,
+                report.reason, report.details, report.status,
+                report.created_at, report.updated_at, report.reviewed_at
          FROM content_reports report
-         LEFT JOIN users target_user ON target_user.id = report.target_user_id
-         LEFT JOIN posts target_post ON target_post.id = report.target_post_id
-         LEFT JOIN users post_author ON post_author.id = target_post.user_id
-         LEFT JOIN comments target_comment ON target_comment.id = report.target_comment_id
-         LEFT JOIN users comment_author ON comment_author.id = target_comment.user_id
          WHERE report.reporter_id = ?
          ORDER BY report.created_at DESC, report.id DESC
          LIMIT ? OFFSET ?",
@@ -649,14 +697,33 @@ pub async fn withdraw_report(
     if Uuid::parse_str(&report_id).is_err() {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let result = query("DELETE FROM content_reports WHERE id = ? AND reporter_id = ?")
+    let now = Utc::now();
+    let result = query(
+        "UPDATE content_reports
+         SET status = 'withdrawn', active_marker = NULL, updated_at = ?, reviewed_at = ?
+         WHERE id = ? AND reporter_id = ? AND status = 'open'",
+    )
+    .bind(now)
+    .bind(now)
+    .bind(&report_id)
+    .bind(&reporter_id)
+    .execute(&pool)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if result.rows_affected() != 1 {
+        let exists: bool = query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM content_reports WHERE id = ? AND reporter_id = ?)",
+        )
         .bind(&report_id)
         .bind(&reporter_id)
-        .execute(&pool)
+        .fetch_one(&pool)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if result.rows_affected() != 1 {
-        return Err(StatusCode::NOT_FOUND);
+        return Err(if exists {
+            StatusCode::CONFLICT
+        } else {
+            StatusCode::NOT_FOUND
+        });
     }
     Ok(Json(json!({ "withdrawn": true })))
 }

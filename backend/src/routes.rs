@@ -7,7 +7,7 @@ use axum::{
 };
 use sqlx::MySqlPool;
 
-use crate::{handlers, health, notifications, safety, security};
+use crate::{handlers, health, moderation, notifications, safety, security};
 
 pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
     let api_routes = Router::new()
@@ -97,6 +97,22 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
             get(safety::list_reports).post(safety::create_report),
         )
         .route("/reports/:id", delete(safety::withdraw_report))
+        // Least-privilege moderation. Role grants are intentionally offline;
+        // every mutation also requires a fresh password confirmation.
+        .route("/moderation/reports", get(moderation::list_reports))
+        .route("/moderation/audit", get(moderation::list_audit_events))
+        .route(
+            "/moderation/reports/:id/claim",
+            put(moderation::claim_report),
+        )
+        .route(
+            "/moderation/reports/:id/release",
+            put(moderation::release_report),
+        )
+        .route(
+            "/moderation/reports/:id/decision",
+            put(moderation::decide_report),
+        )
         // Private in-app notifications
         .route("/notifications", get(notifications::list_notifications))
         .route(

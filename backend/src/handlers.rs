@@ -152,6 +152,7 @@ struct ExportCounts {
     hidden_posts: i64,
     content_reports: i64,
     report_submission_events: i64,
+    moderation_audit_events: i64,
     incoming_follow_requests: i64,
     outgoing_follow_requests: i64,
     notifications: i64,
@@ -176,6 +177,7 @@ impl ExportCounts {
             self.hidden_posts,
             self.content_reports,
             self.report_submission_events,
+            self.moderation_audit_events,
             self.incoming_follow_requests,
             self.outgoing_follow_requests,
             self.notifications,
@@ -194,6 +196,7 @@ struct ExportProfile {
     bio: Option<String>,
     avatar_url: Option<String>,
     is_private: bool,
+    role: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -233,11 +236,23 @@ struct ExportReport {
     target_id: String,
     reason: String,
     details: Option<String>,
+    status: String,
     created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    reviewed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]
 struct ExportReportSubmission {
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportModerationAuditEvent {
+    report_reference: String,
+    action: String,
+    previous_status: String,
+    new_status: String,
     created_at: DateTime<Utc>,
 }
 
@@ -307,6 +322,7 @@ pub(crate) struct AccountDataExport {
     hidden_posts: Vec<ExportSavedPost>,
     content_reports: Vec<ExportReport>,
     report_submission_events: Vec<ExportReportSubmission>,
+    moderation_audit_events: Vec<ExportModerationAuditEvent>,
     incoming_follow_requests: Vec<ExportRelationship>,
     outgoing_follow_requests: Vec<ExportRelationship>,
     notifications: Vec<ExportNotification>,
@@ -653,7 +669,8 @@ pub async fn register(
                         "email": email,
                         "bio": bio,
                         "avatar_url": null,
-                        "is_private": false
+                        "is_private": false,
+                        "role": "user"
                     }
                 }),
             )
@@ -704,7 +721,8 @@ pub async fn login(
                 "email": user.email,
                 "bio": user.bio,
                 "avatar_url": user.avatar_url,
-                "is_private": user.is_private
+                "is_private": user.is_private,
+                "role": user.role
             }
         }),
     )
@@ -730,7 +748,8 @@ pub async fn me(
         "email": user.email,
         "bio": user.bio,
         "avatar_url": user.avatar_url,
-        "is_private": user.is_private
+        "is_private": user.is_private,
+        "role": user.role
     })))
 }
 
@@ -1824,10 +1843,12 @@ pub async fn export_account_data(
             (SELECT COUNT(*) FROM hidden_posts WHERE user_id = ?) AS hidden_posts,
             (SELECT COUNT(*) FROM content_reports WHERE reporter_id = ?) AS content_reports,
             (SELECT COUNT(*) FROM report_submission_events WHERE reporter_id = ?) AS report_submission_events,
+            (SELECT COUNT(*) FROM moderation_audit_events WHERE moderator_id = ?) AS moderation_audit_events,
             (SELECT COUNT(*) FROM follow_requests WHERE target_id = ?) AS incoming_follow_requests,
             (SELECT COUNT(*) FROM follow_requests WHERE requester_id = ?) AS outgoing_follow_requests,
             (SELECT COUNT(*) FROM notifications WHERE recipient_id = ?) AS notifications",
     )
+    .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
@@ -1863,7 +1884,7 @@ pub async fn export_account_data(
 
     let profile = query_as::<_, ExportProfile>(
         "SELECT id, username, email, (email_verified <> 0) AS email_verified,
-                bio, avatar_url, (is_private <> 0) AS is_private, created_at, updated_at
+                bio, avatar_url, (is_private <> 0) AS is_private, role, created_at, updated_at
          FROM users WHERE id = ?",
     )
     .bind(&authenticated_session.user_id)
@@ -2008,9 +2029,18 @@ pub async fn export_account_data(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let content_reports = query_as::<_, ExportReport>(
         "SELECT id, target_type,
-                COALESCE(target_user_id, target_post_id, target_comment_id) AS target_id,
-                reason, details, created_at
+                SUBSTRING_INDEX(target_key, ':', -1) AS target_id,
+                reason, details, status, created_at, updated_at, reviewed_at
          FROM content_reports WHERE reporter_id = ?
+         ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let moderation_audit_events = query_as::<_, ExportModerationAuditEvent>(
+        "SELECT report_reference, action, previous_status, new_status, created_at
+         FROM moderation_audit_events WHERE moderator_id = ?
          ORDER BY created_at ASC, id ASC",
     )
     .bind(&authenticated_session.user_id)
@@ -2079,7 +2109,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 5,
+            format_version: 6,
             exported_at,
             profile,
             counts,
@@ -2099,6 +2129,7 @@ pub async fn export_account_data(
             hidden_posts,
             content_reports,
             report_submission_events,
+            moderation_audit_events,
             incoming_follow_requests,
             outgoing_follow_requests,
             notifications,
@@ -4226,7 +4257,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 5,
+            format_version: 6,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),
@@ -4236,6 +4267,7 @@ mod tests {
                 bio: None,
                 avatar_url: None,
                 is_private: false,
+                role: "user".to_owned(),
                 created_at: now,
                 updated_at: now,
             },
@@ -4256,6 +4288,7 @@ mod tests {
                 hidden_posts: 0,
                 content_reports: 0,
                 report_submission_events: 0,
+                moderation_audit_events: 0,
                 incoming_follow_requests: 0,
                 outgoing_follow_requests: 0,
                 notifications: 0,
@@ -4276,6 +4309,7 @@ mod tests {
             hidden_posts: vec![],
             content_reports: vec![],
             report_submission_events: vec![],
+            moderation_audit_events: vec![],
             incoming_follow_requests: vec![],
             outgoing_follow_requests: vec![],
             notifications: vec![],
