@@ -710,6 +710,29 @@ candidate is `social-media-backend-20261030T112302Z-8fe1995`. The release used n
 database backup because it performs no migration or data write; the existing
 preference-release database backup remains the most recent schema checkpoint.
 
+### Frontend recovery and accessibility checkpoint
+
+Frontend release `20261030T112630Z-4aa95ac` adds a global lazy-chunk/render
+error boundary with an auto-focused recovery screen, a live offline indicator,
+and a keyboard skip link on every client route. The build gate now requires all
+three runtime markers while retaining the entry, stylesheet, total-JavaScript,
+source-map, crawlability, canonical, and sitemap checks. The measured entry is
+105,241 bytes, CSS is 68,002 bytes, and total JavaScript is 234,942 bytes; all
+remain within their enforced budgets. `npm audit --audit-level=low` returned no
+findings.
+
+The immutable release carries one generation of compatibility assets so tabs
+that loaded the pre-error-boundary entry can still resolve their old lazy chunks
+during this transition. Direct and public Cloudflare canaries verified the new
+entry, a new profile chunk, the old entry chunk, JavaScript MIME, immutable
+caching, all recovery markers, crawlable privacy HTML, private-route `noindex`,
+a real unknown-route `404`, and public health. API, Nginx, and Tunnel services
+retained zero unexpected restarts and no warning-or-higher journal messages.
+The atomic symlink's rollback target is
+`20261030T010226Z-89d62c0`; no schema, data, service restart, or Nginx reload was
+required. The VPS has no browser, so this checkpoint does not claim a new visual
+or screen-reader regression pass.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
