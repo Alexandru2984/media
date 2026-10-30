@@ -217,6 +217,10 @@ class ApiService {
     return this.request(`/moderation/audit?limit=${limit}&offset=${offset}`);
   }
 
+  async getModerationRoleAudit(limit = 20, offset = 0) {
+    return this.request(`/moderation/role-audit?limit=${limit}&offset=${offset}`);
+  }
+
   async claimModerationReport(reportId, password) {
     return this.request(`/moderation/reports/${encodeURIComponent(reportId)}/claim`, {
       method: 'PUT',

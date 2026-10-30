@@ -101,3 +101,35 @@ CREATE TABLE moderation_audit_events (
         new_status IN ('open', 'reviewing', 'resolved', 'dismissed')
     )
 );
+
+CREATE TABLE moderation_role_events (
+    id VARCHAR(36) NOT NULL,
+    user_reference VARCHAR(36) NOT NULL,
+    username_snapshot VARCHAR(255) NOT NULL,
+    previous_role VARCHAR(16) NOT NULL,
+    new_role VARCHAR(16) NOT NULL,
+    database_actor VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    INDEX idx_moderation_role_events_created (created_at, id),
+    INDEX idx_moderation_role_events_user (user_reference, created_at, id),
+    CONSTRAINT chk_moderation_role_previous CHECK (
+        previous_role IN ('user', 'moderator', 'admin')
+    ),
+    CONSTRAINT chk_moderation_role_new CHECK (
+        new_role IN ('user', 'moderator', 'admin')
+    ),
+    CONSTRAINT chk_moderation_role_changed CHECK (previous_role <> new_role)
+);
+
+CREATE TRIGGER trg_users_role_audit
+AFTER UPDATE ON users
+FOR EACH ROW
+INSERT INTO moderation_role_events (
+    id, user_reference, username_snapshot, previous_role,
+    new_role, database_actor, created_at
+)
+SELECT
+    UUID(), OLD.id, OLD.username, OLD.role,
+    NEW.role, CURRENT_USER(), CURRENT_TIMESTAMP(6)
+WHERE NOT (OLD.role <=> NEW.role);

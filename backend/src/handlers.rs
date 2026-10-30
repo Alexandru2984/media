@@ -153,6 +153,7 @@ struct ExportCounts {
     content_reports: i64,
     report_submission_events: i64,
     moderation_audit_events: i64,
+    moderation_role_events: i64,
     incoming_follow_requests: i64,
     outgoing_follow_requests: i64,
     notifications: i64,
@@ -178,6 +179,7 @@ impl ExportCounts {
             self.content_reports,
             self.report_submission_events,
             self.moderation_audit_events,
+            self.moderation_role_events,
             self.incoming_follow_requests,
             self.outgoing_follow_requests,
             self.notifications,
@@ -256,6 +258,13 @@ struct ExportModerationAuditEvent {
     created_at: DateTime<Utc>,
 }
 
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportModerationRoleEvent {
+    previous_role: String,
+    new_role: String,
+    created_at: DateTime<Utc>,
+}
+
 #[derive(sqlx::FromRow)]
 struct ExportSessionRow {
     id: String,
@@ -323,6 +332,7 @@ pub(crate) struct AccountDataExport {
     content_reports: Vec<ExportReport>,
     report_submission_events: Vec<ExportReportSubmission>,
     moderation_audit_events: Vec<ExportModerationAuditEvent>,
+    moderation_role_events: Vec<ExportModerationRoleEvent>,
     incoming_follow_requests: Vec<ExportRelationship>,
     outgoing_follow_requests: Vec<ExportRelationship>,
     notifications: Vec<ExportNotification>,
@@ -1844,10 +1854,12 @@ pub async fn export_account_data(
             (SELECT COUNT(*) FROM content_reports WHERE reporter_id = ?) AS content_reports,
             (SELECT COUNT(*) FROM report_submission_events WHERE reporter_id = ?) AS report_submission_events,
             (SELECT COUNT(*) FROM moderation_audit_events WHERE moderator_id = ?) AS moderation_audit_events,
+            (SELECT COUNT(*) FROM moderation_role_events WHERE user_reference = ?) AS moderation_role_events,
             (SELECT COUNT(*) FROM follow_requests WHERE target_id = ?) AS incoming_follow_requests,
             (SELECT COUNT(*) FROM follow_requests WHERE requester_id = ?) AS outgoing_follow_requests,
             (SELECT COUNT(*) FROM notifications WHERE recipient_id = ?) AS notifications",
     )
+    .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
@@ -2047,6 +2059,15 @@ pub async fn export_account_data(
     .fetch_all(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let moderation_role_events = query_as::<_, ExportModerationRoleEvent>(
+        "SELECT previous_role, new_role, created_at
+         FROM moderation_role_events WHERE user_reference = ?
+         ORDER BY created_at ASC, id ASC",
+    )
+    .bind(&authenticated_session.user_id)
+    .fetch_all(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let report_submission_events = query_as::<_, ExportReportSubmission>(
         "SELECT created_at FROM report_submission_events
          WHERE reporter_id = ? ORDER BY created_at ASC, id ASC",
@@ -2130,6 +2151,7 @@ pub async fn export_account_data(
             content_reports,
             report_submission_events,
             moderation_audit_events,
+            moderation_role_events,
             incoming_follow_requests,
             outgoing_follow_requests,
             notifications,
@@ -4289,6 +4311,7 @@ mod tests {
                 content_reports: 0,
                 report_submission_events: 0,
                 moderation_audit_events: 0,
+                moderation_role_events: 0,
                 incoming_follow_requests: 0,
                 outgoing_follow_requests: 0,
                 notifications: 0,
@@ -4310,6 +4333,7 @@ mod tests {
             content_reports: vec![],
             report_submission_events: vec![],
             moderation_audit_events: vec![],
+            moderation_role_events: vec![],
             incoming_follow_requests: vec![],
             outgoing_follow_requests: vec![],
             notifications: vec![],

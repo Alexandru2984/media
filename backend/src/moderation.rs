@@ -61,6 +61,16 @@ pub(crate) struct ModerationAuditResponse {
     created_at: DateTime<Utc>,
 }
 
+#[derive(Serialize, sqlx::FromRow)]
+pub(crate) struct ModerationRoleAuditResponse {
+    id: String,
+    user_reference: String,
+    username_snapshot: String,
+    previous_role: String,
+    new_role: String,
+    created_at: DateTime<Utc>,
+}
+
 #[derive(Deserialize)]
 pub(crate) struct PasswordConfirmation {
     password: String,
@@ -317,6 +327,33 @@ pub async fn list_audit_events(
     .await
     .map_err(|error| {
         tracing::error!(error = %error, "failed to list moderation audit events");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    Ok(Json(events))
+}
+
+pub async fn list_role_audit_events(
+    State(pool): State<MySqlPool>,
+    Query(params): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<ModerationRoleAuditResponse>>, StatusCode> {
+    let moderator = require_moderator(&pool, &headers).await?;
+    if moderator.role != "admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    let (limit, offset) = pagination(&params);
+    let events = query_as::<_, ModerationRoleAuditResponse>(
+        "SELECT id, user_reference, username_snapshot, previous_role, new_role, created_at
+         FROM moderation_role_events
+         ORDER BY created_at DESC, id DESC
+         LIMIT ? OFFSET ?",
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to list moderation role audit events");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     Ok(Json(events))

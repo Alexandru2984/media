@@ -102,6 +102,10 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/moderation/reports", get(moderation::list_reports))
         .route("/moderation/audit", get(moderation::list_audit_events))
         .route(
+            "/moderation/role-audit",
+            get(moderation::list_role_audit_events),
+        )
+        .route(
             "/moderation/reports/:id/claim",
             put(moderation::claim_report),
         )

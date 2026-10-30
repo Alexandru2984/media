@@ -41,6 +41,7 @@ export default function Moderation() {
   const [activeTab, setActiveTab] = createSignal('open');
   const [reports, setReports] = createSignal([]);
   const [auditEvents, setAuditEvents] = createSignal([]);
+  const [roleEvents, setRoleEvents] = createSignal([]);
   const [hasMore, setHasMore] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [loadingMore, setLoadingMore] = createSignal(false);
@@ -59,13 +60,19 @@ export default function Moderation() {
     setError('');
     try {
       const offset = append
-        ? (activeTab() === 'audit' ? auditEvents().length : reports().length)
+        ? (activeTab() === 'audit'
+          ? auditEvents().length
+          : (activeTab() === 'roles' ? roleEvents().length : reports().length))
         : 0;
       const data = activeTab() === 'audit'
         ? await api.getModerationAudit(PAGE_SIZE, offset)
-        : await api.getModerationReports(activeTab(), PAGE_SIZE, offset);
+        : (activeTab() === 'roles'
+          ? await api.getModerationRoleAudit(PAGE_SIZE, offset)
+          : await api.getModerationReports(activeTab(), PAGE_SIZE, offset));
       if (activeTab() === 'audit') {
         setAuditEvents((current) => (append ? [...current, ...data] : data));
+      } else if (activeTab() === 'roles') {
+        setRoleEvents((current) => (append ? [...current, ...data] : data));
       } else {
         setReports((current) => (append ? [...current, ...data] : data));
       }
@@ -88,6 +95,7 @@ export default function Moderation() {
     setActiveTab(tab);
     setReports([]);
     setAuditEvents([]);
+    setRoleEvents([]);
     setHasMore(false);
     setSuccess('');
     setLoadedKey('');
@@ -169,6 +177,10 @@ export default function Moderation() {
     }
   });
 
+  const visibleTabs = () => (auth.user()?.role === 'admin'
+    ? [...tabs, ['roles', 'Roluri']]
+    : tabs);
+
   return (
     <>
       <PageMeta
@@ -196,7 +208,7 @@ export default function Moderation() {
         </div>
 
         <div class="moderation-tabs" role="tablist" aria-label="Stări de moderare">
-          <For each={tabs}>{([value, label]) => (
+          <For each={visibleTabs()}>{([value, label]) => (
             <button type="button" role="tab" aria-selected={activeTab() === value} class={activeTab() === value ? 'is-active' : ''} onClick={() => selectTab(value)}>
               {label}
             </button>
@@ -208,22 +220,43 @@ export default function Moderation() {
 
         <Show when={!loading()} fallback={<div class="surface skeleton"><div class="skeleton-lines"><div class="skeleton-line" /><div class="skeleton-line" /><div class="skeleton-line" /></div></div>}>
           <Show
-            when={activeTab() !== 'audit'}
+            when={!['audit', 'roles'].includes(activeTab())}
             fallback={
-              <Show when={auditEvents().length > 0} fallback={<div class="surface state-card"><div><span class="state-icon">✓</span><h2>Nicio acțiune auditată</h2><p>Evenimentele apar aici după prima tranziție de moderare.</p></div></div>}>
-                <div class="moderation-audit-list">
-                  <For each={auditEvents()}>{(event) => (
-                    <article class="surface moderation-audit-card">
-                      <span class="moderation-audit-mark" aria-hidden="true">↳</span>
-                      <div>
-                        <p class="moderation-card-kicker">{actionLabels[event.action] || event.action}</p>
-                        <h2>{event.moderator_username || 'Cont de moderator șters'}</h2>
-                        <p><code>{event.report_reference}</code> · {event.previous_status} → {event.new_status}</p>
-                        <time datetime={event.created_at}>{dateFormatter.format(new Date(event.created_at))}</time>
-                      </div>
-                    </article>
-                  )}</For>
-                </div>
+              <Show
+                when={activeTab() === 'roles'}
+                fallback={
+                  <Show when={auditEvents().length > 0} fallback={<div class="surface state-card"><div><span class="state-icon">✓</span><h2>Nicio acțiune auditată</h2><p>Evenimentele apar aici după prima tranziție de moderare.</p></div></div>}>
+                    <div class="moderation-audit-list">
+                      <For each={auditEvents()}>{(event) => (
+                        <article class="surface moderation-audit-card">
+                          <span class="moderation-audit-mark" aria-hidden="true">↳</span>
+                          <div>
+                            <p class="moderation-card-kicker">{actionLabels[event.action] || event.action}</p>
+                            <h2>{event.moderator_username || 'Cont de moderator șters'}</h2>
+                            <p><code>{event.report_reference}</code> · {event.previous_status} → {event.new_status}</p>
+                            <time datetime={event.created_at}>{dateFormatter.format(new Date(event.created_at))}</time>
+                          </div>
+                        </article>
+                      )}</For>
+                    </div>
+                  </Show>
+                }
+              >
+                <Show when={roleEvents().length > 0} fallback={<div class="surface state-card"><div><span class="state-icon">✓</span><h2>Nicio schimbare de rol</h2><p>Promovările și revocările offline vor apărea automat aici.</p></div></div>}>
+                  <div class="moderation-audit-list">
+                    <For each={roleEvents()}>{(event) => (
+                      <article class="surface moderation-audit-card moderation-role-card">
+                        <span class="moderation-audit-mark" aria-hidden="true">◆</span>
+                        <div>
+                          <p class="moderation-card-kicker">Schimbare privilegiu</p>
+                          <h2>{event.username_snapshot}</h2>
+                          <p><code>{event.user_reference}</code> · {event.previous_role} → {event.new_role}</p>
+                          <time datetime={event.created_at}>{dateFormatter.format(new Date(event.created_at))}</time>
+                        </div>
+                      </article>
+                    )}</For>
+                  </div>
+                </Show>
               </Show>
             }
           >
