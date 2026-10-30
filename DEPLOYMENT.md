@@ -159,6 +159,9 @@ să livreze titlu/canonical/JSON-LD propriu și să conțină HTML util înainte
 execuția JavaScript. O cale inexistentă trebuie să rămână `404`, iar rutele
 private trebuie să păstreze `X-Robots-Tag: noindex`. După `nginx reload`, folosește
 polling scurt pentru convergența workerilor înainte să declanșezi rollbackul.
+Într-un shell cu `pipefail`, nu valida un răspuns mare prin `curl | grep -q`:
+`grep` poate închide pipe-ul după primul match, iar `curl` va întoarce `23` deși
+verificarea a reușit. Capturează răspunsul complet sau validează fișierul staged.
 
 Primul set verifică Nginx direct pe loopback; al doilea verifică ruta reală prin
 Cloudflare Tunnel.

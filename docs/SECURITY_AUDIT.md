@@ -670,6 +670,19 @@ polling passed. The root-only rollback artifact is
 `/var/backups`, the prior frontend release remains immutable, and the API kept
 zero unexpected restarts.
 
+### Frontend performance checkpoint
+
+Frontend release `20261030T010226Z-89d62c0` moved every non-home route into a
+lazy chunk behind an accessible loading state. Entry JavaScript decreased from
+219,850 bytes (61.77 KiB gzip) to 102,600 bytes (32.53 KiB gzip). The build now
+enforces explicit entry/CSS/total-JavaScript budgets, six public-page canonical
+and crawlability checks, sitemap cardinality, and absence of source maps. A
+local preview served all 25 assets and eight sampled routes; the production
+canary fetched the entry, profile, and privacy chunks through Cloudflare with
+`200`, JavaScript MIME, and immutable caching. Homepage/readiness stayed `200`,
+all services remained active, and the previous immutable frontend release is
+the rollback target.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
