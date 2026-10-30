@@ -287,7 +287,7 @@ collections remain open.
 
 ## Phase 5 — SEO and shareability
 
-**Progress (2026-10-28):** the public shell has Romanian language metadata,
+**Progress (2026-10-30):** the public shell has Romanian language metadata,
 canonical and social tags, route-appropriate JSON-LD, manifest, favicon, crawler
 policy, and a valid XML sitemap. The production build emits distinct initial HTML
 for the landing, about, community-rules, privacy, terms, and help routes,

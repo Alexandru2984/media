@@ -651,6 +651,25 @@ Tunnel health checks returned `200`, the new anonymous endpoint boundary
 returned `401`, immutable asset caching remained active, and the API service
 retained zero unexpected restarts. Brevo still returned the known SMTP `535`.
 
+### Public trust and crawlability checkpoint
+
+The 2026-10-30 frontend release `20261030T005926Z-dda5e2a` added responsive
+privacy, terms, and help pages plus build-time crawlable content for all six
+stable public routes. Each route has distinct canonical/social metadata and
+JSON-LD, while the sitemap contains only those six editorial URLs. Nginx's
+explicit pre-render allowlist was expanded without changing the private-route
+policy. Direct Nginx and Cloudflare Tunnel checks returned `200` for every
+public route, an unknown route remained a real `404`, and `/login` retained
+`X-Robots-Tag: noindex, nofollow, noarchive`.
+
+The first promotion intentionally exercised the automatic rollback path when an
+immediate smoke check raced Nginx worker convergence. The prior frontend and
+configuration were restored successfully; a second promotion with bounded
+polling passed. The root-only rollback artifact is
+`media-nginx-pre-public-trust-20261030T005926Z-dda5e2a.conf` under
+`/var/backups`, the prior frontend release remains immutable, and the API kept
+zero unexpected restarts.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,

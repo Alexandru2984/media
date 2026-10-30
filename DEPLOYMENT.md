@@ -151,6 +151,13 @@ curl -fsS https://media.micutu.com/
 curl -fsS https://media.micutu.com/api/health/ready
 ```
 
+Pentru rutele editoriale publice, verifică separat `/`, `/despre`, `/reguli`,
+`/confidentialitate`, `/termeni` și `/ajutor`: fiecare trebuie să răspundă `200`,
+să livreze titlu/canonical/JSON-LD propriu și să conțină HTML util înainte de
+execuția JavaScript. O cale inexistentă trebuie să rămână `404`, iar rutele
+private trebuie să păstreze `X-Robots-Tag: noindex`. După `nginx reload`, folosește
+polling scurt pentru convergența workerilor înainte să declanșezi rollbackul.
+
 Primul set verifică Nginx direct pe loopback; al doilea verifică ruta reală prin
 Cloudflare Tunnel.
 
