@@ -784,6 +784,26 @@ unexpected restarts and no warning-or-higher journal events. The atomic rollback
 release is `20261030T112913Z-bcdfdc7`; no backend, database, Nginx, or Tunnel
 mutation was required.
 
+### Fail-safe browser-storage checkpoint
+
+Frontend release `20261030T113313Z-6eac6de` moves theme persistence and obsolete
+token cleanup behind allowlisted, exception-safe storage helpers. Application
+bootstrap and theme mounting now continue when Web Storage is absent, denied by
+browser policy/privacy mode, or rejects writes. Fifteen mandatory Node contracts
+cover denied getters, rejected writes, unavailable storage, invalid stored
+themes, system preference, and exact legacy-key removal in addition to transport
+and URL security.
+
+The production build and zero-finding low-threshold npm audit passed; entry
+JavaScript remained within budget at 106,301 bytes. Direct and public canaries
+verified the new entry, profile chunk, prior entry compatibility, immutable
+JavaScript, four crawlable public routes, health, and real `404` handling. API,
+Nginx, and Tunnel retained zero unexpected restarts and no warning-or-higher
+journal events, and production application users remained at zero. The atomic
+rollback release is `20261030T113145Z-065e29e`; no backend, database, Nginx, or
+Tunnel mutation was required. A real blocked-storage browser pass remains open
+because this VPS has no browser runtime.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
