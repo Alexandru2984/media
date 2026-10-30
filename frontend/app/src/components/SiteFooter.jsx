@@ -11,6 +11,9 @@ export default function SiteFooter() {
         <nav class="footer-links" aria-label="Navigație secundară">
           <A href="/despre">Despre Media</A>
           <A href="/reguli">Regulile comunității</A>
+          <A href="/confidentialitate">Confidențialitate</A>
+          <A href="/termeni">Termeni</A>
+          <A href="/ajutor">Ajutor</A>
           <a href="https://github.com/Alexandru2984/media" target="_blank" rel="noreferrer">Codul proiectului</a>
         </nav>
         <p class="footer-meta">© {new Date().getFullYear()} Media</p>

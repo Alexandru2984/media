@@ -290,13 +290,17 @@ collections remain open.
 **Progress (2026-10-28):** the public shell has Romanian language metadata,
 canonical and social tags, route-appropriate JSON-LD, manifest, favicon, crawler
 policy, and a valid XML sitemap. The production build emits distinct initial HTML
-for the landing, about, and community-rules routes, including unique titles,
-descriptions, canonical/hreflang URLs, Open Graph/Twitter cards, and a dedicated
-1200×630 share image. Client-side navigation keeps that metadata synchronized.
+for the landing, about, community-rules, privacy, terms, and help routes,
+including unique titles, descriptions, canonical/hreflang URLs, Open
+Graph/Twitter cards, a dedicated 1200×630 share image, and crawlable editorial
+content rather than an empty application root. Client-side navigation keeps that
+metadata synchronized.
 Nginx serves the pre-rendered route documents, returns real `X-Robots-Tag:
 noindex` headers for private and token-bearing routes, and keeps unknown paths at
-HTTP 404. Public profile/post rendering, privacy/terms/help content, Search
-Console, and real-user Core Web Vitals monitoring remain open.
+HTTP 404. The new privacy disclosure explicitly records the current technical
+controls and unfinished governance instead of claiming legal compliance. Public
+profile/post rendering, formal legal/operator details, Search Console, and
+real-user Core Web Vitals monitoring remain open.
 
 A mobile Lighthouse snapshot against the Cloudflare-served production page
 scored SEO 100, accessibility 100, performance 80, and best practices 77, with
@@ -309,15 +313,16 @@ as application-bundle regressions.
 1. Render public profiles/posts on the server or pre-render them; keep private and
    application-only routes out of the index.
 2. Use `lang="ro"`, route-specific title/description, canonical URL, robots,
-   Open Graph, Twitter cards, and high-quality share images. ✅ for the landing,
-   about, and community-rules pages.
+   Open Graph, Twitter cards, and high-quality share images. ✅ for all stable
+   editorial routes.
 3. Add appropriate JSON-LD for the site, breadcrumbs, people, and public posts;
    validate against current Google guidance rather than emitting unsupported data.
 4. Keep sitemap timestamps and XML/content types valid; add deliberate `410`
    responses for permanently removed public content alongside the live 404 flow.
 5. Add a valid web manifest, icons, favicon, theme colors, installability, and an
    offline shell that never caches private API data.
-6. Create indexable landing/about/safety/privacy/terms/help pages with useful copy.
+6. Create indexable landing/about/privacy/terms/help pages with useful copy. ✅
+   Keep the authenticated safety center private and `noindex` by design.
 7. Add clean public URLs, redirect policy, lowercase/normalization rules, and
    `hreflang` only when real localized content exists.
 8. Improve Core Web Vitals: route/code splitting, critical CSS, responsive images,

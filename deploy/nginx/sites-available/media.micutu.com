@@ -111,7 +111,7 @@ server {
         add_header X-Permitted-Cross-Domain-Policies "none" always;
     }
 
-    location ~ ^/(despre|reguli)/?$ {
+    location ~ ^/(despre|reguli|confidentialitate|termeni|ajutor)/?$ {
         try_files /$1/index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;

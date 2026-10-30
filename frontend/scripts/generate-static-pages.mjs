@@ -9,16 +9,82 @@ const socialImage = 'https://media.micutu.com/og/media-social-preview.png';
 
 const routes = [
   {
+    path: '/',
+    title: 'Media — conversații care contează',
+    description: 'Descoperă o comunitate online pentru idei, imagini și conversații autentice. Creează gratuit un profil pe Media.',
+    schemaType: 'WebSite',
+    eyebrow: 'Comunitate independentă',
+    heading: 'Un loc mai calm pentru idei, imagini și conversații autentice.',
+    sections: [
+      ['Publică și conversează', 'Creează postări, distribuie imagini și participă la discuții într-o interfață rapidă și responsive.'],
+      ['Alege-ți audiența', 'Folosește un profil public sau privat și controlează relațiile, blocările și preferințele de notificare.'],
+      ['Păstrează controlul', 'Administrează sesiunile, exportă datele și folosește centrul privat de siguranță atunci când ai nevoie.'],
+    ],
+  },
+  {
     path: '/despre',
     title: 'Despre Media — o comunitate pentru conversații autentice',
     description: 'Află cum este construită Media: o platformă socială românească, simplă, responsive și orientată către conversații autentice.',
     schemaType: 'AboutPage',
+    eyebrow: 'Despre proiect',
+    heading: 'O rețea socială făcută pentru conversații, nu pentru zgomot.',
+    sections: [
+      ['Conversația înaintea zgomotului', 'Interfața păstrează postările și oamenii în centru, fără mecanisme inutile care să concureze pentru atenție.'],
+      ['Control clar asupra contului', 'Profilul, sesiunile, parola, vizibilitatea și datele pot fi administrate dintr-un singur loc.'],
+      ['Siguranță construită în produs', 'Controalele de acces, raportările private și auditul de moderare sunt aplicate pe server.'],
+    ],
   },
   {
     path: '/reguli',
     title: 'Regulile comunității — Media',
     description: 'Regulile simple care păstrează comunitatea Media sigură, autentică și primitoare pentru toată lumea.',
     schemaType: 'WebPage',
+    eyebrow: 'Regulile comunității',
+    heading: 'Libertatea de a vorbi vine cu grija față de ceilalți.',
+    sections: [
+      ['Respectă oamenii', 'Nu publica amenințări, hărțuire, atacuri țintite sau conținut care încurajează ura.'],
+      ['Publică autentic', 'Nu impersona alte persoane și nu folosi platforma pentru spam, fraude sau linkuri înșelătoare.'],
+      ['Protejează datele personale', 'Nu distribui fără acord informații care pot pune pe cineva în pericol.'],
+    ],
+  },
+  {
+    path: '/confidentialitate',
+    title: 'Confidențialitate și date personale — Media',
+    description: 'Află ce date prelucrează Media, cum sunt protejate și ce controale ai pentru vizibilitate, export și ștergere.',
+    schemaType: 'WebPage',
+    eyebrow: 'Confidențialitate',
+    heading: 'Datele tale trebuie să rămână explicabile și controlabile.',
+    sections: [
+      ['Date și scopuri', 'Media prelucrează date de cont, conținut, relații, sesiuni și evenimente de siguranță pentru a furniza și proteja serviciul.'],
+      ['Vizibilitate', 'Conturile private limitează conținutul la proprietar și urmăritorii acceptați, iar raportările rămân private.'],
+      ['Control și ștergere', 'Poți administra sesiunile și preferințele, descărca un export JSON și șterge permanent contul.'],
+    ],
+  },
+  {
+    path: '/termeni',
+    title: 'Termeni de utilizare — Media',
+    description: 'Condițiile clare pentru folosirea Media, publicarea conținutului, conduită, moderare și închiderea contului.',
+    schemaType: 'WebPage',
+    eyebrow: 'Termeni de utilizare',
+    heading: 'Reguli clare pentru un produs construit responsabil.',
+    sections: [
+      ['Conținutul tău', 'Rămâi responsabil pentru ceea ce publici și acorzi numai permisiunea tehnică necesară afișării conținutului.'],
+      ['Conduită', 'Hărțuirea, impersonarea, frauda, spamul, accesul neautorizat și ocolirea controalelor nu sunt acceptate.'],
+      ['Închiderea contului', 'Îți poți exporta datele și șterge contul după o confirmare explicită protejată prin parolă.'],
+    ],
+  },
+  {
+    path: '/ajutor',
+    title: 'Ajutor și siguranța contului — Media',
+    description: 'Ghid pentru conectare, profil privat, notificări, raportare, exportul datelor și ștergerea contului Media.',
+    schemaType: 'WebPage',
+    eyebrow: 'Centru de ajutor',
+    heading: 'Răspunsuri directe pentru contul și siguranța ta.',
+    sections: [
+      ['Acces la cont', 'Sesiunile folosesc cookie-uri HttpOnly. Verificarea și recuperarea prin email sunt afectate momentan de incidentul SMTP Brevo.'],
+      ['Notificări și vizibilitate', 'Poți controla separat notificările viitoare și poți limita conținutul prin profilul privat.'],
+      ['Siguranță și date', 'Blocarea, silențierea, raportarea, exportul și ștergerea sunt disponibile din interfața contului.'],
+    ],
   },
 ];
 
@@ -56,12 +122,15 @@ function renderRoute(shell, route) {
     url: canonicalUrl,
     inLanguage: 'ro-RO',
     image: socialImage,
-    isPartOf: {
+    dateModified: '2026-10-30',
+  };
+  if (route.schemaType !== 'WebSite') {
+    structuredData.isPartOf = {
       '@type': 'WebSite',
       name: 'Media',
       url: 'https://media.micutu.com/',
-    },
-  };
+    };
+  }
 
   let html = shell.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(route.title)}</title>`);
   html = replaceMeta(html, 'name', 'description', route.description);
@@ -76,16 +145,40 @@ function renderRoute(shell, route) {
 
   const structuredDataPattern = /<script id="page-structured-data" type="application\/ld\+json">[\s\S]*?<\/script>/i;
   if (!structuredDataPattern.test(html)) throw new Error('Missing page structured data block');
-  return html.replace(
+  html = html.replace(
     structuredDataPattern,
     `<script id="page-structured-data" type="application/ld+json">${JSON.stringify(structuredData)}</script>`,
   );
+
+  const rootPattern = /<div id="root"><\/div>/i;
+  if (!rootPattern.test(html)) throw new Error('Missing empty application root');
+  const staticSections = route.sections.map(([title, copy], index) => `
+    <article class="surface guideline-card">
+      <span aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
+      <div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(copy)}</p></div>
+    </article>`).join('');
+  const staticPage = `<div id="root">
+  <main class="public-page" id="main-content">
+    <section class="public-hero public-hero-compact app-container">
+      <p class="eyebrow">${escapeHtml(route.eyebrow)}</p>
+      <h1>${escapeHtml(route.heading)}</h1>
+      <p>${escapeHtml(route.description)}</p>
+    </section>
+    <section class="public-section app-container" aria-label="Rezumatul paginii">
+      <div class="guidelines-list">${staticSections}
+      </div>
+    </section>
+  </main>
+</div>`;
+  return html.replace(rootPattern, staticPage);
 }
 
 const shell = await readFile(indexPath, 'utf8');
 
 for (const route of routes) {
-  const outputPath = resolve(distRoot, route.path.slice(1), 'index.html');
+  const outputPath = route.path === '/'
+    ? indexPath
+    : resolve(distRoot, route.path.slice(1), 'index.html');
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, renderRoute(shell, route));
 }

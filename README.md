@@ -5,8 +5,10 @@ The application currently provides account management, email verification and
 password recovery, user profiles, avatars, posts, image uploads, likes, and
 comments. It also includes a paginated feed, community search, responsive mobile
 navigation, active-session controls, a private security-activity timeline,
-public project/community pages, real HTTP 404 handling, and account-bound upload
-quotas with automatic cleanup of abandoned images. Authenticated members can
+public project/community/privacy/terms/help pages, real HTTP 404 handling, and
+account-bound upload quotas with automatic cleanup of abandoned images. The
+editorial routes ship crawlable build-time HTML in addition to route-specific
+metadata. Authenticated members can
 also keep a private, paginated collection of saved posts, download a
 password-confirmed JSON copy of their account data, and permanently delete their
 account through a double-confirmed flow with retryable media cleanup.
@@ -112,7 +114,7 @@ The next project goals are:
    richer discovery, and granular audiences.
 6. Complete the privacy program with a data inventory, retention schedule,
    asynchronous large-account exports, DPIA screening, processor records, and
-   privacy/terms/help content.
+   formal legal review, operator contact details, and approved policy text.
 7. Add server-rendered or pre-rendered public profiles/posts, Search Console
    integration, and real-user Core Web Vitals monitoring.
 

@@ -401,14 +401,17 @@ media.
   cascades, counter reconciliation, physical file deletion, and an empty queue.
 
 No complete data inventory, retention schedule, consent/lawful-basis record,
-legal-hold procedure, processor inventory, privacy policy implementation, or
-breach communication template was found. This feature is not by itself a claim
-of GDPR compliance.
+legal-hold procedure, approved processor inventory, formal operator/contact
+notice, or breach communication template was found. A public privacy disclosure,
+terms page, and help center now describe the implemented controls, vendors,
+known SMTP incident, deletion caveats, and unfinished governance without claiming
+GDPR compliance; they are not a substitute for legal review and approval.
 
 **Remediation:** perform a data inventory and DPIA screening, minimize retained
 data, add asynchronous export and retention jobs, define deletion behavior for
-backups/legal holds, document lawful bases and processors, publish the privacy
-policy, and test the GDPR incident workflow.
+backups/legal holds, document lawful bases and processors, add verified operator
+and private contact details, obtain legal approval for the public policy text,
+and test the GDPR incident workflow.
 
 #### SEC-018 — Production email delivery is unavailable
 

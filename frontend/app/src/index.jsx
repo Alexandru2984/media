@@ -14,6 +14,9 @@ import VerifyEmailChange from './pages/VerifyEmailChange';
 import Search from './pages/Search';
 import About from './pages/About';
 import CommunityGuidelines from './pages/CommunityGuidelines';
+import Privacy from './pages/Privacy';
+import Terms from './pages/Terms';
+import Help from './pages/Help';
 import SavedPosts from './pages/SavedPosts';
 import Connections from './pages/Connections';
 import FollowRequests from './pages/FollowRequests';
@@ -24,6 +27,10 @@ import NotFound from './pages/NotFound';
 import './index.css';
 
 const root = document.getElementById('root');
+
+// Public editorial routes ship useful crawlable HTML. The interactive client
+// replaces that build-time snapshot instead of duplicating it after hydration.
+root.replaceChildren();
 
 render(
   () => (
@@ -44,6 +51,9 @@ render(
           <Route path="/salvate" component={SavedPosts} />
           <Route path="/despre" component={About} />
           <Route path="/reguli" component={CommunityGuidelines} />
+          <Route path="/confidentialitate" component={Privacy} />
+          <Route path="/termeni" component={Terms} />
+          <Route path="/ajutor" component={Help} />
           <Route path="/verify-email" component={VerifyEmail} />
           <Route path="/forgot-password" component={ForgotPassword} />
           <Route path="/reset-password" component={ResetPassword} />
