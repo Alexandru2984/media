@@ -1,30 +1,48 @@
 /* @refresh reload */
+import { lazy, Suspense } from 'solid-js';
 import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import { AuthProvider } from './AuthContext';
 import { ThemeProvider } from './ThemeContext';
 import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Profile from './pages/Profile';
-import VerifyEmail from './pages/VerifyEmail';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import VerifyEmailChange from './pages/VerifyEmailChange';
-import Search from './pages/Search';
-import About from './pages/About';
-import CommunityGuidelines from './pages/CommunityGuidelines';
-import Privacy from './pages/Privacy';
-import Terms from './pages/Terms';
-import Help from './pages/Help';
-import SavedPosts from './pages/SavedPosts';
-import Connections from './pages/Connections';
-import FollowRequests from './pages/FollowRequests';
-import Notifications from './pages/Notifications';
-import SafetyCenter from './pages/SafetyCenter';
-import Moderation from './pages/Moderation';
-import NotFound from './pages/NotFound';
 import './index.css';
+
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Profile = lazy(() => import('./pages/Profile'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const VerifyEmailChange = lazy(() => import('./pages/VerifyEmailChange'));
+const Search = lazy(() => import('./pages/Search'));
+const About = lazy(() => import('./pages/About'));
+const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Help = lazy(() => import('./pages/Help'));
+const SavedPosts = lazy(() => import('./pages/SavedPosts'));
+const Connections = lazy(() => import('./pages/Connections'));
+const FollowRequests = lazy(() => import('./pages/FollowRequests'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const SafetyCenter = lazy(() => import('./pages/SafetyCenter'));
+const Moderation = lazy(() => import('./pages/Moderation'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+function RouteRoot(props) {
+  return (
+    <Suspense fallback={(
+      <main class="route-loading" role="status" aria-live="polite" aria-busy="true">
+        <svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" opacity="0.24" />
+          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <span>Se încarcă pagina…</span>
+      </main>
+    )}>
+      {props.children}
+    </Suspense>
+  );
+}
 
 const root = document.getElementById('root');
 
@@ -36,7 +54,7 @@ render(
   () => (
     <ThemeProvider>
       <AuthProvider>
-        <Router>
+        <Router root={RouteRoot}>
           <Route path="/" component={Home} />
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />

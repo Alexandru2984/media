@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/generate-static-pages.mjs",
+    "build": "vite build && node scripts/generate-static-pages.mjs && node scripts/check-dist.mjs",
+    "check:dist": "node scripts/check-dist.mjs",
     "preview": "vite preview",
     "audit": "npm audit --audit-level=low"
   },

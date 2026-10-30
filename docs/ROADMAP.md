@@ -302,6 +302,12 @@ controls and unfinished governance instead of claiming legal compliance. Public
 profile/post rendering, formal legal/operator details, Search Console, and
 real-user Core Web Vitals monitoring remain open.
 
+Route-level code splitting now keeps the homepage in the entry bundle and loads
+the other screens on demand behind an accessible Suspense state. The entry
+JavaScript fell from 219,850 to 102,600 bytes (61.77 to 32.70 KiB gzip). A build
+gate caps entry JavaScript at 130 KB, CSS at 85 KB, and total JavaScript at
+300 KB, while also rejecting source maps and missing public-page SEO artifacts.
+
 A mobile Lighthouse snapshot against the Cloudflare-served production page
 scored SEO 100, accessibility 100, performance 80, and best practices 77, with
 2.0 s LCP and 0.005 CLS. Most measured blocking time and both deprecation notices
@@ -325,8 +331,9 @@ as application-bundle regressions.
    Keep the authenticated safety center private and `noindex` by design.
 7. Add clean public URLs, redirect policy, lowercase/normalization rules, and
    `hreflang` only when real localized content exists.
-8. Improve Core Web Vitals: route/code splitting, critical CSS, responsive images,
-   lazy loading, font strategy, long-lived hashed assets, and bundle budgets.
+8. Improve Core Web Vitals: route/code splitting and bundle budgets are now
+   enforced. ✅ Continue with critical CSS, responsive images, broader lazy
+   loading, and real-user validation of the font/rendering strategy.
 9. Monitor Search Console, crawl/index coverage, rich-result validity, 404s,
    sitemap freshness, and real-user CWV.
 

@@ -73,7 +73,9 @@ npm run build
 ```
 
 Outputurile sunt `backend/target/release/social-media-backend` și
-`frontend/dist`. Nu le comite.
+`frontend/dist`. Nu le comite. Build-ul frontend rulează automat gate-ul din
+`scripts/check-dist.mjs`; o depășire de buget, un source map, un canonical lipsă
+sau un sitemap inconsistent trebuie să oprească release-ul.
 
 ## Canary backend
 

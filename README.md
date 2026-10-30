@@ -165,7 +165,10 @@ npm run build
 ```
 
 Vite writes the generated application to `frontend/dist`; that directory must
-never be used as a source directory or committed.
+never be used as a source directory or committed. Non-home routes are split into
+lazy chunks with an accessible loading state. The production build also enforces
+entry-JavaScript, stylesheet, and total-JavaScript budgets; rejects source maps;
+and verifies every public page, canonical URL, and sitemap entry.
 
 ## Git workflow
 

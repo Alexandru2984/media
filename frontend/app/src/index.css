@@ -118,6 +118,23 @@ a {
   min-height: 100vh;
 }
 
+.route-loading {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  font-weight: 720;
+}
+
+.route-loading .spinner {
+  width: 28px;
+  height: 28px;
+  color: var(--brand);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
