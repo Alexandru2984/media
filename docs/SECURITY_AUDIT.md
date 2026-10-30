@@ -690,6 +690,26 @@ canary fetched the entry, profile, and privacy chunks through Cloudflare with
 all services remained active, and the previous immutable frontend release is
 the rollback target.
 
+### Strict-pagination production checkpoint
+
+Backend commit `8fe1995` deployed SHA-256
+`b61231783b97f7b69c3e16cbd342beffcbe4052cc2e60f4cd905a82a67398e56`
+on 2026-10-30 without a schema or data mutation. The public Cloudflare Tunnel
+canary returned `200` for default pagination and the exact `limit=50`,
+`offset=10000` boundary. Zero, negative, malformed, fractional, over-limit, and
+over-offset inputs returned generic `400` problem responses without reflecting
+query details; an unauthenticated private endpoint retained its auth-first `401`
+boundary.
+
+Direct and public liveness/readiness returned `200`. The API, Nginx, and
+Cloudflare Tunnel services remained active with zero unexpected restarts; the
+API journal contained no query strings and no warning-or-higher messages during
+the canary. The root-only rollback binary is
+`media-binary-pre-pagination-20261030T112302Z-8fe1995` and the immutable staged
+candidate is `social-media-backend-20261030T112302Z-8fe1995`. The release used no
+database backup because it performs no migration or data write; the existing
+preference-release database backup remains the most recent schema checkpoint.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
