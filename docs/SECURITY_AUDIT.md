@@ -733,6 +733,27 @@ The atomic symlink's rollback target is
 required. The VPS has no browser, so this checkpoint does not claim a new visual
 or screen-reader regression pass.
 
+### Bounded frontend transport checkpoint
+
+Frontend release `20261030T112913Z-bcdfdc7` routes JSON and multipart API calls
+through one same-origin transport. Ordinary calls now abort after 15 seconds and
+bounded image uploads after 45 seconds; explicit caller cancellation remains
+distinct. Bodyless requests no longer send a misleading JSON content type,
+multipart boundaries remain browser-generated, and timeout, network, abort, and
+malformed-success responses expose only stable generic errors. Mutations are not
+automatically retried, avoiding duplicate writes after an ambiguous timeout.
+
+Eight Node contract tests run as a mandatory build prerequisite. The build and
+zero-finding low-threshold npm audit passed; the 105,995-byte entry and
+235,696-byte total JavaScript remain within enforced budgets. Direct and public
+canaries verified the new entry, profile chunk, prior entry compatibility,
+immutable JavaScript delivery, all transport/recovery runtime markers, bodyless
+public API reads, health, and real `404` handling. API, Nginx, and Tunnel retained
+zero unexpected restarts and no warning-or-higher journal events. The atomic
+rollback release is `20261030T112630Z-4aa95ac`; no schema, data, service restart,
+or configuration change was required. Browser interaction testing remains open
+because the VPS has no browser runtime.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
