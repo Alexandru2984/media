@@ -219,8 +219,10 @@ sudo cat /var/lib/social-media-backup/last-success.env
 ```
 
 Configurația dedicată live este `/etc/social-media/rclone-backup.conf`,
-`root:root 0600`, și include numai remotes necesare. După schimbarea tokenului,
-client ID-ului Google sau parolei crypt, rerulează installerul și dry-run-ul.
+`root:root 0600`, include numai remotes necesare și fixează Drive la ID-ul
+folderului criptat. Unitățile execută numai copiile `root:root` din
+`/usr/local/libexec`, nu checkout-ul editabil. După schimbarea tokenului, client
+ID-ului Google sau parolei crypt, rerulează installerul și dry-run-ul.
 Păstrează separat, offline și controlat, materialul crypt necesar recuperării
 după pierderea completă a VPS-ului; nu îl comite și nu îl copia în loguri.
 

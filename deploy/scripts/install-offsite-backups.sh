@@ -7,6 +7,8 @@ readonly repository_root="/var/www/media.micutu.com"
 readonly source_config="/home/micu/.config/rclone/rclone.conf"
 readonly config_root="/etc/social-media"
 readonly target_config="$config_root/rclone-backup.conf"
+readonly installed_backup="/usr/local/libexec/social-media-backup"
+readonly installed_restore_drill="/usr/local/libexec/social-media-restore-drill"
 
 usage() {
   echo "Usage: sudo $0 [--dry-run]" >&2
@@ -26,7 +28,7 @@ if [[ $EUID -ne 0 ]]; then
   exit 77
 fi
 
-for command in awk chmod find install mktemp rclone sha256sum stat systemctl; do
+for command in awk chmod find install jq mktemp rclone sha256sum stat systemctl; do
   if ! command -v "$command" >/dev/null; then
     echo "Required command is unavailable: $command" >&2
     exit 69
@@ -83,7 +85,10 @@ if [[ $dry_run -eq 1 ]]; then
   echo "dry_run=passed"
   echo "source_config_owner=micu:micu"
   echo "dedicated_sections=gdrive,gdrive-vps-crypt"
+  echo "drive_root=VPS-Backups-Encrypted-folder-id"
   echo "target_config=$target_config"
+  echo "backup_executable=$installed_backup"
+  echo "restore_executable=$installed_restore_drill"
   echo "timer=social-media-backup.timer"
   echo "restore_timer=social-media-restore-drill.timer"
   exit 0
@@ -106,9 +111,38 @@ cleanup() {
 trap cleanup EXIT
 
 source_hash_before=$(sha256sum -- "$source_config" | awk '{print $1}')
-awk '
-  /^\[/ { wanted = ($0 == "[gdrive]" || $0 == "[gdrive-vps-crypt]") }
+mapfile -t backup_folder_ids < <(rclone --config "$source_config" \
+  lsjson "gdrive:" --dirs-only --max-depth 1 | \
+  jq -r '.[] | select(.Name == "VPS-Backups-Encrypted") | .ID')
+if [[ ${#backup_folder_ids[@]} -ne 1 || \
+      ! ${backup_folder_ids[0]} =~ ^[A-Za-z0-9_-]+$ ]]; then
+  echo "Expected exactly one encrypted Google Drive backup folder" >&2
+  exit 65
+fi
+backup_folder_id=${backup_folder_ids[0]}
+awk -v root_id="$backup_folder_id" '
+  $0 == "[gdrive]" {
+    section="gdrive"; wanted=1; root_written=0; print; next
+  }
+  $0 == "[gdrive-vps-crypt]" {
+    if (section == "gdrive" && !root_written) print "root_folder_id = " root_id
+    section="crypt"; wanted=1; print; next
+  }
+  /^\[/ {
+    if (section == "gdrive" && !root_written) print "root_folder_id = " root_id
+    section="other"; wanted=0; next
+  }
+  section == "gdrive" && /^[[:space:]]*root_folder_id[[:space:]]*=/ {
+    if (!root_written) print "root_folder_id = " root_id
+    root_written=1; next
+  }
+  section == "crypt" && /^[[:space:]]*remote[[:space:]]*=/ {
+    print "remote = gdrive:"; next
+  }
   wanted { print }
+  END {
+    if (section == "gdrive" && !root_written) print "root_folder_id = " root_id
+  }
 ' "$source_config" >"$temporary_config"
 source_hash_after=$(sha256sum -- "$source_config" | awk '{print $1}')
 if [[ $source_hash_before != "$source_hash_after" ]]; then
@@ -130,11 +164,36 @@ if [[ ${#copied_remotes[@]} -ne 2 || $seen_gdrive -ne 1 || $seen_crypt -ne 1 ]];
 fi
 rclone --config "$temporary_config" about "gdrive-vps-crypt:" --json >/dev/null
 
+dedicated_root_id=$(awk '
+  $0 == "[gdrive]" { wanted=1; next }
+  /^\[/ { wanted=0 }
+  wanted && /^[[:space:]]*root_folder_id[[:space:]]*=/ {
+    sub(/^[^=]*=[[:space:]]*/, ""); print; exit
+  }
+' "$temporary_config")
+dedicated_crypt_target=$(awk '
+  $0 == "[gdrive-vps-crypt]" { wanted=1; next }
+  /^\[/ { wanted=0 }
+  wanted && /^[[:space:]]*remote[[:space:]]*=/ {
+    sub(/^[^=]*=[[:space:]]*/, ""); print; exit
+  }
+' "$temporary_config")
+if [[ $dedicated_root_id != "$backup_folder_id" || \
+      $dedicated_crypt_target != "gdrive:" ]]; then
+  echo "Dedicated rclone configuration is not pinned to the encrypted folder" >&2
+  exit 65
+fi
+
 install -o root -g root -m 0600 "$temporary_config" "$target_config"
 find "$temporary_config" -maxdepth 0 -type f -delete
 temporary_config=""
 
 install -d -o root -g root -m 0700 /var/backups/social-media-offsite
+install -o root -g root -m 0755 \
+  "$repository_root/deploy/scripts/backup-offsite.sh" "$installed_backup"
+install -o root -g root -m 0755 \
+  "$repository_root/deploy/scripts/drill-offsite-restore.sh" \
+  "$installed_restore_drill"
 install -o root -g root -m 0644 \
   "$repository_root/deploy/systemd/social-media-backup.service" \
   /etc/systemd/system/social-media-backup.service
@@ -152,6 +211,8 @@ systemctl enable --now social-media-backup.timer social-media-restore-drill.time
 
 echo "install=passed"
 echo "dedicated_config=$target_config"
+echo "drive_root_pinned=yes"
+echo "executables_root_owned=yes"
 echo "timer=social-media-backup.timer"
 echo "restore_timer=social-media-restore-drill.timer"
 echo "backup_started=no"

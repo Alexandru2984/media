@@ -102,8 +102,11 @@ remote upload is purged only from the exact newly generated destination.
 
 The installer copies only the required `gdrive` and `gdrive-vps-crypt` sections
 from the operator's mode-`0600` rclone configuration into a dedicated
-`root:root`, mode-`0600` file. It does not print configuration values and does not
-start a backup implicitly:
+`root:root`, mode-`0600` file. The copied Drive remote is pinned to the immutable
+ID of `VPS-Backups-Encrypted`, while the crypt remote points at that restricted
+root. It also installs root-owned executable copies under `/usr/local/libexec`,
+so a timer never executes the user-owned checkout directly. It does not print
+configuration values and does not start a backup implicitly:
 
 ```bash
 sudo deploy/scripts/install-offsite-backups.sh --dry-run

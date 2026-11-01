@@ -34,10 +34,12 @@ Hardening should remain explicit. Do not remove a sandbox control to mask a
 failure without first identifying the exact required resource or syscall.
 
 The backup unit is root-only because it needs the local MariaDB administrative
-socket and read access to the `www-data` upload tree. Its capability set is
-bounded to `CAP_DAC_READ_SEARCH`, its filesystem writes are limited to the
+socket. It receives the `www-data` supplementary group for read-only upload-tree
+access and has an empty capability set. Its filesystem writes are limited to the
 dedicated staging, systemd state/runtime, and rclone-token directories, and its
-rclone config contains only the Google Drive plus crypt remotes. Install it through
+rclone config contains only the Google Drive plus crypt remotes, with Drive
+pinned to the encrypted folder ID. Root timers execute only the root-owned copies
+under `/usr/local/libexec`, never the user-owned checkout. Install it through
 `deploy/scripts/install-offsite-backups.sh`; do not point a root timer at a
 user-writable rclone configuration.
 
