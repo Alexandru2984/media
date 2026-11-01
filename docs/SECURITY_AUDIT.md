@@ -1076,6 +1076,14 @@ separately scoped credential, repeated public-404 proof, log/content attribution
 and a documented GDPR assessment are open P1 exit conditions; this is not marked
 contained or closed at the CDN layer.
 
+Commit `a85e5e1` installs an inert root-owned purge utility without reusing or
+broadening the analytics token. It accepts one strict managed-image path, requires
+the origin to be a `no-store` 404, uses a fixed root-only credential file, offers
+no broad purge selector, and verifies the public response after Cloudflare
+accepts the request. Traversal and missing-credential tests fail closed; the
+installed hash matches the repository. The dedicated `Cache Purge` zone token is
+not yet provisioned, so no live purge or containment claim is made.
+
 Retained Nginx logs span 2026-10-28 00:53 through 2026-11-01 21:04 local time
 and contain 10 origin requests for this exact path from two client addresses:
 five `200`, five `404`, all with curl user agents and no referrer. This is
@@ -1139,6 +1147,8 @@ is also in the backup supply chain and its private OAuth-client migration is P1.
 - [OWASP HTML5 Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html)
 - [systemd execution sandboxing](https://www.freedesktop.org/software/systemd/man/systemd.exec.html)
 - [rclone Google Drive configuration](https://rclone.org/drive/#making-your-own-client-id)
+- [Cloudflare purge API](https://developers.cloudflare.com/api/resources/cache/methods/purge/)
+- [Cloudflare single-file purge](https://developers.cloudflare.com/cache/how-to/purge-cache/purge-by-single-file/)
 - [RustSec Advisory Database](https://rustsec.org/)
 
 ## Exit criteria for the P0 gate

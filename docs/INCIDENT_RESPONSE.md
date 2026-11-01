@@ -854,3 +854,39 @@ independent monitoring of its own notifier.
 **Verdict:** do not close. Origin containment, future-cache prevention, evidence
 preservation, drift detection, and clean recovery are verified. Exact edge-cache
 purge plus documented content/access/GDPR assessment remain P1 exit conditions.
+
+## CISO review record — exact Cloudflare purge utility
+
+**Date:** 2026-11-01
+
+- Top threats: a broad or attacker-controlled purge causing avoidable origin load
+  (low/medium), token disclosure granting cache-control authority across the zone
+  (low/high), and a successful API response being mistaken for verified removal
+  (medium/high).
+- Blast radius: a dedicated token with `Cache Purge` can evict cached content in
+  the production zone, but cannot read application data. The local tool further
+  restricts operation to one allowlisted managed image and exposes no hostname,
+  prefix, tag, or whole-zone selector.
+- Controls: commit `a85e5e1` accepts only a strict avatar/post image path, reads a
+  fixed `root:root 0600` JSON credential, validates its exact schema, and sends
+  the bearer token to curl over stdin rather than arguments or environment. It
+  refuses to purge until local TLS origin returns `404` plus `no-store`, then
+  requires a public `404` with a non-HIT Cloudflare state. Environment proxies,
+  redirects, query strings, traversal and arbitrary hosts are excluded.
+- Detection and response: API HTTP/result errors are sanitized to code/message;
+  post-purge polling fails closed. The installed root-owned executable matches
+  the repository hash. Invalid traversal and missing-credential tests return 65
+  and 66 respectively. No successful production purge is claimed because the
+  dedicated credential is deliberately absent.
+- Regulatory: exact purge supports erasure and incident containment, but does not
+  replace the retention/legal-hold decision or GDPR incident assessment. Record
+  operator, target, time, API result and public verification without copying the
+  image or token into logs.
+- Vendors/supply chain: Cloudflare documents `Cache Purge` as the accepted token
+  permission and warns that API success only accepts the request; the URL must be
+  fetched again to verify cache state. Scope a new token only to the production
+  zone, rotate it, and keep analytics/Telegram credentials separate.
+
+**Verdict:** ship the inert tool; block live use until the dedicated credential
+exists. After provisioning, purge the legacy URL and require repeated public
+`404`/non-HIT evidence before closing the cache-containment P1.

@@ -382,8 +382,11 @@ restore drill older than nine days. It also reconciles every physical upload wit
 DB references and alerts without deleting on drift or unsafe entries. A legacy
 orphan is quarantined and future avatar responses are `private, no-store`, but
 its exact pre-existing Cloudflare cache key still requires a P1 per-URL purge and
-documented access/content/GDPR assessment. A separate five-minute service-health
-timer now checks four services and seven direct/origin/Tunnel boundaries; its
+documented access/content/GDPR assessment. A root-owned exact-URL purge tool is
+installed and fail-closed; provisioning its separately scoped `Cache Purge` zone
+token and proving repeated public 404/non-HIT responses remain open. A separate
+five-minute service-health timer now checks four services and seven
+direct/origin/Tunnel boundaries; its
 controlled initial failure successfully delivered through the shared Telegram
 notifier. Backup-unit-specific injection, email fallback, and independent
 notifier monitoring remain open.
