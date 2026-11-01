@@ -1,7 +1,8 @@
 [Unit]
 Description=Validate Media off-site backup and restore freshness
 Documentation=file:/var/www/media.micutu.com/deploy/scripts/README.md
-After=social-media-backup.service social-media-restore-drill.service
+Wants=mysql.service
+After=mysql.service social-media-backup.service social-media-restore-drill.service
 OnFailure=swift-vapor-alert@%n.service
 ConditionPathExists=/usr/local/libexec/social-media-backup-health
 
@@ -9,6 +10,7 @@ ConditionPathExists=/usr/local/libexec/social-media-backup-health
 Type=oneshot
 User=root
 Group=root
+SupplementaryGroups=www-data
 UMask=0077
 WorkingDirectory=/
 ExecStart=/usr/local/libexec/social-media-backup-health
@@ -22,8 +24,9 @@ PrivateNetwork=true
 ProtectSystem=strict
 ProtectHome=true
 ReadOnlyPaths=/var/lib/social-media-backup
+ReadOnlyPaths=/var/www/media.micutu.com/backend/uploads
 InaccessiblePaths=/etc/social-media
-InaccessiblePaths=/var/www/media.micutu.com
+InaccessiblePaths=/var/www/media.micutu.com/backend/.env
 ProtectClock=true
 ProtectControlGroups=true
 ProtectHostname=true

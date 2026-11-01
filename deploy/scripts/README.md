@@ -147,5 +147,9 @@ hourly and fails if the last remotely verified backup is older than 30 hours, th
 last successful off-site restore drill is older than nine days, a status marker
 is not `root:root 0600`, or cleanup/verification evidence is invalid. Its failure
 uses the same notifier, covering disabled or missed timers as well as explicit job
-failures. The notifier's own delivery path and throttling remain managed by the
-existing host-level `swift-vapor-alert@.service`.
+failures. The same read-only check compares physical upload files with every
+internal URL referenced by users, posts, managed uploads, and the deletion queue;
+orphans, missing files, symlinks, special entries, or unexpected directories
+alert but are never deleted automatically. The notifier's own delivery path and
+throttling remain managed by the existing host-level
+`swift-vapor-alert@.service`.

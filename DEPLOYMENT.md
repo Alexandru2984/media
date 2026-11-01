@@ -244,7 +244,9 @@ systemctl list-timers social-media-backup.timer \
 Eșecurile celor două joburi sunt trimise către notifierul existent al
 operatorului (Telegram, cu fallback email). Watchdog-ul orar alertează și dacă
 markerul ultimului backup verificat depășește 30 de ore sau drill-ul depășește
-nouă zile, acoperind inclusiv un timer dezactivat ori ratat.
+nouă zile, acoperind inclusiv un timer dezactivat ori ratat. Același check compară
+read-only toate URL-urile interne din DB cu fișierele fizice și alertează pentru
+orfani, fișiere lipsă, symlinkuri sau directoare neașteptate; nu șterge automat.
 
 ## Verificări de securitate după release
 

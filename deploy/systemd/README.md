@@ -57,4 +57,6 @@ Backup, restore, and freshness-check failures use the host's existing
 `swift-vapor-alert@.service`. The hourly health unit has no network namespace,
 an empty capability set, and read-only access only to root-owned success markers;
 it alerts after 30 hours without a verified backup or nine days without a passed
-off-site restore drill.
+off-site restore drill. Read-only MariaDB and upload-tree inventory also fails on
+orphaned, missing, special, symlinked, or structurally unexpected upload files;
+the monitor never mutates application data.
