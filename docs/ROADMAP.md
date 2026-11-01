@@ -302,6 +302,11 @@ including unique titles, descriptions, canonical/hreflang URLs, Open
 Graph/Twitter cards, a dedicated 1200×630 share image, and crawlable editorial
 content rather than an empty application root. Client-side navigation keeps that
 metadata synchronized.
+The 2026-11-01 build adds deterministic 192 px and 512 px PNG icons, a dedicated
+opaque maskable icon, a 180 px Apple touch icon, and matching iOS/mobile shell
+metadata. The release gate validates manifest scope, display mode, colors,
+purposes, PNG signatures, and exact dimensions. No service worker is registered,
+so offline behavior cannot cache authenticated API responses by accident.
 Nginx serves the pre-rendered route documents, returns real `X-Robots-Tag:
 noindex` headers for private and token-bearing routes, and keeps unknown paths at
 HTTP 404. The new privacy disclosure explicitly records the current technical
@@ -332,8 +337,9 @@ as application-bundle regressions.
    validate against current Google guidance rather than emitting unsupported data.
 4. Keep sitemap timestamps and XML/content types valid; add deliberate `410`
    responses for permanently removed public content alongside the live 404 flow.
-5. Add a valid web manifest, icons, favicon, theme colors, installability, and an
-   offline shell that never caches private API data.
+5. Add a valid web manifest, icons, favicon, and theme colors. ✅ Standard,
+   maskable, and Apple assets are build-validated. A deliberately designed
+   offline shell that never caches private API data remains open.
 6. Create indexable landing/about/privacy/terms/help pages with useful copy. ✅
    Keep the authenticated safety center private and `noindex` by design.
 7. Add clean public URLs, redirect policy, lowercase/normalization rules, and

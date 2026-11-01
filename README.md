@@ -8,7 +8,9 @@ navigation, active-session controls, a private security-activity timeline,
 public project/community/privacy/terms/help pages, real HTTP 404 handling, and
 account-bound upload quotas with automatic cleanup of abandoned images. The
 editorial routes ship crawlable build-time HTML in addition to route-specific
-metadata. Every list endpoint uses one strict pagination contract with bounded
+metadata. Mobile installation metadata includes deterministic standard,
+maskable, and Apple touch icons without caching private API data. Every list
+endpoint uses one strict pagination contract with bounded
 collection-specific offsets instead of permitting deep database scans.
 Authenticated members can
 also keep a private, paginated collection of saved posts, download a
@@ -88,7 +90,7 @@ frontend/
   app/
     src/                # Solid.js application source
     index.html          # SPA entry document and global metadata
-  public/               # icon, manifest, robots policy, and sitemap
+  public/               # generated app icons, manifest, robots policy, and sitemap
   dist/                 # generated release output; never committed
 deploy/
   nginx/                # tracked vhost, snippets, and rate-limit zones

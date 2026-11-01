@@ -11,11 +11,24 @@ const budgets = {
   stylesheet: 85_000,
   totalJavaScript: 300_000,
 };
+const requiredPwaIcons = [
+  { src: '/icons/icon-192.png', size: 192, purpose: 'any' },
+  { src: '/icons/icon-512.png', size: 512, purpose: 'any' },
+  { src: '/icons/icon-maskable-512.png', size: 512, purpose: 'maskable' },
+];
 
 function requireMatch(value, pattern, message) {
   const match = value.match(pattern);
   if (!match) throw new Error(message);
   return match;
+}
+
+function readPngSize(buffer, label) {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  if (buffer.length < 24 || !buffer.subarray(0, 8).equals(signature) || buffer.toString('ascii', 12, 16) !== 'IHDR') {
+    throw new Error(`${label} is not a valid PNG with an IHDR header`);
+  }
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }
 
 const rootHtml = await readFile(resolve(distRoot, 'index.html'), 'utf8');
@@ -43,6 +56,45 @@ const entrySize = (await stat(resolve(assetsRoot, entryName))).size;
 const stylesheetSize = (await stat(resolve(assetsRoot, stylesheetName))).size;
 const totalJavaScriptSize = javaScriptSizes.reduce((total, size) => total + size, 0);
 const entryJavaScript = await readFile(resolve(assetsRoot, entryName), 'utf8');
+
+if (!rootHtml.includes(
+  '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180"',
+)) {
+  throw new Error('Missing the 180x180 Apple touch icon link');
+}
+if (!rootHtml.includes('<meta name="mobile-web-app-capable" content="yes"')) {
+  throw new Error('Missing mobile web-app metadata');
+}
+
+const manifest = JSON.parse(await readFile(resolve(distRoot, 'manifest.webmanifest'), 'utf8'));
+if (manifest.id !== '/'
+    || manifest.start_url !== '/'
+    || manifest.scope !== '/'
+    || manifest.display !== 'standalone') {
+  throw new Error('Web manifest navigation or display scope is invalid');
+}
+if (manifest.theme_color !== '#2563eb' || manifest.background_color !== '#f5f7fb') {
+  throw new Error('Web manifest colors do not match the application shell');
+}
+for (const requiredIcon of requiredPwaIcons) {
+  const manifestIcon = manifest.icons?.find((icon) => icon.src === requiredIcon.src);
+  if (!manifestIcon
+      || manifestIcon.type !== 'image/png'
+      || manifestIcon.sizes !== `${requiredIcon.size}x${requiredIcon.size}`
+      || !manifestIcon.purpose?.split(/\s+/).includes(requiredIcon.purpose)) {
+    throw new Error(`Manifest icon metadata is invalid: ${requiredIcon.src}`);
+  }
+  const iconBuffer = await readFile(resolve(distRoot, requiredIcon.src.slice(1)));
+  const dimensions = readPngSize(iconBuffer, requiredIcon.src);
+  if (dimensions.width !== requiredIcon.size || dimensions.height !== requiredIcon.size) {
+    throw new Error(`Manifest icon dimensions are invalid: ${requiredIcon.src}`);
+  }
+}
+const appleIcon = await readFile(resolve(distRoot, 'icons', 'apple-touch-icon.png'));
+const appleIconSize = readPngSize(appleIcon, '/icons/apple-touch-icon.png');
+if (appleIconSize.width !== 180 || appleIconSize.height !== 180) {
+  throw new Error('Apple touch icon dimensions must be 180x180');
+}
 
 for (const runtimeMarker of [
   'skip-link',
@@ -98,4 +150,5 @@ console.log(JSON.stringify({
   total_js_bytes: totalJavaScriptSize,
   route_chunks: javaScriptFiles.length - 1,
   public_pages: publicRoutes.length,
+  pwa_icons: requiredPwaIcons.length + 1,
 }));

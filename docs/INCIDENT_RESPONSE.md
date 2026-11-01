@@ -487,3 +487,36 @@ latency metrics, owned alerts, a tabletop, and restore testing remain follow-ups
 bound, candidate drain proof, a root-only rollback binary, readiness gates, and a
 public Tunnel canary are release requirements. Automated alerting, a tabletop,
 and restore testing remain follow-ups; the SMTP P1 is outside this verdict.
+
+## CISO review record — mobile application icons
+
+**Date:** 2026-11-01
+
+- Top threats: a malformed release asset breaking the mobile shell
+  (low/medium), an unsafe offline cache retaining private API data (medium/high),
+  and vulnerable build tooling processing repository paths (medium/medium).
+- Blast radius: incorrect static metadata can affect branding or installation for
+  every visitor but cannot read or mutate account data. No service worker or
+  offline cache is introduced. Production has zero persistent users at this
+  checkpoint; financial and frequency inputs remain unavailable, so a defensible
+  FAIR annualized-loss estimate cannot be calculated.
+- Controls: icons are generated deterministically with Node built-ins, the
+  maskable asset is opaque with the mark inside its safe zone, and the release
+  gate validates manifest scope, display mode, colors, purpose, PNG signatures,
+  and exact dimensions. The existing SVG remains a fallback.
+- Detection and response: build failure blocks release; public manifest, asset
+  MIME/cache headers, HTML links, and prior-release rollback are canary gates.
+  Target MTTD is the release canary window, although no owned alert monitors PWA
+  metadata between releases.
+- Regulatory: this release changes static presentation only and adds no personal
+  data collection, storage, sharing, processor, identifier, or tracking surface.
+- Vendors/supply chain: no package or vendor is added. `npm audit` identified the
+  transitive build-only `sucrase` 3.35.0 path through vulnerable `glob` and
+  `minimatch`; the lockfile now selects `sucrase` 3.35.1, removes that dependency
+  subtree, and returns zero known findings at the low threshold.
+
+**Verdict:** mitigate then ship. A clean locked install, deterministic generation,
+all frontend contracts, the asset/manifest release gate, zero-finding audit,
+atomic frontend release, and public Tunnel canaries are required. Offline support
+remains explicitly out of scope until private-data caching rules are designed and
+tested.
