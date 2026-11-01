@@ -1013,8 +1013,12 @@ uses rclone's shared client ID, which rclone states will stop working during
 the stolen token's Google authorization. Create a private OAuth client, review a
 `drive.file` migration, reauthorize, rerun the installer and both drills, and
 store the crypt material in a separate offline controlled location. Until backup
-failures route to an owned external alert, failure MTTD remains potentially
-unbounded despite local systemd/journal/state evidence.
+failures are explicitly detected by `OnFailure` and routed through the existing
+Telegram/email operator notifier. An hourly 0.9/10 (`SAFE`) sandboxed watchdog
+also alerts after 30 hours without a verified backup or nine days without a
+successful restore, covering disabled/missed timers. Wiring and healthy execution
+are verified; deliberate end-to-end alert delivery and monitoring of the notifier
+itself remain open.
 
 ### Blast radius
 

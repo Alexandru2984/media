@@ -702,8 +702,11 @@ count, and direct/public readiness remained unchanged.
 - Detection: every run records a root-only success marker and journald outcome;
   backup corruption is detected within the daily run and recoverability is
   exercised weekly. The schedule implies a nominal RPO below roughly one day,
-  but realistic-volume RPO/RTO is unmeasured. Without an owned external alert,
-  job-failure MTTD is still potentially unbounded.
+  but realistic-volume RPO/RTO is unmeasured. Explicit job failures now trigger
+  the existing Telegram/email operator notifier, and an hourly watchdog alerts
+  after 30 hours without a verified backup or nine days without a passed drill.
+  Deliberate alert-delivery testing and independent notifier monitoring remain
+  open.
 - Response: the local and off-host restore procedures have both passed. The
   off-host drill restores only to a generated `social_media_offsite_drill_*`
   database, validates schema, SQLx history and `mariadb-check`, extracts media,
@@ -723,8 +726,8 @@ count, and direct/public readiness remained unchanged.
 prefix, verified download, strict retention, root-owned runtime, folder pinning,
 isolated restore, and cleanup gates satisfy the immediate production condition.
 Operational reliance remains conditional on creating private Google OAuth
-credentials, storing crypt recovery material outside this VPS, and routing stale
-or failed jobs to an owned external alert.
+credentials, storing crypt recovery material outside this VPS, and testing plus
+independently monitoring the existing operator-alert delivery path.
 
 The first backup `20261101T142349Z` passed upload and redownload verification.
 The first scheduled restore failed closed when systemd 259's
@@ -742,3 +745,10 @@ fingerprint `58776476252caba16714b592cbcbdee082d63ae5281442b10b1f9736ab4855f5`,
 and one 24,627-byte upload. No temporary database or local staging remained;
 API, Nginx, Tunnel, and MySQL stayed active with zero API restarts and passing
 direct/public readiness.
+
+Commit `5ecceb4` wired backup, restore and freshness-check failures to the host's
+existing `swift-vapor-alert@.service` Telegram/email notifier. The root-owned
+hourly health executable passed against both live evidence files, all three
+timers are enabled and active, and its systemd exposure score is 0.9 (`SAFE`).
+No synthetic failure was generated, so external delivery itself was not claimed
+as tested.

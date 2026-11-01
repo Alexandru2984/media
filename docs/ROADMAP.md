@@ -368,14 +368,18 @@ bodies are excluded. Strict pagination budgets now reject malformed inputs and
 deep scans consistently, with a production Tunnel boundary canary and root-only
 binary rollback artifact. Browser requests now use one tested transport with
 bounded 15-second normal and 45-second upload timeouts, caller cancellation,
-generic network errors, and correct body-specific headers. Metrics, externally
-routed alerts, realistic-volume RPO/RTO measurement, offline crypt-key escrow,
-and migration-job automation remain open. Daily client-side encrypted DB/upload
+generic network errors, and correct body-specific headers. Metrics, broad
+application SLO alerts, realistic-volume RPO/RTO measurement, offline crypt-key
+escrow, and migration-job automation remain open. Daily client-side encrypted DB/upload
 backups now use a fixed Google Drive crypt prefix, remote-download verification,
 strict 35-day retention, root-owned runtime artifacts, and a folder-pinned
 dedicated config. A weekly drill restores the newest off-host bundle into an
 isolated database, verifies schema/SQLx/`mariadb-check` plus media extraction,
 and removes all staging. Both production exercises passed across 23 tables.
+Backup/restore failures now route to the existing Telegram/email notifier, while
+an hourly freshness watchdog detects a verified backup older than 30 hours or a
+restore drill older than nine days. A deliberate delivery test and independent
+monitoring of that notifier remain open.
 The frontend now has a fail-closed deployer with strict release IDs, artifact
 integrity checks, immutable staging, atomic activation, direct-origin and Tunnel
 canaries, and automatic rollback. Its first live activation plus exact-target
