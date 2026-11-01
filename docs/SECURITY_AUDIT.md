@@ -1052,6 +1052,15 @@ separately scoped credential, repeated public-404 proof, log/content attribution
 and a documented GDPR assessment are open P1 exit conditions; this is not marked
 contained or closed at the CDN layer.
 
+Retained Nginx logs span 2026-10-28 00:53 through 2026-11-01 21:04 local time
+and contain 10 origin requests for this exact path from two client addresses:
+five `200`, five `404`, all with curl user agents and no referrer. This is
+consistent with audit traffic but does not prove identity or absence of other
+access. The window excludes earlier activity, and Cloudflare cache HITs do not
+reach Nginx. Edge-log review remains part of the P1 incident assessment. A prior
+2026-10-29 record incorrectly called the orphan permanently removed; the current
+filesystem, cache, and quarantine evidence supersedes that claim.
+
 Backup `20261101T185747Z` captured the post-quarantine state with 23 tables and
 zero uploads, passed remote-download checks, and restored through the scheduled
 unit. The drill verified 23 tables, 12 migration rows, zero upload files, and

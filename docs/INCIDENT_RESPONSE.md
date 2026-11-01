@@ -274,8 +274,9 @@ testing remain mandatory follow-up work.
 - Validation: isolated and Cloudflare Tunnel matrices exercised public, pending,
   accepted, revoked, blocked, search, saved, comment, interaction, connection,
   export-v3, file cleanup, and stale-media behavior. Canary data returned to zero
-  application rows; one separately verified 2025 orphan with no DB owner or
-  reference was permanently removed.
+  application rows. This checkpoint recorded one separately verified 2025 orphan
+  as permanently removed, but the 2026-11-01 audit found the same path present or
+  restored; that deletion claim is superseded by the containment record below.
 - Rollback: root-only artifacts are
   `media-binary-pre-private-20261029T131654Z-b7114c9`,
   `media-nginx-pre-private-20261029T131654Z-b7114c9/`, and
@@ -793,7 +794,13 @@ as tested.
 - Detection and response: preserve the quarantine and access logs, identify the
   image/provenance and any affected person, bound the period of public and cached
   access, complete the exact Cloudflare purge, and record the deletion or legal
-  hold decision. Do not bulk-delete historical backups or quarantine evidence.
+  hold decision. Retained Nginx logs cover 2026-10-28 00:53 through 2026-11-01
+  21:04 local time. They contain 10 origin requests for the exact path from two
+  client addresses: five `200`, five `404`, all with curl user agents and no
+  referrer. This is consistent with operational testing but is not proof of
+  attribution; it excludes earlier activity and every Cloudflare cache HIT that
+  never reached origin. Obtain edge logs if available. Do not bulk-delete
+  historical backups or quarantine evidence.
 - Regulatory: treat this as a potential personal-data incident until content and
   access evidence show otherwise. Record awareness time, scope, likelihood and
   severity; assess GDPR supervisory-authority notification within 72 hours of
