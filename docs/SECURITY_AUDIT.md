@@ -833,6 +833,35 @@ the immutable deployed candidate is
 `/var/lib/media/backend-candidates/social-media-backend-20261101T135646Z-5e4f9fc`.
 Automated alerting, a multi-person tabletop, and a tested restore remain open.
 
+### Mobile icon and build-tooling checkpoint
+
+Lockfile commit `5c3da44` advances the transitive build-only `sucrase` package
+from 3.35.0 to 3.35.1 and removes its vulnerable `glob`/`minimatch` subtree.
+A clean `npm ci` and the low-threshold audit report zero known vulnerabilities;
+no runtime dependency or vendor was added.
+
+Frontend commit `fe8768a` adds deterministic 192 px and 512 px standard icons,
+an opaque 512 px maskable icon with a safe logo area, and a 180 px Apple touch
+icon. The manifest and HTML expose the matching mobile metadata. The production
+gate now validates navigation scope, standalone display, shell colors, icon
+purposes, PNG signatures, exact dimensions, and the existing JavaScript/CSS
+budgets. No service worker or offline cache was introduced, so authenticated API
+responses are not persisted by this release.
+
+Fifteen Node contracts, a clean locked install, production build, and audit
+passed. Entry JavaScript remained 106,301 bytes, CSS 68,002 bytes, and total
+JavaScript 235,914 bytes. Direct-origin and Cloudflare Tunnel canaries verified
+the HTML link, all manifest icon entries, `image/png` responses with exact byte
+sizes, the maskable checksum, API readiness, and real unknown-route `404`
+behavior. The API, Nginx, and Tunnel remained active with zero unexpected API
+restarts. An unrelated request for `/.git/HEAD` during the checkpoint was denied
+by the existing dotfile rule as designed.
+
+Frontend release `20261101T140207Z-fe8768a` is active. Its atomic rollback target
+is `20261030T113313Z-6eac6de`; no database, backend, Nginx, or Tunnel mutation was
+required. Browser installation testing remains open because the VPS has no
+browser runtime.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
