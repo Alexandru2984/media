@@ -139,6 +139,9 @@ Runtime configuration is supplied through environment variables. The current
 deployment uses values for the application URLs, allowed CORS origin, database,
 SMTP, environment, and loopback server binding. Authentication tokens are random
 opaque values; no signing secret or browser-readable credential is used.
+Upload maintenance is enabled by default and in the live service; isolated
+release candidates explicitly disable that background worker so read-only
+health canaries cannot process production cleanup queues or files.
 
 - Never commit `.env` files, credentials, tokens, database dumps, private keys,
   email-provider secrets, or real user uploads.

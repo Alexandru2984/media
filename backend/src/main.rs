@@ -23,6 +23,14 @@ use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tracing_subscriber::EnvFilter;
 
+fn parse_upload_maintenance_enabled(value: Option<&str>) -> Result<bool, &'static str> {
+    match value {
+        None | Some("true") => Ok(true),
+        Some("false") => Ok(false),
+        Some(_) => Err("UPLOAD_MAINTENANCE_ENABLED must be true or false"),
+    }
+}
+
 async fn shutdown_signal() {
     let interrupt = async {
         if let Err(error) = tokio::signal::ctrl_c().await {
@@ -82,12 +90,20 @@ async fn main() {
         .expect("CORS_ORIGIN must be configured")
         .parse()
         .expect("CORS_ORIGIN must be a valid HTTP header value");
+    let upload_maintenance_enabled = parse_upload_maintenance_enabled(
+        std::env::var("UPLOAD_MAINTENANCE_ENABLED").ok().as_deref(),
+    )
+    .expect("Invalid upload maintenance configuration");
 
     // Initialize database
     let db_pool = database::init_db()
         .await
         .expect("Failed to initialize database");
-    upload_lifecycle::spawn_upload_maintenance(db_pool.clone());
+    if upload_maintenance_enabled {
+        upload_lifecycle::spawn_upload_maintenance(db_pool.clone());
+    } else {
+        tracing::info!("upload maintenance disabled for this process");
+    }
 
     // Build our application with routes
     let cors = CorsLayer::new()
@@ -114,4 +130,27 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("server terminated unexpectedly");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_upload_maintenance_enabled;
+
+    #[test]
+    fn upload_maintenance_remains_enabled_by_default() {
+        assert_eq!(parse_upload_maintenance_enabled(None), Ok(true));
+        assert_eq!(parse_upload_maintenance_enabled(Some("true")), Ok(true));
+    }
+
+    #[test]
+    fn deployment_canaries_can_disable_upload_maintenance() {
+        assert_eq!(parse_upload_maintenance_enabled(Some("false")), Ok(false));
+    }
+
+    #[test]
+    fn upload_maintenance_configuration_fails_closed() {
+        for value in ["TRUE", "False", "0", "", "disabled"] {
+            assert!(parse_upload_maintenance_enabled(Some(value)).is_err());
+        }
+    }
 }

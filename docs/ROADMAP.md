@@ -375,7 +375,9 @@ integrity checks, immutable staging, atomic activation, direct-origin and Tunnel
 canaries, and automatic rollback. Its first live activation plus exact-target
 rollback-and-restore drill passed. The API now drains in-flight work after
 `SIGTERM`/`SIGINT`, bounded by
-systemd's 15-second stop timeout. SMTP
+systemd's 15-second stop timeout. Backend release candidates can disable only
+their background upload-maintenance worker through a strict boolean setting,
+preventing health canaries from processing production cleanup state. SMTP
 authentication is currently rejected by Brevo with `535`; rotating and verifying
 that credential is an immediate P1 operational task because verification and
 password-recovery delivery are down.
