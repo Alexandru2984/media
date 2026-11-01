@@ -160,8 +160,10 @@ throttling remain managed by the existing host-level
 requires all four host services to be active and validates direct API readiness,
 anonymous-auth and pagination rejection, the local Nginx/TLS origin, and the
 public Cloudflare Tunnel path. Each HTTP boundary receives one bounded retry;
-the check sends no credentials, cookies, or request body. Failures use the same
-operator notifier:
+the check sends no credentials, cookies, or request body. It also requires the
+origin and edge certificates to remain valid for at least 14 days, root filesystem
+and inode usage to stay below 85%, and at least 10 GiB to remain free. Failures
+use the same operator notifier:
 
 ```bash
 sudo deploy/scripts/install-service-health.sh --dry-run

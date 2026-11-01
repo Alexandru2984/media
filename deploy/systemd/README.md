@@ -68,4 +68,6 @@ minutes. Its dedicated, non-login `social-media-monitor` identity can query
 systemd and make only ordinary Unix/IPv4/IPv6 connections; it has no credentials,
 writable application path, or capabilities. The check covers service state,
 backend readiness and rejection boundaries, local Nginx/TLS, and the public
-Cloudflare Tunnel. Failures use the same `swift-vapor-alert@.service` path.
+Cloudflare Tunnel. It also alerts 14 days before either origin/edge certificate
+expiry and before root filesystem blocks or inodes reach 85% (or free bytes fall
+below 10 GiB). Failures use the same `swift-vapor-alert@.service` path.

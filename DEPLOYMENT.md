@@ -272,8 +272,9 @@ orfani, fișiere lipsă, symlinkuri sau directoare neașteptate; nu șterge auto
 Monitorul separat `social-media-service-health.timer` rulează la aproximativ
 cinci minute și validează starea celor patru servicii, API-ul direct, limitele
 anonime de autentificare/paginare, Nginx local cu TLS și ruta publică prin
-Cloudflare Tunnel. Nu primește secrete sau cookie-uri; orice eșec intră în același
-notifier Telegram/email.
+Cloudflare Tunnel. Alertează și cu 14 zile înainte de expirarea certificatelor,
+la 85% utilizare de blocuri/inode-uri sau sub 10 GiB liberi. Nu primește secrete
+sau cookie-uri; orice eșec intră în același notifier Telegram/email.
 
 ## Verificări de securitate după release
 
