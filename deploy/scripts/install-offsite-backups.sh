@@ -106,6 +106,7 @@ fi
 
 install -d -o root -g root -m 0700 "$config_root"
 temporary_config=$(mktemp --tmpdir="$config_root" .rclone-backup.conf.XXXXXX)
+source_snapshot=$(mktemp --tmpdir="$config_root" .rclone-source.conf.XXXXXX)
 cleanup() {
   local cleanup_status=$?
   if [[ -n ${temporary_config:-} && -f $temporary_config ]]; then
@@ -116,12 +117,27 @@ cleanup() {
       *) echo "Refusing to remove unexpected temporary config" >&2 ;;
     esac
   fi
+  if [[ -n ${source_snapshot:-} && -f $source_snapshot ]]; then
+    case "$source_snapshot" in
+      /etc/social-media/.rclone-source.conf.*)
+        find "$source_snapshot" -maxdepth 0 -type f -delete
+        ;;
+      *) echo "Refusing to remove unexpected source snapshot" >&2 ;;
+    esac
+  fi
   return "$cleanup_status"
 }
 trap cleanup EXIT
 
 source_hash_before=$(sha256sum -- "$source_config" | awk '{print $1}')
-mapfile -t backup_folder_ids < <(rclone --config "$source_config" \
+install -o root -g root -m 0600 "$source_config" "$source_snapshot"
+source_hash_after=$(sha256sum -- "$source_config" | awk '{print $1}')
+if [[ $source_hash_before != "$source_hash_after" ]]; then
+  echo "Source rclone configuration changed while it was snapshotted" >&2
+  exit 75
+fi
+
+mapfile -t backup_folder_ids < <(rclone --config "$source_snapshot" \
   lsjson "gdrive:" --dirs-only --max-depth 1 | \
   jq -r '.[] | select(.Name == "VPS-Backups-Encrypted") | .ID')
 if [[ ${#backup_folder_ids[@]} -ne 1 || \
@@ -153,12 +169,7 @@ awk -v root_id="$backup_folder_id" '
   END {
     if (section == "gdrive" && !root_written) print "root_folder_id = " root_id
   }
-' "$source_config" >"$temporary_config"
-source_hash_after=$(sha256sum -- "$source_config" | awk '{print $1}')
-if [[ $source_hash_before != "$source_hash_after" ]]; then
-  echo "Source rclone configuration changed during installation" >&2
-  exit 75
-fi
+' "$source_snapshot" >"$temporary_config"
 chmod 0600 "$temporary_config"
 
 mapfile -t copied_remotes < <(rclone --config "$temporary_config" listremotes)
@@ -197,6 +208,8 @@ fi
 install -o root -g root -m 0600 "$temporary_config" "$target_config"
 find "$temporary_config" -maxdepth 0 -type f -delete
 temporary_config=""
+find "$source_snapshot" -maxdepth 0 -type f -delete
+source_snapshot=""
 
 install -d -o root -g root -m 0700 /var/backups/social-media-offsite
 install -o root -g root -m 0755 \
