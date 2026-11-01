@@ -93,7 +93,7 @@ if [[ $dry_run -eq 1 ]]; then
 fi
 
 install -d -m 0700 "$backup_root" "$state_root" "$runtime_root"
-exec 9>"$runtime_root/backup.lock"
+exec 9>"$runtime_root/operation.lock"
 if ! flock -n 9; then
   echo "Another social-media backup or restore drill is already running" >&2
   exit 75

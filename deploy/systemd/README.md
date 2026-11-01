@@ -6,6 +6,8 @@ The tracked unit maps to:
 social-media.service -> /etc/systemd/system/social-media.service
 social-media-backup.service -> /etc/systemd/system/social-media-backup.service
 social-media-backup.timer -> /etc/systemd/system/social-media-backup.timer
+social-media-restore-drill.service -> /etc/systemd/system/social-media-restore-drill.service
+social-media-restore-drill.timer -> /etc/systemd/system/social-media-restore-drill.timer
 ```
 
 The service intentionally writes only to
@@ -38,3 +40,7 @@ dedicated staging, systemd state/runtime, and rclone-token directories, and its
 rclone config contains only the Google Drive plus crypt remotes. Install it through
 `deploy/scripts/install-offsite-backups.sh`; do not point a root timer at a
 user-writable rclone configuration.
+
+The restore drill has the same sandbox and shares the backup operation lock. It
+can create and remove only its generated `social_media_offsite_drill_*` database;
+it never accepts an operator-provided database name.

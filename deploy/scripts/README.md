@@ -118,3 +118,22 @@ The daily timer runs at 02:42 Europe/Bucharest with up to 20 minutes of jitter.
 The rclone crypt password is required after total VPS loss, so keep an offline,
 access-controlled recovery copy of that configuration; an encrypted Drive backup
 without its crypt material is intentionally unrecoverable.
+
+`drill-offsite-restore.sh` runs weekly against the newest strictly named backup,
+or manually against an explicit backup ID. It downloads and verifies the bundle,
+validates metadata without sourcing it, rejects unsafe archive paths or entry
+types, extracts uploads into root-only temporary storage, and restores MariaDB
+only into a generated `social_media_offsite_drill_*` database. Schema SHA-256,
+table count, the complete SQLx migration fingerprint, and `mariadb-check` must
+pass before that temporary database is dropped. The live database receives no
+DDL or DML.
+
+```bash
+sudo deploy/scripts/drill-offsite-restore.sh --dry-run
+sudo deploy/scripts/drill-offsite-restore.sh
+sudo cat /var/lib/social-media-backup/last-restore-drill.env
+```
+
+The backup and drill share one non-blocking operation lock, so a long upload can
+never overlap a restore exercise. The drill timer runs Sundays at 04:20
+Europe/Bucharest with up to 20 minutes of jitter.

@@ -68,8 +68,11 @@ fi
 
 for tracked_file in \
   "$repository_root/deploy/scripts/backup-offsite.sh" \
+  "$repository_root/deploy/scripts/drill-offsite-restore.sh" \
   "$repository_root/deploy/systemd/social-media-backup.service" \
-  "$repository_root/deploy/systemd/social-media-backup.timer"; do
+  "$repository_root/deploy/systemd/social-media-backup.timer" \
+  "$repository_root/deploy/systemd/social-media-restore-drill.service" \
+  "$repository_root/deploy/systemd/social-media-restore-drill.timer"; do
   if [[ ! -f $tracked_file || -L $tracked_file ]]; then
     echo "Tracked deployment file is missing or unsafe: $tracked_file" >&2
     exit 66
@@ -82,6 +85,7 @@ if [[ $dry_run -eq 1 ]]; then
   echo "dedicated_sections=gdrive,gdrive-vps-crypt"
   echo "target_config=$target_config"
   echo "timer=social-media-backup.timer"
+  echo "restore_timer=social-media-restore-drill.timer"
   exit 0
 fi
 
@@ -137,10 +141,17 @@ install -o root -g root -m 0644 \
 install -o root -g root -m 0644 \
   "$repository_root/deploy/systemd/social-media-backup.timer" \
   /etc/systemd/system/social-media-backup.timer
+install -o root -g root -m 0644 \
+  "$repository_root/deploy/systemd/social-media-restore-drill.service" \
+  /etc/systemd/system/social-media-restore-drill.service
+install -o root -g root -m 0644 \
+  "$repository_root/deploy/systemd/social-media-restore-drill.timer" \
+  /etc/systemd/system/social-media-restore-drill.timer
 systemctl daemon-reload
-systemctl enable --now social-media-backup.timer
+systemctl enable --now social-media-backup.timer social-media-restore-drill.timer
 
 echo "install=passed"
 echo "dedicated_config=$target_config"
 echo "timer=social-media-backup.timer"
+echo "restore_timer=social-media-restore-drill.timer"
 echo "backup_started=no"

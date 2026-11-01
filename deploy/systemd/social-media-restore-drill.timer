@@ -1,0 +1,12 @@
+[Unit]
+Description=Verify the latest Media off-site backup every week
+
+[Timer]
+OnCalendar=Sun *-*-* 04:20:00 Europe/Bucharest
+RandomizedDelaySec=20m
+Persistent=true
+AccuracySec=1m
+Unit=social-media-restore-drill.service
+
+[Install]
+WantedBy=timers.target

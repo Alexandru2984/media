@@ -224,6 +224,19 @@ client ID-ului Google sau parolei crypt, rerulează installerul și dry-run-ul.
 Păstrează separat, offline și controlat, materialul crypt necesar recuperării
 după pierderea completă a VPS-ului; nu îl comite și nu îl copia în loguri.
 
+Drill-ul săptămânal descarcă ultimul bundle, verifică hashurile și tipurile/path-
+urile arhivei, extrage uploadurile într-un director temporar și restaurează SQL
+numai într-o bază generată `social_media_offsite_drill_*`. Compară schema,
+numărul de tabele și istoricul SQLx, apoi rulează `mariadb-check`. Baza live nu
+primește nicio scriere, iar baza și staging-ul temporar sunt eliminate.
+
+```bash
+sudo deploy/scripts/drill-offsite-restore.sh --dry-run
+sudo deploy/scripts/drill-offsite-restore.sh
+sudo cat /var/lib/social-media-backup/last-restore-drill.env
+systemctl list-timers social-media-backup.timer social-media-restore-drill.timer
+```
+
 ## Verificări de securitate după release
 
 - serviciile `social-media`, `nginx` și `cloudflared` sunt `active`;
