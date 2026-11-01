@@ -90,7 +90,8 @@ frontend/
   app/
     src/                # Solid.js application source
     index.html          # SPA entry document and global metadata
-  public/               # generated app icons, manifest, robots policy, and sitemap
+  public/               # generated app icons, manifest, robots policy, and share image
+  scripts/              # icon, public-page, sitemap, and release-gate automation
   dist/                 # generated release output; never committed
 deploy/
   nginx/                # tracked vhost, snippets, and rate-limit zones

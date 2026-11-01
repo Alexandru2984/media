@@ -520,3 +520,29 @@ all frontend contracts, the asset/manifest release gate, zero-finding audit,
 atomic frontend release, and public Tunnel canaries are required. Offline support
 remains explicitly out of scope until private-data caching rules are designed and
 tested.
+
+## CISO review record — generated sitemap consistency
+
+**Date:** 2026-11-01
+
+- Top threats: silently omitting a public route from discovery (low/medium),
+  duplicate or malformed URL metadata confusing crawlers (low/medium), and stale
+  modification claims diverging from page JSON-LD (low/low).
+- Blast radius: all six editorial pages can lose search discoverability, but the
+  change cannot access account data, secrets, the API, or authenticated routes.
+  Revenue and search-conversion inputs are unavailable, so a defensible FAIR
+  annualized-loss estimate cannot be calculated.
+- Controls: one route registry now generates both pre-rendered metadata and the
+  sitemap. The release gate rejects missing or duplicate URLs, malformed dates,
+  unsupported change frequencies, non-indexable public pages, and sitemap/JSON-LD
+  divergence.
+- Detection and response: build failure blocks release; direct-origin and Tunnel
+  canaries verify XML MIME, all canonical URLs, modification dates, public-page
+  status, and prior-release rollback. Search Console monitoring remains open, so
+  crawler-side MTTD is otherwise unknown.
+- Regulatory and vendors: no personal-data processing, dependency, processor,
+  vendor, or external submission is added.
+
+**Verdict:** ship with the build gate and atomic rollback. A public sitemap
+canary is mandatory; Search Console ownership and crawl/index alerting remain
+follow-ups.

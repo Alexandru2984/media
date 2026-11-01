@@ -10,6 +10,8 @@ const socialImage = 'https://media.micutu.com/og/media-social-preview.png';
 const routes = [
   {
     path: '/',
+    lastModified: '2026-10-28',
+    changeFrequency: 'daily',
     title: 'Media — conversații care contează',
     description: 'Descoperă o comunitate online pentru idei, imagini și conversații autentice. Creează gratuit un profil pe Media.',
     schemaType: 'WebSite',
@@ -23,6 +25,8 @@ const routes = [
   },
   {
     path: '/despre',
+    lastModified: '2026-10-28',
+    changeFrequency: 'monthly',
     title: 'Despre Media — o comunitate pentru conversații autentice',
     description: 'Află cum este construită Media: o platformă socială românească, simplă, responsive și orientată către conversații autentice.',
     schemaType: 'AboutPage',
@@ -36,6 +40,8 @@ const routes = [
   },
   {
     path: '/reguli',
+    lastModified: '2026-10-30',
+    changeFrequency: 'monthly',
     title: 'Regulile comunității — Media',
     description: 'Regulile simple care păstrează comunitatea Media sigură, autentică și primitoare pentru toată lumea.',
     schemaType: 'WebPage',
@@ -49,6 +55,8 @@ const routes = [
   },
   {
     path: '/confidentialitate',
+    lastModified: '2026-10-30',
+    changeFrequency: 'monthly',
     title: 'Confidențialitate și date personale — Media',
     description: 'Află ce date prelucrează Media, cum sunt protejate și ce controale ai pentru vizibilitate, export și ștergere.',
     schemaType: 'WebPage',
@@ -62,6 +70,8 @@ const routes = [
   },
   {
     path: '/termeni',
+    lastModified: '2026-10-30',
+    changeFrequency: 'monthly',
     title: 'Termeni de utilizare — Media',
     description: 'Condițiile clare pentru folosirea Media, publicarea conținutului, conduită, moderare și închiderea contului.',
     schemaType: 'WebPage',
@@ -75,6 +85,8 @@ const routes = [
   },
   {
     path: '/ajutor',
+    lastModified: '2026-10-30',
+    changeFrequency: 'monthly',
     title: 'Ajutor și siguranța contului — Media',
     description: 'Ghid pentru conectare, profil privat, notificări, raportare, exportul datelor și ștergerea contului Media.',
     schemaType: 'WebPage',
@@ -94,6 +106,31 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;');
+}
+
+function escapeXml(value) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
+function renderSitemap() {
+  const entries = routes.map((route) => {
+    const canonicalUrl = `https://media.micutu.com${route.path}`;
+    return `  <url>
+    <loc>${escapeXml(canonicalUrl)}</loc>
+    <lastmod>${route.lastModified}</lastmod>
+    <changefreq>${route.changeFrequency}</changefreq>
+  </url>`;
+  }).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${entries}
+</urlset>
+`;
 }
 
 function replaceMeta(html, attribute, key, content) {
@@ -122,7 +159,7 @@ function renderRoute(shell, route) {
     url: canonicalUrl,
     inLanguage: 'ro-RO',
     image: socialImage,
-    dateModified: '2026-10-30',
+    dateModified: route.lastModified,
   };
   if (route.schemaType !== 'WebSite') {
     structuredData.isPartOf = {
@@ -182,3 +219,5 @@ for (const route of routes) {
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, renderRoute(shell, route));
 }
+
+await writeFile(resolve(distRoot, 'sitemap.xml'), renderSitemap());

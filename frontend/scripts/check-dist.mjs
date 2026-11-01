@@ -119,6 +119,25 @@ if (totalJavaScriptSize > budgets.totalJavaScript) {
   throw new Error(`Total JavaScript exceeds ${budgets.totalJavaScript} bytes: ${totalJavaScriptSize}`);
 }
 
+const sitemap = await readFile(resolve(distRoot, 'sitemap.xml'), 'utf8');
+const sitemapEntries = new Map();
+for (const match of sitemap.matchAll(
+  /<url>\s*<loc>([^<]+)<\/loc>\s*<lastmod>([^<]+)<\/lastmod>\s*<changefreq>([^<]+)<\/changefreq>\s*<\/url>/g,
+)) {
+  const [, url, lastModified, changeFrequency] = match;
+  if (sitemapEntries.has(url)) throw new Error(`Duplicate sitemap URL: ${url}`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(lastModified)) {
+    throw new Error(`Invalid sitemap lastmod for ${url}: ${lastModified}`);
+  }
+  if (!['daily', 'weekly', 'monthly', 'yearly'].includes(changeFrequency)) {
+    throw new Error(`Invalid sitemap changefreq for ${url}: ${changeFrequency}`);
+  }
+  sitemapEntries.set(url, { lastModified, changeFrequency });
+}
+if (sitemapEntries.size !== publicRoutes.length) {
+  throw new Error(`Sitemap URL count mismatch: expected ${publicRoutes.length}, found ${sitemapEntries.size}`);
+}
+
 for (const route of publicRoutes) {
   const htmlPath = route
     ? resolve(distRoot, route, 'index.html')
@@ -136,12 +155,17 @@ for (const route of publicRoutes) {
   if (html.includes('noindex')) {
     throw new Error(`Public route /${route} must remain indexable`);
   }
-}
-
-const sitemap = await readFile(resolve(distRoot, 'sitemap.xml'), 'utf8');
-const sitemapUrlCount = sitemap.match(/<loc>/g)?.length ?? 0;
-if (sitemapUrlCount !== publicRoutes.length) {
-  throw new Error(`Sitemap URL count mismatch: expected ${publicRoutes.length}, found ${sitemapUrlCount}`);
+  const sitemapEntry = sitemapEntries.get(canonicalUrl);
+  if (!sitemapEntry) throw new Error(`Missing sitemap entry for /${route}`);
+  const structuredDataText = requireMatch(
+    html,
+    /<script id="page-structured-data" type="application\/ld\+json">([^<]+)<\/script>/i,
+    `Missing structured data for /${route}`,
+  )[1];
+  const structuredData = JSON.parse(structuredDataText);
+  if (structuredData.url !== canonicalUrl || structuredData.dateModified !== sitemapEntry.lastModified) {
+    throw new Error(`Structured data and sitemap metadata diverge for /${route}`);
+  }
 }
 
 console.log(JSON.stringify({

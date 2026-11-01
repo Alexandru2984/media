@@ -307,6 +307,9 @@ opaque maskable icon, a 180 px Apple touch icon, and matching iOS/mobile shell
 metadata. The release gate validates manifest scope, display mode, colors,
 purposes, PNG signatures, and exact dimensions. No service worker is registered,
 so offline behavior cannot cache authenticated API responses by accident.
+The pre-render generator also owns sitemap output and each route's modification
+date; the release gate rejects missing/duplicate URLs, malformed dates or change
+frequencies, and any difference between sitemap and JSON-LD metadata.
 Nginx serves the pre-rendered route documents, returns real `X-Robots-Tag:
 noindex` headers for private and token-bearing routes, and keeps unknown paths at
 HTTP 404. The new privacy disclosure explicitly records the current technical
