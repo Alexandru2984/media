@@ -95,6 +95,7 @@ frontend/
   dist/                 # generated release output; never committed
 deploy/
   nginx/                # tracked vhost, snippets, and rate-limit zones
+  scripts/              # fail-closed atomic release automation and runbook
   systemd/              # tracked hardened API service unit
 docs/                   # living security audit and delivery roadmap
 ```

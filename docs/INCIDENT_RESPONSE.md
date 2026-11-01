@@ -546,3 +546,37 @@ tested.
 **Verdict:** ship with the build gate and atomic rollback. A public sitemap
 canary is mandatory; Search Console ownership and crawl/index alerting remain
 follow-ups.
+
+## CISO review record — frontend release automation
+
+**Date:** 2026-11-01
+
+- Top threats: release-ID/path injection reaching root-owned paths (high/high),
+  partial or corrupted staging replacing the site (medium/high), and rollback to
+  an unintended target after a failed canary (medium/high).
+- Blast radius: a faulty activation can make the static frontend unavailable for
+  every visitor. The API, database, secrets, uploads, Nginx configuration, and
+  service processes are outside the deployer's mutation scope. Production has
+  zero persistent users at this checkpoint, and financial inputs remain unknown.
+- Controls: only a strict UTC timestamp plus lowercase Git SHA is accepted; all
+  filesystem roots are fixed; source symlinks, escaped current targets, existing
+  destinations, and non-root activation are rejected. Build/audit run unprivileged.
+  Staging checks file count and critical SHA-256 values before an atomic symlink
+  switch. Direct-origin and Tunnel canaries trigger exact-target rollback. No
+  release is automatically deleted.
+- Detection and response: failed staging, integrity, activation, or HTTP gates
+  terminate nonzero with the rollback result and prior target. MTTD for release
+  regressions is the canary window; between releases, owned external alerting is
+  still absent.
+- Regulatory: frontend availability can affect access to personal-data controls,
+  so an incident still requires GDPR impact assessment, but this change adds no
+  personal-data processing or disclosure path.
+- Vendors/supply chain: no dependency, vendor, processor, secret, or external
+  deployment platform is added.
+- Validation: Bash syntax, ShellCheck, a positive dry-run, invalid-ID rejection,
+  existing-target rejection, the frontend build gate, and zero-finding npm audit
+  passed. A live activation/rollback-path exercise remains a release requirement.
+
+**Verdict:** mitigate then ship. Exercise the committed script against production
+with the current release retained, verify all services and public behavior, and
+record the exact automatic rollback target before relying on it operationally.

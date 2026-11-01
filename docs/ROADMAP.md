@@ -369,9 +369,12 @@ deep scans consistently, with a production Tunnel boundary canary and root-only
 binary rollback artifact. Browser requests now use one tested transport with
 bounded 15-second normal and 45-second upload timeouts, caller cancellation,
 generic network errors, and correct body-specific headers. Metrics, alerts,
-retention policy, restore drills, and release automation remain open. The API
-now drains in-flight work after `SIGTERM`/`SIGINT`, bounded by systemd's
-15-second stop timeout. SMTP
+retention policy, restore drills, and backend release automation remain open.
+The frontend now has a fail-closed deployer with strict release IDs, artifact
+integrity checks, immutable staging, atomic activation, direct-origin and Tunnel
+canaries, and automatic rollback; its first live exercise remains a release
+gate. The API now drains in-flight work after `SIGTERM`/`SIGINT`, bounded by
+systemd's 15-second stop timeout. SMTP
 authentication is currently rejected by Brevo with `535`; rotating and verifying
 that credential is an immediate P1 operational task because verification and
 password-recovery delivery are down.
