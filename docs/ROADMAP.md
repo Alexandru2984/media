@@ -386,7 +386,8 @@ documented access/content/GDPR assessment. A root-owned exact-URL purge tool is
 installed and fail-closed; provisioning its separately scoped `Cache Purge` zone
 token and proving repeated public 404/non-HIT responses remain open. A separate
 five-minute service-health timer now checks four services and seven
-direct/origin/Tunnel boundaries; its
+direct/origin/Tunnel boundaries, both certificate-expiry windows, and root
+filesystem block/inode/free-space thresholds; its
 controlled initial failure successfully delivered through the shared Telegram
 notifier. Backup-unit-specific injection, email fallback, and independent
 notifier monitoring remain open.

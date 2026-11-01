@@ -771,12 +771,17 @@ Telegram; backup-unit-specific triggering and email fallback remain untested.
   pagination rejection, local Nginx/TLS, homepage delivery, and public Cloudflare
   Tunnel readiness. Commit `ddeafec` runs it as the dedicated non-login
   `social-media-monitor` account after systemd 259 proved incompatible with
-  manager queries from `DynamicUser`. The unit exposure score is 1.5 (`OK`).
+  manager queries from `DynamicUser`. Commit `cc518f8` adds 14-day expiry gates
+  for both the local origin and public edge certificates, plus root filesystem
+  block/inode thresholds of 85% and a 10 GiB minimum-free floor. The unit
+  exposure score is 1.5 (`OK`).
 - Detection: the monotonic timer runs roughly every five minutes with at most 30
   seconds of jitter; normal execution completed in under one second. A sustained
   covered outage should therefore alert in approximately six minutes or less,
-  excluding notifier/network failure. Abuse, latency, saturation and business
-  SLO detection remain outside this monitor.
+  excluding notifier/network failure. The live capacity checkpoint is 79% blocks,
+  13% inodes and roughly 110 GB free; both certificates extend into January 2027.
+  Abuse, latency, process-level saturation and business SLO detection remain
+  outside this monitor.
 - Response: all failures use `swift-vapor-alert@%n.service`. The initial
   `DynamicUser` incompatibility failed closed and triggered a real alert; the
   notifier reported successful Telegram delivery. The application services

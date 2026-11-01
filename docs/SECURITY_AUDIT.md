@@ -1041,6 +1041,14 @@ Commit `ddeafec` replaced the transient identity with a dedicated, non-login
 the repository hash, the timer is enabled/active, all 11 checks pass with zero
 API restarts, and the final unit exposure score is 1.5 (`OK`).
 
+Commit `cc518f8` extends the same least-privilege check with two certificate
+expiry gates and filesystem capacity limits. Origin and Cloudflare edge
+certificates must remain valid for at least 14 days; root block/inode use must
+stay below 85% with at least 10 GiB free. The sandboxed production run passed at
+79% block use, 13% inode use and about 110 GB free, with both certificates valid
+into January 2027. This closes advance detection for these bounded failure modes,
+not general capacity forecasting.
+
 Covered availability MTTD is now approximately six minutes or less under a
 healthy timer and notification path. This does not detect credential abuse,
 authorization anomalies, latency/saturation trends, or notifier failure. Email
