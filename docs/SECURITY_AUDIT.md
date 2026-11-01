@@ -939,8 +939,10 @@ auth and pagination boundaries, services, and restart count passed.
 A controlled drill atomically restored the prior binary and readiness, then
 restored the new binary and both direct and public readiness. The API, Nginx, and
 Tunnel are active with zero unexpected API restarts; production users and both
-upload-lifecycle tables remain empty. Migration-job automation, database restore
-testing, external alerting, and scheduled drills remain open.
+upload-lifecycle tables remain empty. At that checkpoint migration-job
+automation, database restore testing, external alerting, and scheduled drills
+were open; recovery drills and backup-specific alerts are closed below, while
+migration automation and broader application alerting remain open.
 
 ### Isolated database restore checkpoint
 
@@ -969,7 +971,8 @@ API, Nginx, Tunnel, and MySQL remained active with zero unexpected API restarts
 and passing direct/public readiness. Encrypted scheduled backups, a 35-day
 retention policy, and a real off-host restore drill are now implemented and
 exercised. Measured RPO/RTO under realistic data volume, offline crypt-key
-escrow, and external alerting remain open.
+escrow, deliberate alert-delivery testing, and independent notifier monitoring
+remain open.
 
 ### Encrypted off-site recovery checkpoint
 
