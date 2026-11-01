@@ -39,7 +39,8 @@ ProtectKernelModules=true
 ProtectKernelTunables=true
 ProtectProc=invisible
 ProcSubset=pid
-RestrictSUIDSGID=true
+# systemd 259 makes RestrictSUIDSGID block GNU tar's safe openat2 traversal.
+# The drill rejects special archive modes and extracts with mode preservation off.
 RestrictRealtime=true
 RestrictNamespaces=true
 LockPersonality=true

@@ -43,4 +43,8 @@ user-writable rclone configuration.
 
 The restore drill has the same sandbox and shares the backup operation lock. It
 can create and remove only its generated `social_media_offsite_drill_*` database;
-it never accepts an operator-provided database name.
+it never accepts an operator-provided database name. On systemd 259 the restore
+unit intentionally omits `RestrictSUIDSGID`: that control returns `ENOSYS` for
+GNU tar's safe `openat2` traversal. The drill compensates by accepting only
+regular files/directories without special mode bits, disabling permission/owner
+restoration, enforcing `UMask=0077`, and writing only below a root-only path.

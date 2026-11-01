@@ -217,8 +217,11 @@ if [[ $unsafe_archive_path -ne 0 ]]; then
   exit 74
 fi
 if ! tar --verbose --list --file="$uploads_tar" | \
-    awk 'substr($1, 1, 1) != "-" && substr($1, 1, 1) != "d" { exit 1 }'; then
-  echo "Upload archive contains a non-file, non-directory entry" >&2
+    awk '
+      substr($1, 1, 1) != "-" && substr($1, 1, 1) != "d" { exit 1 }
+      substr($1, 1, 10) ~ /[sStT]/ { exit 1 }
+    '; then
+  echo "Upload archive contains an unsafe entry type or special mode" >&2
   exit 74
 fi
 tar --extract --file="$uploads_tar" --directory="$upload_extract_root" \
