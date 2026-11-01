@@ -675,3 +675,70 @@ the migration fingerprint was
 Post-drill inventory found no prefixed database or temporary directory. The live
 schema, user count, latest migration, service states, API binary hash, restart
 count, and direct/public readiness remained unchanged.
+
+## CISO review record — encrypted off-site backup and recovery
+
+**Date:** 2026-11-01
+
+- Top threats: plaintext database or upload disclosure through the backup path
+  (medium/critical), destructive or misdirected remote cleanup (low/critical),
+  and an unreadable/corrupt backup falsely reported as successful (medium/high).
+  Theft of the current full-scope Google OAuth token can affect more than this
+  backup folder even though the dedicated rclone config is logically pinned.
+- Blast radius: a backup disclosure can expose the entire application database
+  and managed media at the captured point in time. `backend/.env`, DB credentials,
+  and SMTP credentials are excluded. Production still has zero persistent users,
+  but future bundles can contain all account/content PII. Financial impact,
+  incident cost, and event frequency remain unknown, so a defensible FAIR ALE
+  cannot be calculated. Token theft may expose the wider personal Drive until
+  OAuth scope is reduced and reauthorized.
+- Controls: rclone crypt encrypts content and names client-side; a dedicated
+  `root:root 0600` config contains only Drive/crypt remotes and pins Drive to the
+  encrypted folder ID. Root timers execute only `root:root 0755` copies under
+  `/usr/local/libexec`. Bundle IDs and paths are strict, `sync` is never used,
+  partial cleanup is limited to the new ID, retention begins only after successful
+  redownload and SHA-256 verification, and pruning accepts only strict IDs older
+  than 35 days. Plaintext staging is root-only and removed by an exact-path trap.
+- Detection: every run records a root-only success marker and journald outcome;
+  backup corruption is detected within the daily run and recoverability is
+  exercised weekly. The schedule implies a nominal RPO below roughly one day,
+  but realistic-volume RPO/RTO is unmeasured. Without an owned external alert,
+  job-failure MTTD is still potentially unbounded.
+- Response: the local and off-host restore procedures have both passed. The
+  off-host drill restores only to a generated `social_media_offsite_drill_*`
+  database, validates schema, SQLx history and `mariadb-check`, extracts media,
+  then removes the database and staging. Offline crypt-key recovery, a
+  multi-person tabletop, and pre-written communications remain open.
+- Regulatory: retained backups contain personal data once users exist. Google
+  Drive is a processor/subprocessor dependency requiring DPA, region, retention,
+  deletion, lawful-basis and incident-routing review. A qualifying breach starts
+  immediate assessment and may trigger the GDPR 72-hour notification window.
+- Vendors/supply chain: Google Drive and rclone are now recovery dependencies.
+  Rclone's official guidance states its shared Drive client ID will stop working
+  during 2026; the current remote demonstrably still uses it and has `drive`
+  scope. A private client ID, least-privilege scope review, reauthorization, and
+  repeat backup/restore drill are P1.
+
+**Verdict:** mitigate then ship. The client-side encryption, fixed copy-only
+prefix, verified download, strict retention, root-owned runtime, folder pinning,
+isolated restore, and cleanup gates satisfy the immediate production condition.
+Operational reliance remains conditional on creating private Google OAuth
+credentials, storing crypt recovery material outside this VPS, and routing stale
+or failed jobs to an owned external alert.
+
+The first backup `20261101T142349Z` passed upload and redownload verification.
+The first scheduled restore failed closed when systemd 259's
+`RestrictSUIDSGID` made GNU tar's safe `openat2` traversal return `ENOSYS`; no
+temporary DB or staging remained. Commit `1fbf4d4` removed only that incompatible
+control and added archive type/mode and extraction compensations. Commit
+`77093d0` then moved runtime executables out of the user-owned checkout, emptied
+capability sets, and pinned the dedicated Drive remote by folder ID.
+
+The final end-to-end run created and redownloaded backup `20261101T143350Z`, then
+restored it through the scheduled unit in seven seconds. It verified all 23
+tables, 12 migration rows, schema SHA-256
+`ff67072384a5277123cba20e1729114962f370b6d5e9c4b14b1a172ee1a6c0b4`, SQLx
+fingerprint `58776476252caba16714b592cbcbdee082d63ae5281442b10b1f9736ab4855f5`,
+and one 24,627-byte upload. No temporary database or local staging remained;
+API, Nginx, Tunnel, and MySQL stayed active with zero API restarts and passing
+direct/public readiness.

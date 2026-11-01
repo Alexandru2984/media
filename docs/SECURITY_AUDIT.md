@@ -966,9 +966,55 @@ The live database retained 23 tables, zero users, and successful migration
 `20261030000000`. The API binary remained at SHA-256
 `221d34b40616045469b8177de4a893b60175f674c1f1bce2c65db3dcdd45cbd1`;
 API, Nginx, Tunnel, and MySQL remained active with zero unexpected API restarts
-and passing direct/public readiness. Encrypted scheduled backups, off-host
-recovery, measured RPO/RTO under realistic data volume, retention policy, and
-external alerting remain open.
+and passing direct/public readiness. Encrypted scheduled backups, a 35-day
+retention policy, and a real off-host restore drill are now implemented and
+exercised. Measured RPO/RTO under realistic data volume, offline crypt-key
+escrow, and external alerting remain open.
+
+### Encrypted off-site recovery checkpoint
+
+Operations commits `e2482d1` and `20361ef` add a daily client-side encrypted
+Google Drive backup and a weekly isolated restore drill. The bundle contains a
+transaction-consistent MariaDB dump, managed uploads, minimal recovery metadata,
+and SHA-256 manifest; it excludes `backend/.env` and application/SMTP secrets.
+Every upload uses a unique directory below the fixed
+`gdrive-vps-crypt:media-social/backups` prefix, uses `copy` rather than `sync`,
+and is downloaded and hashed again before success or retention pruning.
+
+Commit `77093d0` closes two root-boundary issues found during the live exercise:
+systemd now executes immutable `root:root` copies from `/usr/local/libexec`, not
+the user-owned checkout, and the dedicated root-only rclone config includes no
+R2 credentials and pins its Drive root to the encrypted folder ID. Both services
+have empty capability sets; the backup receives only the `www-data` supplementary
+group to read uploads. Their systemd exposure scores are 1.8 and 2.0 (`OK`).
+
+The first bundle, `20261101T142349Z`, uploaded and passed remote-download
+verification. The initial systemd restore attempt failed closed because systemd
+259's `RestrictSUIDSGID` filter returned `ENOSYS` for GNU tar's safe `openat2`
+path traversal. No database or staging residue remained. Commit `1fbf4d4`
+removed only that incompatible restore-unit control and added compensating
+archive type/mode checks, owner/permission suppression, `UMask=0077`, and a
+root-only write boundary. The scheduled path then restored successfully.
+
+The fully hardened end-to-end exercise created backup `20261101T143350Z`,
+redownloaded and verified all four objects, and restored its database and upload
+archive in seven seconds at the current tiny data volume. It verified 23 tables,
+12 migration-history rows, schema SHA-256
+`ff67072384a5277123cba20e1729114962f370b6d5e9c4b14b1a172ee1a6c0b4`, and
+SQLx fingerprint
+`58776476252caba16714b592cbcbdee082d63ae5281442b10b1f9736ab4855f5`.
+It also extracted one 24,627-byte upload. Post-drill inventory found no temporary
+database or local staging; all production services remained active with zero API
+restarts and passing direct/Tunnel readiness.
+
+Residual risk remains material: the current OAuth token has full Drive scope and
+uses rclone's shared client ID, which rclone states will stop working during
+2026. Logical folder pinning limits normal rclone operations but does not narrow
+the stolen token's Google authorization. Create a private OAuth client, review a
+`drive.file` migration, reauthorize, rerun the installer and both drills, and
+store the crypt material in a separate offline controlled location. Until backup
+failures route to an owned external alert, failure MTTD remains potentially
+unbounded despite local systemd/journal/state evidence.
 
 ### Blast radius
 
@@ -992,8 +1038,8 @@ revenue, incident cost, and control frequency before assigning an ALE.
 
 ### Response
 
-- Incident response runbook: ✅ documented; live drill remains open
-- Tested restore procedure: ❌ not found
+- Incident response runbook: ✅ documented; technical restore drills passed
+- Tested restore procedure: ✅ local and encrypted off-host drills passed
 - Tabletop exercise: ❌ not documented
 - Pre-written user/regulator communications: ❌ not found
 
@@ -1002,8 +1048,9 @@ revenue, incident cost, and control frequency before assigning an ALE.
 GDPR is presumed relevant because the system is operated in the EU and processes
 personal data. A qualifying personal-data breach may require supervisory-authority
 notification within 72 hours. Vendors/processors in observed scope include the
-hosting provider, Cloudflare, Brevo SMTP, GitHub, and Let's Encrypt; ownership,
-DPAs, retention, regions, and last security review are unknown.
+hosting provider, Cloudflare, Brevo SMTP, Google Drive, GitHub, and Let's Encrypt;
+ownership, DPAs, retention, regions, and last security review are unknown. Rclone
+is also in the backup supply chain and its private OAuth-client migration is P1.
 
 ## Reference baseline
 
@@ -1011,6 +1058,7 @@ DPAs, retention, regions, and last security review are unknown.
 - [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
 - [OWASP HTML5 Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html)
 - [systemd execution sandboxing](https://www.freedesktop.org/software/systemd/man/systemd.exec.html)
+- [rclone Google Drive configuration](https://rclone.org/drive/#making-your-own-client-id)
 - [RustSec Advisory Database](https://rustsec.org/)
 
 ## Exit criteria for the P0 gate

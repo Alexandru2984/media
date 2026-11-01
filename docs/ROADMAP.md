@@ -361,18 +361,21 @@ content.
 
 ## Phase 6 — Reliability, observability, and operations
 
-**Progress (2026-10-30):** public liveness and dependency-aware readiness routes
+**Progress (2026-11-01):** public liveness and dependency-aware readiness routes
 are deployed and used after each release. Privacy-redacted JSON request logs
 carry request IDs, methods, paths, status codes, and latency; query strings and
 bodies are excluded. Strict pagination budgets now reject malformed inputs and
 deep scans consistently, with a production Tunnel boundary canary and root-only
 binary rollback artifact. Browser requests now use one tested transport with
 bounded 15-second normal and 45-second upload timeouts, caller cancellation,
-generic network errors, and correct body-specific headers. Metrics, alerts,
-retention policy, scheduled/off-host restore drills, and migration-job automation
-remain open. An isolated, checksum-verified MariaDB restore drill is scripted;
-its first production-data exercise passed across all 23 tables with no retained
-temporary database or dump.
+generic network errors, and correct body-specific headers. Metrics, externally
+routed alerts, realistic-volume RPO/RTO measurement, offline crypt-key escrow,
+and migration-job automation remain open. Daily client-side encrypted DB/upload
+backups now use a fixed Google Drive crypt prefix, remote-download verification,
+strict 35-day retention, root-owned runtime artifacts, and a folder-pinned
+dedicated config. A weekly drill restores the newest off-host bundle into an
+isolated database, verifies schema/SQLx/`mariadb-check` plus media extraction,
+and removes all staging. Both production exercises passed across 23 tables.
 The frontend now has a fail-closed deployer with strict release IDs, artifact
 integrity checks, immutable staging, atomic activation, direct-origin and Tunnel
 canaries, and automatic rollback. Its first live activation plus exact-target
@@ -392,7 +395,9 @@ password-recovery delivery are down.
   moderation, queues, and product funnels.
 - SLOs and burn-rate alerts; restart/crash, 5xx, abuse, egress, disk, certificate,
   backup, and queue alerts routed to an owned on-call path.
-- Automated encrypted backups with restore drills and documented RPO/RTO.
+- Automated encrypted backups with restore drills and retention. ✅ Add private
+  Google OAuth credentials, offline crypt-key escrow, external failure alerts,
+  and realistic-volume RPO/RTO measurement.
 - Atomic releases, canary/blue-green rollout, feature flags, migration guards,
   rollback automation, capacity/load testing, and chaos/tabletop exercises.
 - Secrets manager or protected credentials, rotation schedule, and least-privilege
