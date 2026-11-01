@@ -620,3 +620,13 @@ record the exact automatic rollback target before relying on it operationally.
 committed deployer must pass a real activation plus exact rollback/restore drill
 before operational reliance. Releases containing migrations remain blocked from
 this path and require the dump-backed reviewed migration workflow.
+
+The first live attempt stopped before backup or promotion because the root-owned
+candidate directory did not grant `www-data` traverse permission. The live hash,
+service, database, and port were unchanged. Commit `f52489d` narrowed candidate
+access to `root:www-data` mode `0750`; the second attempt then passed every gate,
+activated binary hash `221d34b40616045469b8177de4a893b60175f674c1f1bce2c65db3dcdd45cbd1`,
+and retained the prior hash in a root-only backup. A controlled drill restored
+that exact prior binary, verified readiness, reactivated the new candidate, and
+verified direct and public readiness again. The verdict's live-exercise condition
+is satisfied for code-only releases with exact migration parity.

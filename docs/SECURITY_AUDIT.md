@@ -907,6 +907,41 @@ backend, Nginx, or Tunnel mutation was required. Backend release automation,
 external availability alerting, retention policy, and scheduled rollback drills
 remain open.
 
+### Guarded backend deployment checkpoint
+
+Backend commit `d10cd0c` adds a strict, default-enabled upload-maintenance switch.
+Only isolated release candidates set it to `false`, preventing their immediate
+maintenance tick from processing production cleanup rows or files. Unit tests
+reject misspelled or ambiguous values. An isolated candidate logged the disabled
+worker, drained on shutdown, left no listener, and preserved zero users, managed
+uploads, and deletion-queue rows before and after the test.
+
+Operations commit `98e755e` adds a backend deployer that validates fixed paths,
+ELF artifacts, SHA-256 integrity, root-only secrets, active dependencies, exact
+SQLx migration parity, isolated candidate behavior, live health boundaries, and
+zero automatic restarts. It refuses migration-bearing releases so they continue
+through the dump-backed manual workflow. The first live exercise safely stopped
+before backup or promotion when `www-data` could not traverse the root-only
+candidate directory; the live hash and all services remained unchanged. Commit
+`f52489d` corrected this with a `root:www-data` mode-`0750` directory and candidate,
+without making artifacts world-accessible.
+
+The second exercise activated candidate
+`/var/lib/media/backend-candidates/social-media-backend-20261101T141520Z-f52489d`
+with SHA-256
+`221d34b40616045469b8177de4a893b60175f674c1f1bce2c65db3dcdd45cbd1`.
+Its root-only rollback binary is
+`/var/backups/media-binary-pre-backend-20261101T141520Z-f52489d`, with prior
+SHA-256 `c1b1393d41bb0e1d80b8a7a3d48b42a83d2f0fea3f882cc0f97dd77714d0026d`.
+All 12 migrations through `20261030000000`, direct and public readiness, feed,
+auth and pagination boundaries, services, and restart count passed.
+
+A controlled drill atomically restored the prior binary and readiness, then
+restored the new binary and both direct and public readiness. The API, Nginx, and
+Tunnel are active with zero unexpected API restarts; production users and both
+upload-lifecycle tables remain empty. Migration-job automation, database restore
+testing, external alerting, and scheduled drills remain open.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
