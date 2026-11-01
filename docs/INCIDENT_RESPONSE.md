@@ -580,3 +580,43 @@ follow-ups.
 **Verdict:** mitigate then ship. Exercise the committed script against production
 with the current release retained, verify all services and public behavior, and
 record the exact automatic rollback target before relying on it operationally.
+
+## CISO review record — backend release automation
+
+**Date:** 2026-11-01
+
+- Top threats: path or binary tampering under root authority (high/high), an
+  unexpected migration mutating production data (high/high), and a broken API
+  promotion causing full application outage (medium/high).
+- Blast radius: a malicious API binary can access all application data and the
+  DB/SMTP credentials available to the service. A failed release can interrupt
+  the API for every user. Production has zero persistent users at this checkpoint;
+  revenue, incident-cost, and frequency inputs remain unavailable, so a
+  defensible FAIR annualized-loss estimate cannot be calculated.
+- Controls: the deployer accepts only a strict timestamp/SHA identifier and fixed
+  paths; validates ELF artifacts and critical hashes; requires a root-only mode
+  `0600` environment; and rejects failed, pending, extra, or reordered migrations.
+  The isolated candidate runs as `www-data` on loopback with background upload
+  maintenance disabled. Promotion is atomic, retains a root-only prior binary,
+  and rolls back on direct-origin, Tunnel, public, service, hash, or restart gates.
+- Detection and response: candidate and live health/auth/pagination boundaries,
+  systemd state, restart count, migration log markers, and hashes fail the release
+  within the canary window. The incident runbook covers containment and exact
+  binary recovery, but owned external alerts, a multi-person tabletop, and a DB
+  restore drill remain open.
+- Regulatory: an outage or compromise affecting personal data starts immediate
+  GDPR assessment and may trigger the 72-hour supervisory-authority window after
+  awareness.
+- Vendors/supply chain: no dependency, vendor, processor, secret, or external
+  deployment service is added. Existing VPS, systemd, MariaDB, Cloudflare, GitHub,
+  and broken Brevo SMTP governance remains in scope.
+- Validation before live exercise: 58 backend tests plus five seed tests, strict
+  Clippy, locked release build, zero-finding RustSec scan across 265 crates, Bash
+  syntax, ShellCheck, valid dry-run, invalid-ID rejection, root-visible existing
+  destination rejection, and a maintenance-isolated production-DB candidate
+  passed. The candidate left users and both upload-lifecycle tables unchanged.
+
+**Verdict:** mitigate then ship for releases with exact migration parity. The
+committed deployer must pass a real activation plus exact rollback/restore drill
+before operational reliance. Releases containing migrations remain blocked from
+this path and require the dump-backed reviewed migration workflow.

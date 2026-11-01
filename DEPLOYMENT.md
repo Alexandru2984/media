@@ -120,6 +120,13 @@ CI/jurnal.
 
 ## Promovare backend
 
+Pentru release-uri fără migrare pending, folosește
+`deploy/scripts/deploy-backend.sh` după toate verificările de build și audit.
+Scriptul refuză orice diferență între migrațiile SQL din checkout și istoricul
+SQLx live, rulează candidatul fără workerul de mentenanță, păstrează backupul
+root-only și automatizează promovarea, canarul și rollbackul. Release-urile cu
+migrare rămân în fluxul manual de mai sus, inclusiv dump și verificarea restore.
+
 1. Copiază binarul live într-un backup root-only identificat prin timestamp și
    commit; verifică hashul.
 2. Instalează candidatul într-un fișier temporar din același filesystem.

@@ -369,7 +369,7 @@ deep scans consistently, with a production Tunnel boundary canary and root-only
 binary rollback artifact. Browser requests now use one tested transport with
 bounded 15-second normal and 45-second upload timeouts, caller cancellation,
 generic network errors, and correct body-specific headers. Metrics, alerts,
-retention policy, restore drills, and backend release automation remain open.
+retention policy, restore drills, and migration-job automation remain open.
 The frontend now has a fail-closed deployer with strict release IDs, artifact
 integrity checks, immutable staging, atomic activation, direct-origin and Tunnel
 canaries, and automatic rollback. Its first live activation plus exact-target
