@@ -173,6 +173,13 @@ verificarea a reușit. Capturează răspunsul complet sau validează fișierul s
 Primul set verifică Nginx direct pe loopback; al doilea verifică ruta reală prin
 Cloudflare Tunnel.
 
+Uploadurile administrate trebuie să răspundă cu `Cache-Control: private, no-store`;
+orice subarbore diferit de `avatars` și `posts` trebuie să rămână `404`. Mutarea
+unui fișier din origin nu invalidează o copie deja prezentă în Cloudflare: într-un
+incident, verifică separat `CF-Cache-Status` pe URL-ul exact și execută purge
+punctual cu un token care are permisiunea `Cache Purge`. Nu declara închisă
+expunerea cât timp cheia exactă mai răspunde `HIT`.
+
 ## Rollback
 
 - Backend: reinstalează backupul binar exact al release-ului anterior, repornește

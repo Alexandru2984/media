@@ -752,3 +752,59 @@ hourly health executable passed against both live evidence files, all three
 timers are enabled and active, and its systemd exposure score is 0.9 (`SAFE`).
 No synthetic failure was generated, so external delivery itself was not claimed
 as tested.
+
+## CISO review record — orphan upload and CDN cache containment
+
+**Date:** 2026-11-01
+
+- Top threats: an unowned legacy image remained anonymously accessible
+  (confirmed/high), a CDN copy survived origin removal because it was marked
+  public and immutable for 30 days (confirmed/high), and automatic orphan cleanup
+  could destroy evidence or legitimate data (low/high).
+- Blast radius: the confirmed object is one 24,627-byte JPEG at
+  `/uploads/avatars/672da927-79fd-4aad-8332-a5a3a347cf0c_c6d9cdf1-6469-4147-bdc2-da6bba370f0b.jpg`.
+  It has no reference in users, posts, `managed_uploads`, or the deletion queue;
+  production currently has zero users. Its content and provenance have not been
+  classified, so personal-data impact cannot be assumed absent. The first two
+  encrypted off-site bundles retain the historical object until normal 35-day
+  retention, and a protected pre-P0 local backup also contains a copy.
+- Controls and evidence: the live file was moved, not deleted, to root-only
+  quarantine ID `20261101T144016Z`; its SHA-256 is
+  `0fc5a98b12e580b29e1c8d3917c4176d5bbf10be5a20c280e33496ab8340e02b`.
+  The quarantine chain is `root:root 0700` and the evidence file is mode `0600`.
+  Commit `25c0c8e` adds an hourly read-only DB/filesystem reconciliation that
+  alerts on orphaned, missing, special, symlinked, or structurally unexpected
+  entries and never deletes automatically. Its production result is 0 physical,
+  0 expected, 0 orphaned, and 0 missing files; sandbox exposure is 0.9 (`SAFE`).
+- Cache containment: commit `cf02df6` makes managed avatar responses
+  `private, no-store` and rejects every upload subtree other than managed avatars
+  and access-controlled posts. Direct origin and new Tunnel cache keys return
+  `404`; Cloudflare reports `BYPASS`. The exact pre-existing URL still returns
+  `200` with `CF-Cache-Status: HIT`. The available analytics token is active but
+  lacks zone `Cache Purge` authority (`10000 Authentication error`), so CDN
+  containment is not complete. Purge that single URL with an appropriately
+  scoped credential and prove repeated public `404` responses before closure.
+- Recovery validation: after quarantine, backup `20261101T185747Z` passed remote
+  redownload verification with 23 tables and zero uploads. The scheduled restore
+  drill restored that exact bundle, verified 23 tables and 12 migration rows,
+  found zero uploads, and removed its generated database and local staging.
+  Commit `3d89f4b` also prevents OAuth refresh from rewriting the user-owned rclone
+  config by installing from a verified root-only snapshot.
+- Detection and response: preserve the quarantine and access logs, identify the
+  image/provenance and any affected person, bound the period of public and cached
+  access, complete the exact Cloudflare purge, and record the deletion or legal
+  hold decision. Do not bulk-delete historical backups or quarantine evidence.
+- Regulatory: treat this as a potential personal-data incident until content and
+  access evidence show otherwise. Record awareness time, scope, likelihood and
+  severity; assess GDPR supervisory-authority notification within 72 hours of
+  awareness and data-subject communication if high risk is likely. Balance
+  evidence preservation with storage limitation and the documented retention
+  decision.
+- Vendors/supply chain: Cloudflare edge caching extended the exposure after
+  origin containment. Establish a least-privilege emergency purge credential,
+  owner, rotation schedule and tested per-URL purge playbook; do not reuse the
+  analytics token by silently broadening its role.
+
+**Verdict:** do not close. Origin containment, future-cache prevention, evidence
+preservation, drift detection, and clean recovery are verified. Exact edge-cache
+purge plus documented content/access/GDPR assessment remain P1 exit conditions.

@@ -1015,13 +1015,51 @@ uses rclone's shared client ID, which rclone states will stop working during
 2026. Logical folder pinning limits normal rclone operations but does not narrow
 the stolen token's Google authorization. Create a private OAuth client, review a
 `drive.file` migration, reauthorize, rerun the installer and both drills, and
-store the crypt material in a separate offline controlled location. Until backup
+store the crypt material in a separate offline controlled location. Backup
 failures are explicitly detected by `OnFailure` and routed through the existing
 Telegram/email operator notifier. An hourly 0.9/10 (`SAFE`) sandboxed watchdog
 also alerts after 30 hours without a verified backup or nine days without a
 successful restore, covering disabled/missed timers. Wiring and healthy execution
 are verified; deliberate end-to-end alert delivery and monitoring of the notifier
 itself remain open.
+
+### Orphan upload and edge-cache checkpoint
+
+The production upload tree contained one 24,627-byte JPEG from 2025 with no DB
+reference in users, posts, `managed_uploads`, or `upload_deletion_queue`. It was
+anonymously reachable. The exact file was moved recoverably to root-only
+quarantine `20261101T144016Z`, mode `0600`, with SHA-256
+`0fc5a98b12e580b29e1c8d3917c4176d5bbf10be5a20c280e33496ab8340e02b`;
+the complete quarantine path is mode `0700`. A legacy backup copy is protected
+behind a root-only `0700` parent. No copy was destructively removed.
+
+Commit `25c0c8e` extends the hourly backup watchdog with a read-only union of all
+internal upload references and a physical-tree inventory. It fails and alerts on
+orphans, missing files, symlinks, special entries, unsafe paths, or unexpected
+directories, but never auto-deletes. The deployed root-owned script matches the
+repository hash, reports 0/0 inventory after quarantine, and retains systemd's
+0.9 (`SAFE`) exposure score.
+
+The origin stopped serving the object, but audit caught the exact public URL
+still returning `200` from a Cloudflare `HIT`: the previous vhost had emitted
+`public, max-age=2592000, immutable`. Commit `cf02df6` now serves managed avatars
+with `private, no-store`, keeps post media uncached and authorization-checked,
+and returns `404` for every other upload subtree. Fresh origin and Tunnel keys
+return `404`; Cloudflare reports `BYPASS`. The old exact cache key remains public.
+The existing analytics API token is active but receives Cloudflare error `10000`
+on per-URL purge because it lacks the required zone authority. Exact purge with a
+separately scoped credential, repeated public-404 proof, log/content attribution,
+and a documented GDPR assessment are open P1 exit conditions; this is not marked
+contained or closed at the CDN layer.
+
+Backup `20261101T185747Z` captured the post-quarantine state with 23 tables and
+zero uploads, passed remote-download checks, and restored through the scheduled
+unit. The drill verified 23 tables, 12 migration rows, zero upload files, and
+removed its database and staging. Three encrypted versioned backups now exist;
+the first two retain the historical object until their 35-day lifecycle expires.
+Commit `3d89f4b` additionally snapshots the user rclone config before any network
+call, preventing token refresh from changing its ownership while retaining the
+installer's concurrent-modification guard.
 
 ### Blast radius
 
