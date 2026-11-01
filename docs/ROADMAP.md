@@ -382,8 +382,11 @@ restore drill older than nine days. It also reconciles every physical upload wit
 DB references and alerts without deleting on drift or unsafe entries. A legacy
 orphan is quarantined and future avatar responses are `private, no-store`, but
 its exact pre-existing Cloudflare cache key still requires a P1 per-URL purge and
-documented access/content/GDPR assessment. A deliberate alert-delivery test and
-independent monitoring of the notifier remain open.
+documented access/content/GDPR assessment. A separate five-minute service-health
+timer now checks four services and seven direct/origin/Tunnel boundaries; its
+controlled initial failure successfully delivered through the shared Telegram
+notifier. Backup-unit-specific injection, email fallback, and independent
+notifier monitoring remain open.
 The frontend now has a fail-closed deployer with strict release IDs, artifact
 integrity checks, immutable staging, atomic activation, direct-origin and Tunnel
 canaries, and automatic rollback. Its first live activation plus exact-target
@@ -404,8 +407,8 @@ password-recovery delivery are down.
 - SLOs and burn-rate alerts; restart/crash, 5xx, abuse, egress, disk, certificate,
   backup, and queue alerts routed to an owned on-call path.
 - Automated encrypted backups with restore drills and retention. ✅ Add private
-  Google OAuth credentials, offline crypt-key escrow, deliberate alert-delivery
-  validation, and realistic-volume RPO/RTO measurement.
+  Google OAuth credentials, offline crypt-key escrow, backup-specific failure and
+  email-fallback validation, and realistic-volume RPO/RTO measurement.
 - Atomic releases, canary/blue-green rollout, feature flags, migration guards,
   rollback automation, capacity/load testing, and chaos/tabletop exercises.
 - Secrets manager or protected credentials, rotation schedule, and least-privilege

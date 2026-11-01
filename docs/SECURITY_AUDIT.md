@@ -971,8 +971,9 @@ API, Nginx, Tunnel, and MySQL remained active with zero unexpected API restarts
 and passing direct/public readiness. Encrypted scheduled backups, a 35-day
 retention policy, and a real off-host restore drill are now implemented and
 exercised. Measured RPO/RTO under realistic data volume, offline crypt-key
-escrow, deliberate alert-delivery testing, and independent notifier monitoring
-remain open.
+escrow, backup-unit-specific failure injection, email fallback, and independent
+notifier monitoring remain open. The common Telegram delivery path is exercised
+by the service-health checkpoint below.
 
 ### Encrypted off-site recovery checkpoint
 
@@ -1020,8 +1021,31 @@ failures are explicitly detected by `OnFailure` and routed through the existing
 Telegram/email operator notifier. An hourly 0.9/10 (`SAFE`) sandboxed watchdog
 also alerts after 30 hours without a verified backup or nine days without a
 successful restore, covering disabled/missed timers. Wiring and healthy execution
-are verified; deliberate end-to-end alert delivery and monitoring of the notifier
-itself remain open.
+are verified. The shared Telegram delivery path is tested below; email fallback,
+backup-unit-specific injection, and monitoring of the notifier itself remain open.
+
+### Production service-health checkpoint
+
+Operations commit `9f7e99f` adds a five-minute smoke monitor for all four
+production services plus seven fixed HTTP boundaries spanning the direct API,
+anonymous auth/pagination rejection, local Nginx/TLS, and the public Cloudflare
+Tunnel. Requests contain no credentials, cookies, bodies, or user identifiers.
+Each boundary receives one bounded retry to reduce transient alert noise.
+
+The first sandboxed exercise exposed a systemd 259 incompatibility: a
+`DynamicUser` could not query manager state and failed closed even though all
+services were healthy. That failure changed no application state and triggered
+the common `OnFailure` notifier, which reported successful Telegram delivery.
+Commit `ddeafec` replaced the transient identity with a dedicated, non-login
+`social-media-monitor` system account. The installed root-owned script matches
+the repository hash, the timer is enabled/active, all 11 checks pass with zero
+API restarts, and the final unit exposure score is 1.5 (`OK`).
+
+Covered availability MTTD is now approximately six minutes or less under a
+healthy timer and notification path. This does not detect credential abuse,
+authorization anomalies, latency/saturation trends, or notifier failure. Email
+fallback, independent notifier monitoring, SLO/burn-rate metrics, alert-storm
+behavior and a multi-person tabletop remain open.
 
 ### Orphan upload and edge-cache checkpoint
 
@@ -1083,7 +1107,9 @@ revenue, incident cost, and control frequency before assigning an ALE.
 
 - **Target MTTD:** 15 minutes for account takeover, credential stuffing, mass
   export, or upload abuse; 5 minutes for outage/resource exhaustion.
-- **Current MTTD:** unknown and potentially unbounded.
+- **Current MTTD:** covered service/Tunnel outages are approximately six minutes
+  or less; account abuse, authorization anomalies, data exfiltration and resource
+  saturation remain unknown and potentially unbounded.
 - **Required detections:** auth failure velocity, session anomalies, recovery
   bursts, follow/block/notification velocity, frequent notification-cap pruning,
   blocked-action denials, upload rejects, 4xx/5xx shifts, DB error/latency,

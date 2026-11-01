@@ -706,8 +706,9 @@ count, and direct/public readiness remained unchanged.
   but realistic-volume RPO/RTO is unmeasured. Explicit job failures now trigger
   the existing Telegram/email operator notifier, and an hourly watchdog alerts
   after 30 hours without a verified backup or nine days without a passed drill.
-  Deliberate alert-delivery testing and independent notifier monitoring remain
-  open.
+  The shared Telegram delivery path is now exercised by the production service
+  monitor record below. Backup-unit-specific failure injection, email fallback,
+  and independent notifier monitoring remain open.
 - Response: the local and off-host restore procedures have both passed. The
   off-host drill restores only to a generated `social_media_offsite_drill_*`
   database, validates schema, SQLx history and `mariadb-check`, extracts media,
@@ -751,8 +752,46 @@ Commit `5ecceb4` wired backup, restore and freshness-check failures to the host'
 existing `swift-vapor-alert@.service` Telegram/email notifier. The root-owned
 hourly health executable passed against both live evidence files, all three
 timers are enabled and active, and its systemd exposure score is 0.9 (`SAFE`).
-No synthetic failure was generated, so external delivery itself was not claimed
-as tested.
+No backup-unit failure was generated at this checkpoint. A later controlled
+service-monitor failure exercised the same shared notifier and delivered to
+Telegram; backup-unit-specific triggering and email fallback remain untested.
+
+## CISO review record — production service health monitoring
+
+**Date:** 2026-11-01
+
+- Top threats: an API/Nginx/Tunnel/database outage remaining undetected
+  (medium/high), a privileged monitor expanding compromise blast radius
+  (low/high), and transient Internet failure producing alert noise (medium/low).
+- Blast radius: the monitor receives no cookie, API key, DB credential, user data,
+  or writable application path. A compromise can make outbound HTTP requests and
+  query systemd state but has an empty capability set and cannot mutate services.
+- Controls: commit `9f7e99f` adds two bounded attempts across four fixed service
+  states and seven fixed HTTP boundaries: backend readiness, anonymous auth and
+  pagination rejection, local Nginx/TLS, homepage delivery, and public Cloudflare
+  Tunnel readiness. Commit `ddeafec` runs it as the dedicated non-login
+  `social-media-monitor` account after systemd 259 proved incompatible with
+  manager queries from `DynamicUser`. The unit exposure score is 1.5 (`OK`).
+- Detection: the monotonic timer runs roughly every five minutes with at most 30
+  seconds of jitter; normal execution completed in under one second. A sustained
+  covered outage should therefore alert in approximately six minutes or less,
+  excluding notifier/network failure. Abuse, latency, saturation and business
+  SLO detection remain outside this monitor.
+- Response: all failures use `swift-vapor-alert@%n.service`. The initial
+  `DynamicUser` incompatibility failed closed and triggered a real alert; the
+  notifier reported successful Telegram delivery. The application services
+  stayed active throughout. Email fallback, alert throttling under a storm,
+  independent notifier health, and a multi-person tabletop remain open.
+- Regulatory: the monitor processes no personal data. A detected outage or
+  security incident still starts the normal GDPR impact assessment; availability
+  loss involving personal data may be reportable depending on risk.
+- Vendors/supply chain: no new vendor or dependency was added. Detection still
+  depends on systemd, Nginx, Cloudflare Tunnel, Telegram and the existing email
+  fallback, whose ownership/DPA/incident-routing review remains required.
+
+**Verdict:** ship. The monitor is least-privilege, live-tested and alert-delivery
+verified for Telegram. Do not treat it as application security analytics or as
+independent monitoring of its own notifier.
 
 ## CISO review record — orphan upload and CDN cache containment
 
