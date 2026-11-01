@@ -10,6 +10,8 @@ social-media-backup-health.service -> /etc/systemd/system/social-media-backup-he
 social-media-backup-health.timer -> /etc/systemd/system/social-media-backup-health.timer
 social-media-restore-drill.service -> /etc/systemd/system/social-media-restore-drill.service
 social-media-restore-drill.timer -> /etc/systemd/system/social-media-restore-drill.timer
+social-media-service-health.service -> /etc/systemd/system/social-media-service-health.service
+social-media-service-health.timer -> /etc/systemd/system/social-media-service-health.timer
 ```
 
 The service intentionally writes only to
@@ -60,3 +62,10 @@ it alerts after 30 hours without a verified backup or nine days without a passed
 off-site restore drill. Read-only MariaDB and upload-tree inventory also fails on
 orphaned, missing, special, symlinked, or structurally unexpected upload files;
 the monitor never mutates application data.
+
+`social-media-service-health.timer` runs a separate smoke monitor every five
+minutes. Its transient dynamic user can query systemd and make only ordinary
+Unix/IPv4/IPv6 connections; it has no credentials, writable application path, or
+capabilities. The check covers service state, backend readiness and rejection
+boundaries, local Nginx/TLS, and the public Cloudflare Tunnel. Failures use the
+same `swift-vapor-alert@.service` path.

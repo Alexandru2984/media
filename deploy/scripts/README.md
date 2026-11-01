@@ -153,3 +153,19 @@ orphans, missing files, symlinks, special entries, or unexpected directories
 alert but are never deleted automatically. The notifier's own delivery path and
 throttling remain managed by the existing host-level
 `swift-vapor-alert@.service`.
+
+## Production service monitor
+
+`check-service-health.sh` provides a five-minute production smoke monitor. It
+requires all four host services to be active and validates direct API readiness,
+anonymous-auth and pagination rejection, the local Nginx/TLS origin, and the
+public Cloudflare Tunnel path. Each HTTP boundary receives one bounded retry;
+the check sends no credentials, cookies, or request body. Failures use the same
+operator notifier:
+
+```bash
+sudo deploy/scripts/install-service-health.sh --dry-run
+sudo deploy/scripts/install-service-health.sh
+sudo systemctl start social-media-service-health.service
+journalctl -u social-media-service-health.service -n 30 --no-pager
+```

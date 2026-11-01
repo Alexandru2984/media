@@ -1,0 +1,12 @@
+[Unit]
+Description=Check Media production health every five minutes
+
+[Timer]
+OnBootSec=2m
+OnUnitInactiveSec=5m
+RandomizedDelaySec=30s
+AccuracySec=15s
+Unit=social-media-service-health.service
+
+[Install]
+WantedBy=timers.target

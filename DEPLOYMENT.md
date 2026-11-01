@@ -255,6 +255,12 @@ nouă zile, acoperind inclusiv un timer dezactivat ori ratat. Același check com
 read-only toate URL-urile interne din DB cu fișierele fizice și alertează pentru
 orfani, fișiere lipsă, symlinkuri sau directoare neașteptate; nu șterge automat.
 
+Monitorul separat `social-media-service-health.timer` rulează la aproximativ
+cinci minute și validează starea celor patru servicii, API-ul direct, limitele
+anonime de autentificare/paginare, Nginx local cu TLS și ruta publică prin
+Cloudflare Tunnel. Nu primește secrete sau cookie-uri; orice eșec intră în același
+notifier Telegram/email.
+
 ## Verificări de securitate după release
 
 - serviciile `social-media`, `nginx` și `cloudflared` sunt `active`;
