@@ -8,7 +8,8 @@ ConditionPathExists=/usr/local/libexec/social-media-service-health
 
 [Service]
 Type=oneshot
-DynamicUser=true
+User=social-media-monitor
+Group=social-media-monitor
 UMask=0077
 WorkingDirectory=/
 ExecStart=/usr/local/libexec/social-media-service-health

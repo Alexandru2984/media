@@ -64,8 +64,8 @@ orphaned, missing, special, symlinked, or structurally unexpected upload files;
 the monitor never mutates application data.
 
 `social-media-service-health.timer` runs a separate smoke monitor every five
-minutes. Its transient dynamic user can query systemd and make only ordinary
-Unix/IPv4/IPv6 connections; it has no credentials, writable application path, or
-capabilities. The check covers service state, backend readiness and rejection
-boundaries, local Nginx/TLS, and the public Cloudflare Tunnel. Failures use the
-same `swift-vapor-alert@.service` path.
+minutes. Its dedicated, non-login `social-media-monitor` identity can query
+systemd and make only ordinary Unix/IPv4/IPv6 connections; it has no credentials,
+writable application path, or capabilities. The check covers service state,
+backend readiness and rejection boundaries, local Nginx/TLS, and the public
+Cloudflare Tunnel. Failures use the same `swift-vapor-alert@.service` path.
