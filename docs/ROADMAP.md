@@ -372,8 +372,9 @@ generic network errors, and correct body-specific headers. Metrics, alerts,
 retention policy, restore drills, and backend release automation remain open.
 The frontend now has a fail-closed deployer with strict release IDs, artifact
 integrity checks, immutable staging, atomic activation, direct-origin and Tunnel
-canaries, and automatic rollback; its first live exercise remains a release
-gate. The API now drains in-flight work after `SIGTERM`/`SIGINT`, bounded by
+canaries, and automatic rollback. Its first live activation plus exact-target
+rollback-and-restore drill passed. The API now drains in-flight work after
+`SIGTERM`/`SIGINT`, bounded by
 systemd's 15-second stop timeout. SMTP
 authentication is currently rejected by Brevo with `535`; rotating and verifying
 that credential is an immediate P1 operational task because verification and

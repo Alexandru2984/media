@@ -884,6 +884,29 @@ Frontend release `20261101T140418Z-56706e0` is active. Its atomic rollback targe
 is `20261101T140207Z-fe8768a`; no database, backend, Nginx, or Tunnel mutation was
 required. Search Console ownership and crawl/index alerting remain open.
 
+### Atomic frontend deployment checkpoint
+
+Operations commit `706ef08` adds a fail-closed frontend deployer and runbook.
+Only a strict UTC timestamp plus lowercase Git SHA can select a fixed release
+path. The deployer rejects source symlinks, current targets outside the release
+root, existing destinations, non-root activation, and staging mismatches. It
+builds nothing as root, never deletes a release, changes no service or proxy
+configuration, and compares file count plus critical hashes before activation.
+
+Bash syntax, ShellCheck, positive dry-run, traversal-shaped ID rejection, and
+existing-target rejection passed. The committed script then staged and activated
+release `20261101T140635Z-706ef08`; all direct-origin and Cloudflare Tunnel gates
+passed, with `20261101T140418Z-56706e0` recorded as the exact rollback target.
+A controlled drill atomically switched to that prior release, verified direct
+API readiness and the public sitemap checksum, restored the new release, and
+verified readiness plus manifest content again.
+
+The API, Nginx, and Tunnel remained active with zero unexpected API restarts,
+and `/var/lib/media/frontend-current` resolves to the new release. No database,
+backend, Nginx, or Tunnel mutation was required. Backend release automation,
+external availability alerting, retention policy, and scheduled rollback drills
+remain open.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
