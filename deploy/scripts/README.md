@@ -169,3 +169,29 @@ sudo deploy/scripts/install-service-health.sh
 sudo systemctl start social-media-service-health.service
 journalctl -u social-media-service-health.service -n 30 --no-pager
 ```
+
+## Exact Cloudflare upload purge
+
+`purge-cloudflare-upload.sh` is an incident/deletion tool for one exact managed
+image URL. It accepts only a strict `/uploads/avatars/...` or
+`/uploads/posts/...` image path, refuses to continue unless the local TLS origin
+already returns `404` with `no-store`, purges only that URL, and then requires a
+public `404` without a Cloudflare `HIT`. It never supports hostname, prefix, tag,
+or zone-wide purge.
+
+Install the root-owned executable separately:
+
+```bash
+sudo deploy/scripts/install-cloudflare-purge.sh --dry-run
+sudo deploy/scripts/install-cloudflare-purge.sh
+sudo /usr/local/libexec/social-media-purge-upload-cache \
+  /uploads/avatars/<managed-image>.webp
+```
+
+Provision `/etc/social-media/cloudflare-purge.json` as `root:root 0600`, with
+exactly two string fields: `api_token` and `zone_id`. The token must be separate
+from analytics/Telegram credentials and have only Cloudflare `Cache Purge`
+permission for the one production zone. Never pass it as an argument, environment
+variable, repository file, or journal field. A successful API response is not
+enough: the script polls the public URL and fails unless edge verification also
+passes.

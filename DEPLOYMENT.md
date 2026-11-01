@@ -180,6 +180,20 @@ incident, verifică separat `CF-Cache-Status` pe URL-ul exact și execută purge
 punctual cu un token care are permisiunea `Cache Purge`. Nu declara închisă
 expunerea cât timp cheia exactă mai răspunde `HIT`.
 
+Pentru invalidare folosește utilitarul root-owned, după ce ai provisionat un
+token separat limitat la `Cache Purge` pentru zona de producție:
+
+```bash
+sudo deploy/scripts/install-cloudflare-purge.sh --dry-run
+sudo deploy/scripts/install-cloudflare-purge.sh
+sudo /usr/local/libexec/social-media-purge-upload-cache \
+  /uploads/avatars/<managed-image>.webp
+```
+
+Utilitarul refuză purge dacă originul încă servește obiectul sau nu emite
+`no-store`; nu poate executa purge global și nu declară succes până când URL-ul
+public răspunde `404` fără `HIT`.
+
 ## Rollback
 
 - Backend: reinstalează backupul binar exact al release-ului anterior, repornește
