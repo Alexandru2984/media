@@ -804,6 +804,35 @@ rollback release is `20261030T113145Z-065e29e`; no backend, database, Nginx, or
 Tunnel mutation was required. A real blocked-storage browser pass remains open
 because this VPS has no browser runtime.
 
+### Graceful API shutdown checkpoint
+
+Backend commit `5e4f9fc` makes `SIGTERM` and `SIGINT` stop new accepts while
+allowing in-flight requests to finish. Handler-installation failures are logged
+without crashing the running API, and systemd's existing 15-second stop timeout
+remains the non-negotiable bound against slow-request drain exhaustion.
+
+Strict Clippy, 55 backend tests plus five seed tests, the locked release build,
+and an isolated production-database signal canary passed. The canary proved that
+new connections were refused after `SIGTERM`, an incomplete active request kept
+the process alive, and closing that request produced a clean systemd `success`
+result with no remaining process or listener.
+
+The production binary checksum is
+`c1b1393d41bb0e1d80b8a7a3d48b42a83d2f0fea3f882cc0f97dd77714d0026d`.
+Direct and Cloudflare Tunnel liveness/readiness checks, the public feed, and a
+generic invalid-pagination response passed. A controlled restart of the deployed
+binary recorded the drain transition and returned to readiness; the API, Nginx,
+and Tunnel are active with zero unexpected API restarts and no warning-or-higher
+API journal events during the rollout. Production application users remained at
+zero, and migration `20261030000000` remained current. No database, frontend,
+Nginx, or Tunnel mutation was required.
+
+The root-only rollback binary is
+`/var/backups/media-binary-pre-graceful-shutdown-20261101T135646Z-5e4f9fc`;
+the immutable deployed candidate is
+`/var/lib/media/backend-candidates/social-media-backend-20261101T135646Z-5e4f9fc`.
+Automated alerting, a multi-person tabletop, and a tested restore remain open.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
