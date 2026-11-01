@@ -9,6 +9,7 @@ readonly config_root="/etc/social-media"
 readonly target_config="$config_root/rclone-backup.conf"
 readonly installed_backup="/usr/local/libexec/social-media-backup"
 readonly installed_restore_drill="/usr/local/libexec/social-media-restore-drill"
+readonly installed_health_check="/usr/local/libexec/social-media-backup-health"
 
 usage() {
   echo "Usage: sudo $0 [--dry-run]" >&2
@@ -70,9 +71,12 @@ fi
 
 for tracked_file in \
   "$repository_root/deploy/scripts/backup-offsite.sh" \
+  "$repository_root/deploy/scripts/check-backup-health.sh" \
   "$repository_root/deploy/scripts/drill-offsite-restore.sh" \
   "$repository_root/deploy/systemd/social-media-backup.service" \
   "$repository_root/deploy/systemd/social-media-backup.timer" \
+  "$repository_root/deploy/systemd/social-media-backup-health.service" \
+  "$repository_root/deploy/systemd/social-media-backup-health.timer" \
   "$repository_root/deploy/systemd/social-media-restore-drill.service" \
   "$repository_root/deploy/systemd/social-media-restore-drill.timer"; do
   if [[ ! -f $tracked_file || -L $tracked_file ]]; then
@@ -80,6 +84,10 @@ for tracked_file in \
     exit 66
   fi
 done
+if ! systemctl cat swift-vapor-alert@.service >/dev/null 2>&1; then
+  echo "The existing operator alert service is unavailable" >&2
+  exit 66
+fi
 
 if [[ $dry_run -eq 1 ]]; then
   echo "dry_run=passed"
@@ -89,7 +97,9 @@ if [[ $dry_run -eq 1 ]]; then
   echo "target_config=$target_config"
   echo "backup_executable=$installed_backup"
   echo "restore_executable=$installed_restore_drill"
+  echo "health_executable=$installed_health_check"
   echo "timer=social-media-backup.timer"
+  echo "health_timer=social-media-backup-health.timer"
   echo "restore_timer=social-media-restore-drill.timer"
   exit 0
 fi
@@ -192,6 +202,9 @@ install -d -o root -g root -m 0700 /var/backups/social-media-offsite
 install -o root -g root -m 0755 \
   "$repository_root/deploy/scripts/backup-offsite.sh" "$installed_backup"
 install -o root -g root -m 0755 \
+  "$repository_root/deploy/scripts/check-backup-health.sh" \
+  "$installed_health_check"
+install -o root -g root -m 0755 \
   "$repository_root/deploy/scripts/drill-offsite-restore.sh" \
   "$installed_restore_drill"
 install -o root -g root -m 0644 \
@@ -201,18 +214,26 @@ install -o root -g root -m 0644 \
   "$repository_root/deploy/systemd/social-media-backup.timer" \
   /etc/systemd/system/social-media-backup.timer
 install -o root -g root -m 0644 \
+  "$repository_root/deploy/systemd/social-media-backup-health.service" \
+  /etc/systemd/system/social-media-backup-health.service
+install -o root -g root -m 0644 \
+  "$repository_root/deploy/systemd/social-media-backup-health.timer" \
+  /etc/systemd/system/social-media-backup-health.timer
+install -o root -g root -m 0644 \
   "$repository_root/deploy/systemd/social-media-restore-drill.service" \
   /etc/systemd/system/social-media-restore-drill.service
 install -o root -g root -m 0644 \
   "$repository_root/deploy/systemd/social-media-restore-drill.timer" \
   /etc/systemd/system/social-media-restore-drill.timer
 systemctl daemon-reload
-systemctl enable --now social-media-backup.timer social-media-restore-drill.timer
+systemctl enable --now social-media-backup.timer social-media-backup-health.timer \
+  social-media-restore-drill.timer
 
 echo "install=passed"
 echo "dedicated_config=$target_config"
 echo "drive_root_pinned=yes"
 echo "executables_root_owned=yes"
 echo "timer=social-media-backup.timer"
+echo "health_timer=social-media-backup-health.timer"
 echo "restore_timer=social-media-restore-drill.timer"
 echo "backup_started=no"

@@ -140,3 +140,12 @@ sudo cat /var/lib/social-media-backup/last-restore-drill.env
 The backup and drill share one non-blocking operation lock, so a long upload can
 never overlap a restore exercise. The drill timer runs Sundays at 04:20
 Europe/Bucharest with up to 20 minutes of jitter.
+
+Backup and restore unit failures trigger the VPS's existing operator notifier,
+which routes to Telegram with email fallback. `check-backup-health.sh` also runs
+hourly and fails if the last remotely verified backup is older than 30 hours, the
+last successful off-site restore drill is older than nine days, a status marker
+is not `root:root 0600`, or cleanup/verification evidence is invalid. Its failure
+uses the same notifier, covering disabled or missed timers as well as explicit job
+failures. The notifier's own delivery path and throttling remain managed by the
+existing host-level `swift-vapor-alert@.service`.

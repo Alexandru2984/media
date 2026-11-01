@@ -236,8 +236,15 @@ primește nicio scriere, iar baza și staging-ul temporar sunt eliminate.
 sudo deploy/scripts/drill-offsite-restore.sh --dry-run
 sudo deploy/scripts/drill-offsite-restore.sh
 sudo cat /var/lib/social-media-backup/last-restore-drill.env
-systemctl list-timers social-media-backup.timer social-media-restore-drill.timer
+sudo /usr/local/libexec/social-media-backup-health
+systemctl list-timers social-media-backup.timer \
+  social-media-backup-health.timer social-media-restore-drill.timer
 ```
+
+Eșecurile celor două joburi sunt trimise către notifierul existent al
+operatorului (Telegram, cu fallback email). Watchdog-ul orar alertează și dacă
+markerul ultimului backup verificat depășește 30 de ore sau drill-ul depășește
+nouă zile, acoperind inclusiv un timer dezactivat ori ratat.
 
 ## Verificări de securitate după release
 

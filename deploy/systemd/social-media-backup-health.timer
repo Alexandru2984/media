@@ -1,0 +1,12 @@
+[Unit]
+Description=Check Media off-site backup freshness every hour
+
+[Timer]
+OnCalendar=*-*-* *:17:00 Europe/Bucharest
+RandomizedDelaySec=5m
+Persistent=true
+AccuracySec=1m
+Unit=social-media-backup-health.service
+
+[Install]
+WantedBy=timers.target

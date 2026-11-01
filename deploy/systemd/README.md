@@ -6,6 +6,8 @@ The tracked unit maps to:
 social-media.service -> /etc/systemd/system/social-media.service
 social-media-backup.service -> /etc/systemd/system/social-media-backup.service
 social-media-backup.timer -> /etc/systemd/system/social-media-backup.timer
+social-media-backup-health.service -> /etc/systemd/system/social-media-backup-health.service
+social-media-backup-health.timer -> /etc/systemd/system/social-media-backup-health.timer
 social-media-restore-drill.service -> /etc/systemd/system/social-media-restore-drill.service
 social-media-restore-drill.timer -> /etc/systemd/system/social-media-restore-drill.timer
 ```
@@ -50,3 +52,9 @@ unit intentionally omits `RestrictSUIDSGID`: that control returns `ENOSYS` for
 GNU tar's safe `openat2` traversal. The drill compensates by accepting only
 regular files/directories without special mode bits, disabling permission/owner
 restoration, enforcing `UMask=0077`, and writing only below a root-only path.
+
+Backup, restore, and freshness-check failures use the host's existing
+`swift-vapor-alert@.service`. The hourly health unit has no network namespace,
+an empty capability set, and read-only access only to root-owned success markers;
+it alerts after 30 hours without a verified backup or nine days without a passed
+off-site restore drill.

@@ -3,6 +3,7 @@ Description=Media encrypted off-site database and upload backup
 Documentation=file:/var/www/media.micutu.com/deploy/scripts/README.md
 Wants=network-online.target mysql.service
 After=network-online.target mysql.service
+OnFailure=swift-vapor-alert@%n.service
 ConditionPathIsReadWrite=/var/backups/social-media-offsite
 ConditionPathIsReadWrite=/etc/social-media/rclone-backup.conf
 ConditionPathExists=/usr/local/libexec/social-media-backup
