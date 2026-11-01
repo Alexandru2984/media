@@ -371,7 +371,8 @@ bounded 15-second normal and 45-second upload timeouts, caller cancellation,
 generic network errors, and correct body-specific headers. Metrics, alerts,
 retention policy, scheduled/off-host restore drills, and migration-job automation
 remain open. An isolated, checksum-verified MariaDB restore drill is scripted;
-its first production-data exercise remains a release gate.
+its first production-data exercise passed across all 23 tables with no retained
+temporary database or dump.
 The frontend now has a fail-closed deployer with strict release IDs, artifact
 integrity checks, immutable staging, atomic activation, direct-origin and Tunnel
 canaries, and automatic rollback. Its first live activation plus exact-target

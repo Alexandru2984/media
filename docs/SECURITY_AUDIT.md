@@ -942,6 +942,34 @@ Tunnel are active with zero unexpected API restarts; production users and both
 upload-lifecycle tables remain empty. Migration-job automation, database restore
 testing, external alerting, and scheduled drills remain open.
 
+### Isolated database restore checkpoint
+
+Operations commit `01db316` adds a root-only restore drill that cannot accept an
+operator-selected target name. It produces a transaction-consistent temporary
+dump, creates only a generated `<source>_restore_drill_<timestamp>` database,
+and verifies schema SHA-256, every base-table row count, the complete SQLx
+version/success/checksum fingerprint, and `mariadb-check`. The source database is
+hashed again before success. Both the isolated database and root-only temporary
+dump are removed; the tool does not create an undeclared retained backup.
+
+The first production-data drill completed in 6.7 seconds. All 23 base tables and
+12 rows matched; at this zero-user checkpoint those rows were the migration
+history. The temporary dump SHA-256 was
+`7d22781e5ba35869c16387ea362890217698e0bddf631c694858095a91ae904d`,
+the schema SHA-256 was
+`ff67072384a5277123cba20e1729114962f370b6d5e9c4b14b1a172ee1a6c0b4`,
+and the migration fingerprint was
+`58776476252caba16714b592cbcbdee082d63ae5281442b10b1f9736ab4855f5`.
+
+Post-drill inventory found no restore database and no temporary backup directory.
+The live database retained 23 tables, zero users, and successful migration
+`20261030000000`. The API binary remained at SHA-256
+`221d34b40616045469b8177de4a893b60175f674c1f1bce2c65db3dcdd45cbd1`;
+API, Nginx, Tunnel, and MySQL remained active with zero unexpected API restarts
+and passing direct/public readiness. Encrypted scheduled backups, off-host
+recovery, measured RPO/RTO under realistic data volume, retention policy, and
+external alerting remain open.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,

@@ -666,3 +666,12 @@ is satisfied for code-only releases with exact migration parity.
 confirm zero unexpected application restarts, prove the isolated database and
 temporary dump are gone, and record table/row/schema/migration results. This is
 not a substitute for encrypted scheduled backups or an off-host disaster drill.
+
+The first live drill passed in 6.7 seconds across all 23 base tables and 12 rows,
+which were the SQLx migration history at this zero-user checkpoint. Schema
+SHA-256 was `ff67072384a5277123cba20e1729114962f370b6d5e9c4b14b1a172ee1a6c0b4`;
+the migration fingerprint was
+`58776476252caba16714b592cbcbdee082d63ae5281442b10b1f9736ab4855f5`.
+Post-drill inventory found no prefixed database or temporary directory. The live
+schema, user count, latest migration, service states, API binary hash, restart
+count, and direct/public readiness remained unchanged.
