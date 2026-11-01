@@ -178,8 +178,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-install -d -o root -g root -m 0750 "$candidate_root"
-install -o root -g root -m 0755 "$source_binary" "$candidate_binary"
+install -d -o root -g www-data -m 0750 "$candidate_root"
+install -o root -g www-data -m 0750 "$source_binary" "$candidate_binary"
 if [[ $(sha256sum -- "$candidate_binary" | awk '{print $1}') != "$source_hash" ]]; then
   echo "Candidate binary integrity check failed" >&2
   exit 74

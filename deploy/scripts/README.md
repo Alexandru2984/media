@@ -40,8 +40,9 @@ requires exact parity between every embedded migration and the live SQLx history
 pending, failed, extra, or reordered migrations stop the deployment and must use
 the separately reviewed migration workflow with a database dump.
 
-The script copies an immutable candidate under `/var/lib/media`, launches it as
-`www-data` on loopback port `18084`, and disables only that process's background
+The script copies an immutable `root:www-data` mode-`0750` candidate under a
+non-public root-owned directory, launches it as `www-data` on loopback port
+`18084`, and disables only that process's background
 upload-maintenance worker. Read-only health, feed, auth-boundary, pagination, and
 journal gates run before the live binary is touched. Promotion saves a root-only
 rollback binary, replaces the live binary atomically, restarts the API, and runs
