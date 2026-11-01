@@ -66,3 +66,21 @@ sudo deploy/scripts/deploy-backend.sh "$release_id"
 The production action requires the root-owned mode-`0600` environment file and
 active API, Nginx, and Tunnel services. It never prints configuration or secrets,
 does not mutate migrations, and does not delete candidates or backups.
+
+## Database restore drill
+
+`drill-database-restore.sh` takes a transaction-consistent, root-only temporary
+dump of the live database and restores it into a uniquely named isolated database.
+It compares schema hashes, every base-table row count, the SQLx version/checksum
+fingerprint, and `mariadb-check` results. It then drops only the strictly prefixed
+temporary database and removes the temporary dump. The source database receives
+no DDL or DML.
+
+```bash
+sudo deploy/scripts/drill-database-restore.sh --dry-run
+sudo deploy/scripts/drill-database-restore.sh
+```
+
+The drill intentionally does not create a retained backup. Retention, encryption,
+off-host copies, and scheduled production backups require a separately approved
+policy and recovery objective.

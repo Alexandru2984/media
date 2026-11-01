@@ -630,3 +630,39 @@ and retained the prior hash in a root-only backup. A controlled drill restored
 that exact prior binary, verified readiness, reactivated the new candidate, and
 verified direct and public readiness again. The verdict's live-exercise condition
 is satisfied for code-only releases with exact migration parity.
+
+## CISO review record — isolated database restore drill
+
+**Date:** 2026-11-01
+
+- Top threats: dropping or restoring over the live database (low/critical),
+  leaving a plaintext personal-data dump behind (medium/high), and creating load
+  or inconsistent backup data during the drill (low/high).
+- Blast radius: a target-selection failure could destroy all application data;
+  dump disclosure could expose every stored account and content record. Production
+  has zero persistent users at this checkpoint, but the control is designed for
+  nonzero future data. Financial impact and annual frequency remain unknown.
+- Controls: the source name and generated target are allowlisted identifiers;
+  the target must use a unique `_restore_drill_` prefix and cannot equal the
+  source. The dump uses `--single-transaction`, mode `0600`, a root-only random
+  directory, and no retained copy. Restore verification covers schema SHA-256,
+  all base-table row counts, SQLx version/success/checksum history, and
+  `mariadb-check`. Cleanup drops only the exact prefixed database and deletes only
+  the exact temporary directory.
+- Detection and response: any mismatch exits nonzero and the trap retries isolated
+  cleanup. Source schema is hashed again before success. Database/server health,
+  temporary-schema inventory, and filesystem inventory are post-drill gates.
+  Automated external alerts and a timed RTO/RPO exercise remain open.
+- Regulatory: temporary dumps remain personal data whenever production contains
+  it. Unauthorized access triggers immediate GDPR assessment and may trigger the
+  72-hour notification window; no dump may be retained as an undeclared backup.
+- Vendors/supply chain: no dependency, vendor, processor, or off-host transfer is
+  added; the drill uses the local MariaDB tools and root socket.
+- Validation before live exercise: Bash syntax, ShellCheck, strict-name checks,
+  root-only execution, source discovery, charset/collation discovery, and a
+  read-only dry-run over 23 tables passed.
+
+**Verdict:** mitigate then ship. Run only while the source service is healthy,
+confirm zero unexpected application restarts, prove the isolated database and
+temporary dump are gone, and record table/row/schema/migration results. This is
+not a substitute for encrypted scheduled backups or an off-host disaster drill.

@@ -191,6 +191,15 @@ execută o cale pe care nu o poate valida.
 O migrare backward-compatible poate rămâne în DB când binarul anterior o ignoră.
 Documentează explicit această decizie în incident/release notes.
 
+## Drill de restore izolat
+
+Rulează `sudo deploy/scripts/drill-database-restore.sh --dry-run`, apoi scriptul
+fără opțiune. Acesta produce temporar un dump root-only și o bază cu prefixul
+strict `<baza>_restore_drill_`, compară schema, numărul de rânduri din fiecare
+tabel, fingerprintul migrațiilor și `mariadb-check`, apoi elimină copia și baza
+temporară. Nu folosi numele bazei live ca țintă de restore și nu păstra dumpul
+temporar drept backup operațional.
+
 ## Verificări de securitate după release
 
 - serviciile `social-media`, `nginx` și `cloudflared` sunt `active`;
