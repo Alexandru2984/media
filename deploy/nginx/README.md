@@ -24,7 +24,8 @@ on a host without those dependencies.
 3. Run `nginx -t`; restore the backups immediately on failure.
 4. Reload, do not restart, Nginx.
 5. Verify the homepage, API, assets, sensitive-route cache policy, CORS removal,
-   direct-origin rejection, upload response headers, and rate-limit status.
+   direct-origin rejection, private `no-store` upload response headers, rejection
+   of unknown upload subtrees, and rate-limit status.
 6. Keep the backup until logs and application behavior have been reviewed.
 
 Do not edit the installed copies independently. Update and validate the tracked

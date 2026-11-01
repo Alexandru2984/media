@@ -284,8 +284,11 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location /uploads/ {
-        alias /var/www/media.micutu.com/backend/uploads/;
+    # Avatar URLs are unique per upload, but their lifetime is still controlled
+    # by the account owner. Keeping them out of shared and browser caches makes
+    # replacement or account deletion effective at the origin immediately.
+    location ^~ /uploads/avatars/ {
+        alias /var/www/media.micutu.com/backend/uploads/avatars/;
         autoindex off;
         limit_except GET HEAD { deny all; }
 
@@ -296,7 +299,21 @@ server {
         }
         default_type application/octet-stream;
 
-        add_header Cache-Control "public, max-age=2592000, immutable" always;
+        add_header Cache-Control "private, no-store" always;
+        add_header Content-Security-Policy "default-src 'none'; sandbox" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    # Only the two managed upload classes above may ever be served. A file that
+    # lands in another subtree must remain inaccessible until it is investigated.
+    location ^~ /uploads/ {
+        return 404;
+        add_header Cache-Control "private, no-store" always;
         add_header Content-Security-Policy "default-src 'none'; sandbox" always;
         add_header Cross-Origin-Resource-Policy "same-origin" always;
         add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
