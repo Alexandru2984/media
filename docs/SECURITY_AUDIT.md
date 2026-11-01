@@ -862,6 +862,28 @@ is `20261030T113313Z-6eac6de`; no database, backend, Nginx, or Tunnel mutation w
 required. Browser installation testing remains open because the VPS has no
 browser runtime.
 
+### Generated sitemap consistency checkpoint
+
+Frontend commit `56706e0` removes the independently maintained source sitemap.
+The same route registry now generates each public page's JSON-LD modification
+date and the complete sitemap, preventing metadata drift. The production gate
+rejects missing or duplicate URLs, malformed modification dates, unsupported
+change frequencies, public `noindex`, and any canonical/date mismatch between a
+page and its sitemap record.
+
+Fifteen Node contracts, the production build, the extended six-page SEO gate,
+and a zero-finding low-threshold npm audit passed. Direct-origin and Cloudflare
+Tunnel canaries returned the identical sitemap SHA-256
+`8464bf374bc36c34c077fc017c7daa08717fd697ae49db77976a97d5d56868b7`
+with `200` and an XML MIME type. All six public pages exposed their exact
+canonical URL and route-specific `dateModified`; real `404` behavior and API
+readiness were unchanged. The API, Nginx, and Tunnel remained active with zero
+unexpected API restarts.
+
+Frontend release `20261101T140418Z-56706e0` is active. Its atomic rollback target
+is `20261101T140207Z-fe8768a`; no database, backend, Nginx, or Tunnel mutation was
+required. Search Console ownership and crawl/index alerting remain open.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
