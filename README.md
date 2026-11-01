@@ -14,6 +14,8 @@ Authenticated members can
 also keep a private, paginated collection of saved posts, download a
 password-confirmed JSON copy of their account data, and permanently delete their
 account through a double-confirmed flow with retryable media cleanup.
+The API drains in-flight requests on `SIGTERM`/`SIGINT` during releases, while
+systemd retains a 15-second hard stop as the final availability bound.
 Members can follow or unfollow one another, browse bounded follower/following
 lists, switch to a dedicated following feed, and block unwanted accounts.
 Accounts can also be private: follow requests require explicit approval, and

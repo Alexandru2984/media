@@ -360,7 +360,9 @@ deep scans consistently, with a production Tunnel boundary canary and root-only
 binary rollback artifact. Browser requests now use one tested transport with
 bounded 15-second normal and 45-second upload timeouts, caller cancellation,
 generic network errors, and correct body-specific headers. Metrics, alerts,
-retention policy, restore drills, and release automation remain open. SMTP
+retention policy, restore drills, and release automation remain open. The API
+now drains in-flight work after `SIGTERM`/`SIGINT`, bounded by systemd's
+15-second stop timeout. SMTP
 authentication is currently rejected by Brevo with `535`; rotating and verifying
 that credential is an immediate P1 operational task because verification and
 password-recovery delivery are down.

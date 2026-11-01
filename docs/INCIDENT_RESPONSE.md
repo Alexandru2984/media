@@ -44,6 +44,11 @@ for active abuse or user-visible outage without confirmed compromise, and
    reachable. If process compromise is plausible, assume every secret available
    to the API was exposed and begin scoped rotation after evidence capture.
 
+An ordinary `systemctl stop` or restart sends `SIGTERM`; the API stops accepting
+new connections and drains active requests. Systemd enforces a 15-second final
+timeout and then kills a stuck process. During confirmed active exploitation,
+do not extend that drain window merely to preserve untrusted requests.
+
 Useful read-only checks:
 
 ```bash
@@ -440,3 +445,45 @@ and unaccepted by this verdict.
 generic errors, candidate matrix, health gates, root-only rollback binary, and
 public Tunnel canary are release requirements. Cursor pagination, database
 latency metrics, owned alerts, a tabletop, and restore testing remain follow-ups.
+
+## CISO review record — graceful API shutdown
+
+**Date:** 2026-11-01
+
+- Top threats: interrupted writes or uploads during routine releases
+  (medium/medium), deliberate slow requests exhausting the drain window
+  (medium/medium), and a failed signal handler leaving a process unable to stop
+  cleanly (low/high).
+- Blast radius: normal release risk is limited to requests active at the stop
+  boundary. A process that fails to terminate can delay the API replacement for
+  every user until systemd's hard stop. Production has zero persistent users at
+  this checkpoint, while revenue, incident cost, and loss-frequency inputs remain
+  unavailable, so a defensible FAIR annualized-loss estimate cannot be produced.
+- Controls: the API stops accepting new connections on `SIGTERM` or `SIGINT`,
+  drains active work, records the transition, and remains bounded by systemd's
+  15-second `TimeoutStopSec` plus forced termination. Signal-handler installation
+  errors are logged instead of panicking the running service.
+- Detection: the journal records shutdown receipt, request completion, unit result,
+  stop timeouts, forced kills, and restarts. Target MTTD is five minutes for a
+  failed or forced release, but no owned automatic alert exists, so automated MTTD
+  remains unknown.
+- Response: the shutdown section above preserves the hard bound during active
+  exploitation. The broader runbook covers evidence capture, rollback, readiness,
+  and Tunnel canaries. A multi-person tabletop and tested database restore remain
+  open.
+- Regulatory: availability loss involving personal data requires immediate GDPR
+  assessment; if it constitutes a personal-data breach, the supervisory-authority
+  notification window may be 72 hours after awareness.
+- Vendors/supply chain: no dependency, processor, vendor, secret, or external
+  service was added. Existing VPS, systemd, Cloudflare, MariaDB, GitHub, and broken
+  Brevo SMTP governance remains in scope.
+- Validation: strict Clippy, 55 backend tests plus five seed tests, release
+  compilation, and an isolated production-database candidate passed. During the
+  signal canary, new connections were refused immediately, an incomplete active
+  request kept the process alive, and closing that request produced a clean
+  systemd `success` result with no listener or process left behind.
+
+**Verdict:** mitigate then ship. Graceful signal handling, a 15-second forced-stop
+bound, candidate drain proof, a root-only rollback binary, readiness gates, and a
+public Tunnel canary are release requirements. Automated alerting, a tabletop,
+and restore testing remain follow-ups; the SMTP P1 is outside this verdict.
