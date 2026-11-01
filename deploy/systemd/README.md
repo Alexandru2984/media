@@ -4,6 +4,8 @@ The tracked unit maps to:
 
 ```text
 social-media.service -> /etc/systemd/system/social-media.service
+social-media-backup.service -> /etc/systemd/system/social-media-backup.service
+social-media-backup.timer -> /etc/systemd/system/social-media-backup.timer
 ```
 
 The service intentionally writes only to
@@ -28,3 +30,11 @@ does not need read access to the file itself.
 
 Hardening should remain explicit. Do not remove a sandbox control to mask a
 failure without first identifying the exact required resource or syscall.
+
+The backup unit is root-only because it needs the local MariaDB administrative
+socket and read access to the `www-data` upload tree. Its capability set is
+bounded to `CAP_DAC_READ_SEARCH`, its filesystem writes are limited to the
+dedicated staging, systemd state/runtime, and rclone-token directories, and its
+rclone config contains only the Google Drive plus crypt remotes. Install it through
+`deploy/scripts/install-offsite-backups.sh`; do not point a root timer at a
+user-writable rclone configuration.

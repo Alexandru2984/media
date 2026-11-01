@@ -84,3 +84,37 @@ sudo deploy/scripts/drill-database-restore.sh
 The drill intentionally does not create a retained backup. Retention, encryption,
 off-host copies, and scheduled production backups require a separately approved
 policy and recovery objective.
+
+## Encrypted off-site backup
+
+`backup-offsite.sh` creates a transaction-consistent MariaDB dump and a separate
+archive of the managed upload tree. Both are compressed, covered by a SHA-256
+manifest, copied only below the versioned
+`gdrive-vps-crypt:media-social/backups/<UTC timestamp>` prefix, downloaded again,
+and verified before the run can succeed. The script never reads `backend/.env`,
+never sends application or SMTP credentials, and never uses `rclone sync`.
+
+Successful backups are retained for 35 days. Pruning runs only after remote
+download verification and accepts only directories matching the exact backup ID
+format; other crypt-remote directories and other projects are outside its scope.
+Local plaintext staging remains root-only and is removed on every exit. A partial
+remote upload is purged only from the exact newly generated destination.
+
+The installer copies only the required `gdrive` and `gdrive-vps-crypt` sections
+from the operator's mode-`0600` rclone configuration into a dedicated
+`root:root`, mode-`0600` file. It does not print configuration values and does not
+start a backup implicitly:
+
+```bash
+sudo deploy/scripts/install-offsite-backups.sh --dry-run
+sudo deploy/scripts/install-offsite-backups.sh
+sudo deploy/scripts/backup-offsite.sh --dry-run
+sudo systemctl start social-media-backup.service
+sudo systemctl status social-media-backup.service
+sudo cat /var/lib/social-media-backup/last-success.env
+```
+
+The daily timer runs at 02:42 Europe/Bucharest with up to 20 minutes of jitter.
+The rclone crypt password is required after total VPS loss, so keep an offline,
+access-controlled recovery copy of that configuration; an encrypted Drive backup
+without its crypt material is intentionally unrecoverable.

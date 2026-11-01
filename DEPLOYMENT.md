@@ -200,6 +200,30 @@ tabel, fingerprintul migrațiilor și `mariadb-check`, apoi elimină copia și b
 temporară. Nu folosi numele bazei live ca țintă de restore și nu păstra dumpul
 temporar drept backup operațional.
 
+## Backup criptat off-site
+
+Backupul zilnic folosește remote-ul rclone crypt dedicat, fără `sync` și fără
+secretele aplicației. Bundle-ul versionat conține dumpul MariaDB, uploadurile,
+metadata minimă și manifestul SHA-256. Un run este declarat reușit numai după ce
+bundle-ul a fost redescărcat de pe Google Drive și toate hashurile au fost
+revalidate. Retenția este 35 de zile și poate șterge exclusiv directoare cu ID-ul
+strict generat sub `media-social/backups`.
+
+```bash
+sudo deploy/scripts/install-offsite-backups.sh --dry-run
+sudo deploy/scripts/install-offsite-backups.sh
+sudo deploy/scripts/backup-offsite.sh --dry-run
+sudo systemctl start social-media-backup.service
+systemctl list-timers social-media-backup.timer
+sudo cat /var/lib/social-media-backup/last-success.env
+```
+
+Configurația dedicată live este `/etc/social-media/rclone-backup.conf`,
+`root:root 0600`, și include numai remotes necesare. După schimbarea tokenului,
+client ID-ului Google sau parolei crypt, rerulează installerul și dry-run-ul.
+Păstrează separat, offline și controlat, materialul crypt necesar recuperării
+după pierderea completă a VPS-ului; nu îl comite și nu îl copia în loguri.
+
 ## Verificări de securitate după release
 
 - serviciile `social-media`, `nginx` și `cloudflared` sunt `active`;

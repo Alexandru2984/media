@@ -1,0 +1,12 @@
+[Unit]
+Description=Run the Media encrypted off-site backup daily
+
+[Timer]
+OnCalendar=*-*-* 02:42:00 Europe/Bucharest
+RandomizedDelaySec=20m
+Persistent=true
+AccuracySec=1m
+Unit=social-media-backup.service
+
+[Install]
+WantedBy=timers.target
