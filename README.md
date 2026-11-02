@@ -123,8 +123,10 @@ The next project goals are:
 6. Complete the privacy program with a data inventory, retention schedule,
    asynchronous large-account exports, DPIA screening, processor records, and
    formal legal review, operator contact details, and approved policy text.
-7. Add server-rendered or pre-rendered public profiles/posts, Search Console
-   integration, and real-user Core Web Vitals monitoring.
+7. Add an explicit search-indexing preference and legal/privacy approval before
+   allowing the existing server-rendered post permalinks into sitemaps; then add
+   public-profile rendering, Search Console integration, structured-data
+   validation, and real-user Core Web Vitals monitoring.
 
 See the [security audit](docs/SECURITY_AUDIT.md) and the
 [implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,

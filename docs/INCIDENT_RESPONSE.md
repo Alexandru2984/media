@@ -1021,3 +1021,48 @@ and a separate security review.
 **Verdict:** ship. The feature is presentation-only, reversible, non-authoritative
 and data-minimizing. Do not evolve the percentage into ranking, recommendations,
 eligibility, or verification without a separate fairness/privacy/security review.
+
+## CISO review record — post permalinks and share previews
+
+**Date:** 2026-11-02
+
+- Data and boundaries: permalinks process user-authored post text, managed post
+  images, public profile identity, engagement counts, an optional HttpOnly
+  session, and block/follow/hide state. Requests cross Cloudflare Tunnel, Nginx,
+  the Rust renderer, and MariaDB; a recipient may then send the URL to a third-
+  party messaging or social-preview service. Private messages, email,
+  credentials, moderation records, and reporter identity are not selected.
+- Top threats: IDOR exposure of a private post (critical), stored XSS through
+  metadata or JSON-LD (high), stale authorized content in a shared cache (high),
+  search indexing without a distinct user choice (medium/high), a private-
+  content existence oracle (medium), and database amplification (medium).
+- Controls: one shared query applies private-account, accepted-follow,
+  bidirectional-block, and per-viewer hidden-post rules to both JSON and HTML.
+  UUID parsing fails closed; unauthorized, missing, and invalid targets all
+  return 404. HTML and embedded JSON are escaped in separate contexts, and only
+  managed same-origin post media can become an Open Graph image. Nginx rate-
+  limits the route and emits `no-store` plus `noindex, nofollow, noarchive`; no
+  permalink enters the sitemap. Privacy is reevaluated on every HTML, JSON,
+  comment, and media request.
+- Blast radius: a renderer or access-policy defect could expose the text, image,
+  identity, and counts of every post reachable through the flawed policy. It
+  does not directly grant access to messages, credentials, email, or moderation
+  data. Production currently has zero persistent users, which reduces present
+  incident size but is not treated as a control.
+- Detection and response: privacy-redacted logs retain route, status, latency,
+  and request ID, while the service monitor covers API/Nginx/Tunnel availability.
+  No alert yet detects unusual permalink volume or a silent authorization
+  regression, so MTTD for that class remains unknown. Contain by disabling the
+  Nginx permalink location, validating with `nginx -t`, reloading Nginx, making
+  affected accounts private or removing content when user-directed, preserving
+  logs/request IDs, and assessing external preview caches. Apply the normal
+  breach assessment and 72-hour GDPR clock if private content was disclosed.
+- Vendors and recovery limits: Cloudflare sees request metadata under the
+  existing Tunnel relationship. A user-chosen messaging/social service may fetch
+  and retain its preview under its own policies. No new SDK, tracker, dependency,
+  credential, or processor integration is added, and Media cannot promise to
+  erase copies already created outside the platform.
+
+**Verdict:** mitigate then ship, with the mitigations implemented. Search
+indexing remains blocked until an explicit user control, legal/privacy approval,
+deletion expectations, and authorization-regression monitoring exist.

@@ -23,6 +23,11 @@ const sections = [
     paragraphs: ['Identitatea de bază a profilului rămâne descoperibilă, însă un cont privat limitează postările, imaginile, comentariile și listele sociale la proprietar și urmăritorii acceptați. Blocarea se aplică pe suprafețele autentificate, iar raportările și controalele de siguranță sunt private. Mesajele nu sunt pagini publice.'],
   },
   {
+    id: 'linkuri-postari',
+    title: 'Linkuri de distribuire pentru postări',
+    paragraphs: ['Fiecare postare are un link direct. Pentru un cont public, linkul și preview-ul său pot fi deschise fără autentificare; pentru un cont privat, accesul rămâne limitat la proprietar și urmăritorii acceptați. Media verifică vizibilitatea, blocările, ascunderea și existența postării la fiecare acces și nu permite indexarea acestor pagini în motoare de căutare. Dacă distribui linkul într-un serviciu extern, acel serviciu poate genera și păstra propriul preview conform politicilor sale; trecerea contului în privat sau ștergerea oprește accesul nou prin Media, dar nu poate șterge copiile deja create în afara platformei.'],
+  },
+  {
     id: 'furnizori',
     title: 'Infrastructură și furnizori',
     paragraphs: ['Traficul public trece prin Cloudflare Tunnel și Nginx către aplicația găzduită pe un VPS. Datele aplicației sunt stocate în MariaDB, iar Brevo este configurat pentru emailurile de verificare și recuperare. În prezent, autentificarea SMTP Brevo este defectă, astfel încât acele mesaje nu sunt livrate; eroarea nu schimbă controalele contului din aplicație.'],

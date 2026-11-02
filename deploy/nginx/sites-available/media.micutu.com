@@ -102,6 +102,27 @@ server {
         add_header X-Permitted-Cross-Domain-Policies "none" always;
     }
 
+    # Post permalinks are rendered server-side for real share previews. They
+    # remain non-indexable until Media has an explicit per-account search-
+    # indexing choice and completed privacy/legal review. Every request reaches
+    # the API so privacy changes, blocks, hides, and deletions take effect
+    # without a browser or Cloudflare cache retaining an authorized response.
+    location ~ "^/post/([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-4[0-9A-Fa-f]{3}-[89AaBb][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12})/$" {
+        return 308 /post/$1;
+        include snippets/media-security-headers.conf;
+        add_header Cache-Control "no-store" always;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    location ~ "^/post/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-4[0-9A-Fa-f]{3}-[89AaBb][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$" {
+        limit_req zone=media_api burst=60 nodelay;
+        include snippets/media-api-proxy.conf;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+    }
+
     location = / {
         try_files /index.html =404;
         include snippets/media-security-headers.conf;
