@@ -2368,6 +2368,84 @@ pub async fn create_post(
     Ok(Json(post))
 }
 
+pub(crate) async fn visible_post(
+    pool: &MySqlPool,
+    headers: &HeaderMap,
+    post_id: &str,
+) -> Result<Option<PostWithUser>, StatusCode> {
+    let current_user_id = get_current_user(pool, headers).await.ok();
+    let row = query_as::<_, PostFeedRow>(
+        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+                u.id AS user_id, u.username, u.bio, u.avatar_url,
+                post_counts.posts_count AS user_posts_count,
+                u.created_at AS user_created_at,
+                (current_like.id IS NOT NULL) AS is_liked,
+                (current_save.user_id IS NOT NULL) AS is_saved
+         FROM posts p
+         INNER JOIN users u ON u.id = p.user_id
+         INNER JOIN (
+             SELECT user_id, COUNT(*) AS posts_count
+             FROM posts
+             GROUP BY user_id
+         ) post_counts ON post_counts.user_id = p.user_id
+         LEFT JOIN likes current_like
+           ON current_like.post_id = p.id AND current_like.user_id = ?
+         LEFT JOIN saved_posts current_save
+           ON current_save.post_id = p.id AND current_save.user_id = ?
+         WHERE p.id = ?
+           AND NOT EXISTS(
+               SELECT 1 FROM user_blocks block_pair
+               WHERE (block_pair.blocker_id = ? AND block_pair.blocked_id = p.user_id)
+                  OR (block_pair.blocker_id = p.user_id AND block_pair.blocked_id = ?)
+           )
+           AND NOT EXISTS(
+               SELECT 1 FROM hidden_posts hidden
+               WHERE hidden.user_id = ? AND hidden.post_id = p.id
+           )
+           AND (
+               u.is_private = 0
+               OR p.user_id = ?
+               OR EXISTS(
+                   SELECT 1 FROM follows private_follow
+                   WHERE private_follow.follower_id = ?
+                     AND private_follow.followed_id = p.user_id
+               )
+           )
+         LIMIT 1",
+    )
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
+    .bind(post_id)
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
+    .bind(current_user_id.as_deref())
+    .fetch_optional(pool)
+    .await
+    .map_err(|error| {
+        tracing::error!(error = %error, "failed to fetch visible post");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(row.map(post_feed_row_to_response))
+}
+
+pub async fn get_post(
+    State(pool): State<MySqlPool>,
+    Path(post_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<PostWithUser>, StatusCode> {
+    if Uuid::parse_str(&post_id).is_err() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    visible_post(&pool, &headers, &post_id)
+        .await?
+        .map(Json)
+        .ok_or(StatusCode::NOT_FOUND)
+}
+
 pub async fn get_posts(
     State(pool): State<MySqlPool>,
     Query(params): Query<HashMap<String, String>>,

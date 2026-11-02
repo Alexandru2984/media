@@ -7,7 +7,7 @@ use axum::{
 };
 use sqlx::MySqlPool;
 
-use crate::{handlers, health, moderation, notifications, safety, security};
+use crate::{handlers, health, moderation, notifications, public_pages, safety, security};
 
 pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
     let api_routes = Router::new()
@@ -87,8 +87,12 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
             "/posts/upload-image",
             post(handlers::upload_post_image).layer(DefaultBodyLimit::max(11 * 1024 * 1024)),
         )
-        .route("/posts/:id", put(handlers::update_post))
-        .route("/posts/:id", delete(handlers::delete_post))
+        .route(
+            "/posts/:id",
+            get(handlers::get_post)
+                .put(handlers::update_post)
+                .delete(handlers::delete_post),
+        )
         .route("/posts/:id/like", post(handlers::like_post))
         .route("/posts/:id/save", post(handlers::save_post))
         .route(
@@ -152,7 +156,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/search", get(handlers::search))
         // Nginx exposes this only as an internal auth subrequest for post media.
         .route("/media/post-access", get(handlers::authorize_post_media))
-        .with_state(pool)
+        .with_state(pool.clone())
         .layer(middleware::from_fn_with_state(
             expected_origin,
             security::enforce_same_origin,
@@ -160,5 +164,11 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .layer(middleware::from_fn(security::api_response_policy))
         .layer(middleware::from_fn(security::request_observability));
 
-    Router::new().nest("/api", api_routes)
+    let public_routes = Router::new()
+        .route("/post/:id", get(public_pages::post_page))
+        .with_state(pool)
+        .layer(middleware::from_fn(security::api_response_policy))
+        .layer(middleware::from_fn(security::request_observability));
+
+    Router::new().merge(public_routes).nest("/api", api_routes)
 }

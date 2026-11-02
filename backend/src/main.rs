@@ -8,6 +8,7 @@ mod moderation;
 mod notifications;
 mod pagination;
 mod passwords;
+mod public_pages;
 mod routes;
 mod safety;
 mod security;
