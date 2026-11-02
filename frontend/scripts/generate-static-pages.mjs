@@ -6,6 +6,8 @@ const frontendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distRoot = resolve(frontendRoot, 'dist');
 const indexPath = resolve(distRoot, 'index.html');
 const socialImage = 'https://media.micutu.com/og/media-social-preview.png';
+const rootStart = '<!--media-app-root-start-->';
+const rootEnd = '<!--media-app-root-end-->';
 
 const routes = [
   {
@@ -188,14 +190,14 @@ function renderRoute(shell, route) {
     `<script id="page-structured-data" type="application/ld+json">${JSON.stringify(structuredData)}</script>`,
   );
 
-  const rootPattern = /<div id="root"><\/div>/i;
-  if (!rootPattern.test(html)) throw new Error('Missing empty application root');
+  const rootPattern = /<!--media-app-root-start-->[\s\S]*?<!--media-app-root-end-->/i;
+  if (!rootPattern.test(html)) throw new Error('Missing bounded application root');
   const staticSections = route.sections.map(([title, copy], index) => `
     <article class="surface guideline-card">
       <span aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
       <div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(copy)}</p></div>
     </article>`).join('');
-  const staticPage = `<div id="root">
+  const staticPage = `${rootStart}<div id="root">
   <main class="public-page" id="main-content">
     <section class="public-hero public-hero-compact app-container">
       <p class="eyebrow">${escapeHtml(route.eyebrow)}</p>
@@ -207,7 +209,7 @@ function renderRoute(shell, route) {
       </div>
     </section>
   </main>
-</div>`;
+</div>${rootEnd}`;
   return html.replace(rootPattern, staticPage);
 }
 

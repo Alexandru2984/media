@@ -1,8 +1,8 @@
 import { For, Show, createSignal } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
+import { A, useNavigate } from '@solidjs/router';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
-import { getImageUrl, profilePath } from '../utils/urls';
+import { getImageUrl, loginPath, postPath, profilePath } from '../utils/urls';
 import ReportDialog from './ReportDialog';
 
 const MAX_CONTENT_LENGTH = 500;
@@ -55,7 +55,17 @@ export default function PostCard(props) {
   let editFileInput;
 
   const isOwn = () => auth.user()?.id === props.post.user.id;
-  const openProfile = (userId) => navigate(profilePath(userId));
+  const currentPostPath = () => postPath(props.post.id);
+  const requireAuthentication = () => {
+    if (auth.isAuthenticated()) return true;
+    if (auth.loading()) return false;
+    navigate(loginPath(currentPostPath()));
+    return false;
+  };
+  const openProfile = (userId) => {
+    const path = profilePath(userId);
+    navigate(auth.isAuthenticated() ? path : loginPath(currentPostPath()));
+  };
 
   const reloadComments = async () => {
     const data = await api.getComments(props.post.id);
@@ -64,7 +74,7 @@ export default function PostCard(props) {
   };
 
   const handleLike = async () => {
-    if (likePending()) return;
+    if (likePending() || !requireAuthentication()) return;
     setLikePending(true);
     setError('');
     try {
@@ -87,7 +97,7 @@ export default function PostCard(props) {
   };
 
   const handleSave = async () => {
-    if (savePending()) return;
+    if (savePending() || !requireAuthentication()) return;
     setSavePending(true);
     setError('');
     try {
@@ -124,6 +134,7 @@ export default function PostCard(props) {
 
   const handleComment = async (event) => {
     event.preventDefault();
+    if (!requireAuthentication()) return;
     const content = commentText().trim();
     if (!content || commentPending()) return;
 
@@ -280,7 +291,7 @@ export default function PostCard(props) {
             </button>
           </div>
         </Show>
-        <Show when={!isOwn() && !editing()}>
+        <Show when={auth.isAuthenticated() && !isOwn() && !editing()}>
           <div class="post-owner-actions" aria-label="Acțiuni de siguranță">
             <ReportDialog
               targetType="post"
@@ -401,25 +412,44 @@ export default function PostCard(props) {
           </svg>
           <span class="post-save-label">{saved() ? 'Salvată' : 'Salvează'}</span>
         </button>
+        <A
+          href={currentPostPath()}
+          class="post-action post-permalink"
+          aria-label="Deschide postarea și opțiunile de distribuire"
+          title="Deschide postarea"
+        >
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M10 14a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1M14 10a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+          <span class="post-save-label">Deschide</span>
+        </A>
       </div>
 
       <Show when={showComments()}>
         <section class="comments-panel" aria-label="Comentarii">
-          <form class="comment-form" onSubmit={handleComment}>
-            <label class="sr-only" for={`comment-${props.post.id}`}>Scrie un comentariu</label>
-            <input
-              id={`comment-${props.post.id}`}
-              class="input"
-              type="text"
-              value={commentText()}
-              onInput={(event) => setCommentText(event.currentTarget.value)}
-              maxlength="500"
-              placeholder="Scrie un comentariu…"
-            />
-            <button type="submit" class="btn btn-primary" disabled={commentPending() || !commentText().trim()}>
-              {commentPending() ? 'Se trimite…' : 'Trimite'}
-            </button>
-          </form>
+          <Show
+            when={auth.isAuthenticated()}
+            fallback={
+              <div class="comment-login-prompt">
+                <span>Conectează-te pentru a răspunde conversației.</span>
+                <A href={loginPath(currentPostPath())} class="btn btn-secondary">Conectare</A>
+              </div>
+            }
+          >
+            <form class="comment-form" onSubmit={handleComment}>
+              <label class="sr-only" for={`comment-${props.post.id}`}>Scrie un comentariu</label>
+              <input
+                id={`comment-${props.post.id}`}
+                class="input"
+                type="text"
+                value={commentText()}
+                onInput={(event) => setCommentText(event.currentTarget.value)}
+                maxlength="500"
+                placeholder="Scrie un comentariu…"
+              />
+              <button type="submit" class="btn btn-primary" disabled={commentPending() || !commentText().trim()}>
+                {commentPending() ? 'Se trimite…' : 'Trimite'}
+              </button>
+            </form>
+          </Show>
 
           <Show when={!commentsLoading()} fallback={<p class="comments-status">Se încarcă comentariile…</p>}>
             <Show when={comments().length > 0} fallback={<p class="comments-status">Fii primul care răspunde.</p>}>
@@ -467,7 +497,7 @@ export default function PostCard(props) {
                               <button type="button" class="comment-link danger" onClick={() => handleDeleteComment(comment.id)}>Șterge</button>
                             </div>
                           </Show>
-                          <Show when={auth.user()?.id !== comment.user.id}>
+                          <Show when={auth.isAuthenticated() && auth.user()?.id !== comment.user.id}>
                             <div class="comment-actions">
                               <ReportDialog
                                 targetType="comment"

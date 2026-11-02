@@ -35,6 +35,9 @@ function readPngSize(buffer, label) {
 }
 
 const rootHtml = await readFile(resolve(distRoot, 'index.html'), 'utf8');
+if (!rootHtml.includes('<!--media-app-root-start-->') || !rootHtml.includes('<!--media-app-root-end-->')) {
+  throw new Error('Missing bounded application root required by dynamic permalink rendering');
+}
 const entryName = requireMatch(
   rootHtml,
   /<script\b[^>]*\bsrc="\/assets\/(index-[^"]+\.js)"/i,

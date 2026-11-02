@@ -17,6 +17,30 @@ export const withQuery = (path, parameters) => {
 
 export const profilePath = (userId) => `/profile/${encodePathSegment(userId)}`;
 
+export const postPath = (postId) => `/post/${encodePathSegment(postId)}`;
+
+export const loginPath = (returnPath = '/') => withQuery('/login', { next: returnPath });
+
+export const safeReturnPath = (value, fallback = '/') => {
+  if (typeof value !== 'string'
+      || value.length === 0
+      || value.length > 1024
+      || !value.startsWith('/')
+      || value.startsWith('//')
+      || value.includes('\\')
+      || /[\u0000-\u001f\u007f]/.test(value)) {
+    return fallback;
+  }
+
+  try {
+    const target = new URL(value, 'https://media.micutu.com');
+    if (target.origin !== 'https://media.micutu.com') return fallback;
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return fallback;
+  }
+};
+
 export const getImageUrl = (path) => {
   if (!path) return null;
   if (path.startsWith('http')) return path;

@@ -11,6 +11,7 @@ import './index.css';
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const Profile = lazy(() => import('./pages/Profile'));
+const PostDetails = lazy(() => import('./pages/PostDetails'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
@@ -122,6 +123,7 @@ render(
           <Route path="/login" component={Login} />
           <Route path="/register" component={Register} />
           <Route path="/profile/:id" component={Profile} />
+          <Route path="/post/:id" component={PostDetails} />
           <Route path="/profile/:id/urmaritori" component={Connections} />
           <Route path="/profile/:id/urmariri" component={Connections} />
           <Route path="/cereri" component={FollowRequests} />

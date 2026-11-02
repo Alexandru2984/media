@@ -1,8 +1,9 @@
-import { A, useNavigate } from '@solidjs/router';
+import { A, useNavigate, useSearchParams } from '@solidjs/router';
 import { createSignal, Show } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
+import { safeReturnPath } from '../utils/urls';
 
 function SubmitSpinner() {
   return (
@@ -19,6 +20,7 @@ export default function Login() {
   const [error, setError] = createSignal('');
   const [submitting, setSubmitting] = createSignal(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const auth = useAuth();
 
   const handleSubmit = async (event) => {
@@ -28,7 +30,7 @@ export default function Login() {
 
     try {
       await auth.login(email().trim(), password());
-      navigate('/');
+      navigate(safeReturnPath(searchParams.next), { replace: true });
     } catch (requestError) {
       console.error('Login failed:', requestError);
       setError('Datele de conectare nu sunt corecte. Verifică emailul și parola.');

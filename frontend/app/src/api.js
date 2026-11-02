@@ -122,6 +122,10 @@ class ApiService {
     return this.request(withQuery('/posts', { limit, offset }));
   }
 
+  async getPost(postId) {
+    return this.request(`/posts/${encodePathSegment(postId)}`);
+  }
+
   async getFollowingFeed(limit = 10, offset = 0) {
     return this.request(withQuery('/feed/following', { limit, offset }));
   }

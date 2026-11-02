@@ -43,6 +43,18 @@ function setCanonicalLinks(canonicalUrl) {
   document.head.querySelector('link[rel="alternate"][hreflang="x-default"]')?.setAttribute('href', canonicalUrl);
 }
 
+function safeSocialImage(imageUrl) {
+  if (!imageUrl) return SOCIAL_IMAGE_URL;
+  try {
+    const parsed = new URL(imageUrl, SITE_URL);
+    return parsed.origin === SITE_URL && parsed.pathname.startsWith('/uploads/posts/')
+      ? parsed.href
+      : SOCIAL_IMAGE_URL;
+  } catch {
+    return SOCIAL_IMAGE_URL;
+  }
+}
+
 export default function PageMeta(props) {
   createEffect(() => {
     const title = props.title || DEFAULT_TITLE;
@@ -50,6 +62,8 @@ export default function PageMeta(props) {
     const canonicalPath = props.canonicalPath || '/';
     const canonicalUrl = `${SITE_URL}${canonicalPath}`;
     const schemaType = props.schemaType || 'WebPage';
+    const socialImage = safeSocialImage(props.imageUrl);
+    const openGraphType = props.openGraphType || 'website';
     const robots = props.noIndex
       ? 'noindex, nofollow, noarchive'
       : 'index, follow, max-image-preview:large';
@@ -61,8 +75,12 @@ export default function PageMeta(props) {
     setMeta('meta[property="og:title"]', title);
     setMeta('meta[property="og:description"]', description);
     setMeta('meta[property="og:url"]', canonicalUrl);
+    setMeta('meta[property="og:type"]', openGraphType);
+    setMeta('meta[property="og:image"]', socialImage);
+    setMeta('meta[property="og:image:secure_url"]', socialImage);
     setMeta('meta[name="twitter:title"]', title);
     setMeta('meta[name="twitter:description"]', description);
+    setMeta('meta[name="twitter:image"]', socialImage);
     setStructuredData(props.noIndex
       ? null
       : buildStructuredData({ title, description, canonicalUrl, schemaType }));
@@ -76,8 +94,12 @@ export default function PageMeta(props) {
     setMeta('meta[property="og:title"]', DEFAULT_TITLE);
     setMeta('meta[property="og:description"]', DEFAULT_DESCRIPTION);
     setMeta('meta[property="og:url"]', `${SITE_URL}/`);
+    setMeta('meta[property="og:type"]', 'website');
+    setMeta('meta[property="og:image"]', SOCIAL_IMAGE_URL);
+    setMeta('meta[property="og:image:secure_url"]', SOCIAL_IMAGE_URL);
     setMeta('meta[name="twitter:title"]', DEFAULT_TITLE);
     setMeta('meta[name="twitter:description"]', DEFAULT_DESCRIPTION);
+    setMeta('meta[name="twitter:image"]', SOCIAL_IMAGE_URL);
     setStructuredData(buildStructuredData({
       title: DEFAULT_TITLE,
       description: DEFAULT_DESCRIPTION,
