@@ -187,7 +187,14 @@ now replaces blank screens after lazy-chunk or render failures with an
 auto-focused recovery view, while every route exposes a keyboard skip link and
 a responsive live offline indicator. Theme persistence and legacy-token cleanup
 now tolerate unavailable, policy-blocked, or quota-failing Web Storage instead
-of aborting application bootstrap.
+of aborting application bootstrap. The 2026-11-02 release adds a global,
+responsive command palette with a visible header trigger, `Ctrl`/`Cmd`+`K`,
+diacritic-insensitive search, arrow/Enter navigation, Escape dismissal, focus
+trapping/restoration, and mobile sheet presentation. Public, authenticated, and
+moderation commands are separated by session and role; global shortcuts never
+intercept editable fields. The authenticated mobile header now hides its
+duplicated profile avatar because profile navigation is already present in the
+bottom bar, preserving the 320 px layout even for moderator controls.
 
 ### Design system
 
@@ -422,8 +429,8 @@ password-recovery delivery are down.
 
 - Guided onboarding, interest selection, suggested follows, and profile checklist.
 - PWA install prompt, push notifications, offline drafts, and share target.
-- Keyboard shortcuts, command palette, saved searches, content filters, and
-  accessibility preferences.
+- Keyboard shortcuts and role-aware command palette ✅. Add saved searches,
+  content filters, additional shortcut discovery, and accessibility preferences.
 - Creator analytics, post insights, scheduled content calendar, and export tools.
 - API keys/OAuth only after scopes, consent, quotas, revocation, audit, and public
   developer documentation are complete.

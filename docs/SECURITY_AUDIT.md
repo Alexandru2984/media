@@ -1110,6 +1110,34 @@ Commit `3d89f4b` additionally snapshots the user rclone config before any networ
 call, preventing token refresh from changing its ownership while retaining the
 installer's concurrent-modification guard.
 
+### Accessible command-palette release checkpoint
+
+Frontend commit `f0703ee` adds a fixed, role-aware command catalog and accessible
+responsive palette without adding an API, dependency, storage mechanism,
+telemetry stream, or third-party script. Anonymous sessions receive only public
+account/editorial routes; authenticated account commands require the existing
+session, and the moderation shortcut appears only for moderator/admin roles.
+This presentation filter is not treated as an authorization boundary: protected
+pages and APIs retain their existing server/session checks. Profile identifiers
+are encoded into one path segment, and global shortcuts are ignored while focus
+is in input, textarea, select, or editable content.
+
+The frontend suite passes 20 tests, including diacritic-insensitive ranking,
+public/privileged command separation, unsafe profile-ID encoding, and editable
+target detection. The production build passes its static-page/PWA/bundle gate at
+118,968 entry-JavaScript bytes, 73,296 stylesheet bytes, and 248,581 total
+JavaScript bytes; `npm audit --audit-level=low` reports zero findings.
+
+Immutable release `20261102T000539Z-f0703ee` is active. The direct-origin and
+Cloudflare Tunnel copies of `index-DHHB3Qbv.js` both returned `200` and matched
+the release SHA-256
+`efc4f800f13a3cd3924dcc3f208345b2f0ed31bcf5d1105cbe00df4b5342bf35`.
+All four services remained active, API restarts stayed at zero, and the full
+service monitor passed seven HTTP and two certificate boundaries. Filesystem use
+is now 80% with about 104 GB free, still inside the 85%/10 GiB alert gates. The
+atomic rollback target is `20261101T140635Z-706ef08`; no backend, database,
+Nginx, Tunnel, user data, or vendor configuration changed.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,

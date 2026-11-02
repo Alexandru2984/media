@@ -895,3 +895,44 @@ purge plus documented content/access/GDPR assessment remain P1 exit conditions.
 **Verdict:** ship the inert tool; block live use until the dedicated credential
 exists. After provisioning, purge the legacy URL and require repeated public
 `404`/non-HIT evidence before closing the cache-containment P1.
+
+## CISO review record — accessible command palette
+
+**Date:** 2026-11-02
+
+- Top threats: a global shortcut intercepting text or password entry
+  (medium/medium), privileged navigation being advertised to anonymous or
+  ordinary accounts (low/low because backend authorization remains decisive),
+  and attacker-controlled profile identifiers changing the destination path
+  (low/medium).
+- Blast radius: the change is a static frontend navigation layer used by every
+  browser session. It has no credential, API, database, upload, local-content
+  storage, background execution, or destructive action. A defective release
+  could impede navigation, but cannot grant backend privileges. Production had
+  zero persistent users at this checkpoint.
+- Controls: commands are a fixed local catalog rather than server- or
+  user-supplied HTML. Anonymous, member, and moderator/admin entries are derived
+  from the existing session state; profile paths reuse the shared segment
+  encoder. `Ctrl`/`Cmd`+`K` is ignored in input, textarea, select, and
+  `contenteditable` targets. The modal implements initial focus, cyclic Tab
+  containment, Escape/backdrop dismissal, focus restoration, ARIA dialog and
+  combobox relationships, selected-option announcements, reduced-motion
+  inheritance, and a 320 px mobile sheet layout.
+- Detection and response: 20 frontend tests, production build gates, dependency
+  audit, atomic direct/Tunnel canaries, exact live-asset checksum comparison,
+  and the existing five-minute service monitor all passed. Those checks detect
+  release/availability failure but not palette-specific interaction errors;
+  automated browser and screen-reader regression remain open. Roll back the
+  frontend pointer to `20261101T140635Z-706ef08` if navigation or accessibility
+  regresses; no schema or data reversal is required.
+- Regulatory: the palette stores and transmits no search terms or other personal
+  data, creates no profiling, and adds no retention. Existing session state is
+  used only in memory to choose locally defined commands.
+- Vendors/supply chain: no new dependency, processor, external request, or
+  browser storage was added. The locked dependency audit has zero findings; the
+  normal Cloudflare delivery path and its existing availability/privacy review
+  remain unchanged.
+
+**Verdict:** ship. The feature is bounded, role-aware, keyboard-safe, reversible,
+and does not expand data or vendor scope. Add automated browser and assistive-
+technology regression before treating accessibility as continuously verified.
