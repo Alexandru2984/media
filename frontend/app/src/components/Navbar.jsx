@@ -133,6 +133,21 @@ export default function Navbar() {
         </Show>
 
         <div class="nav-actions">
+          <button
+            type="button"
+            class="icon-button command-palette-trigger"
+            onClick={() => window.dispatchEvent(new CustomEvent('media:command-palette:open'))}
+            aria-label="Deschide paleta de comenzi (Control sau Command K)"
+            aria-haspopup="dialog"
+            aria-keyshortcuts="Control+K Meta+K"
+            title="Comenzi rapide (Ctrl/⌘ K)"
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8" />
+              <path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+            </svg>
+            <kbd>Ctrl K</kbd>
+          </button>
           <Show when={auth.isAuthenticated()}>
             <Show when={['moderator', 'admin'].includes(auth.user()?.role)}>
               <A

@@ -4,6 +4,7 @@ import { render } from 'solid-js/web';
 import { Router, Route } from '@solidjs/router';
 import { AuthProvider } from './AuthContext';
 import { ThemeProvider } from './ThemeContext';
+import CommandPalette from './components/CommandPalette';
 import Home from './pages/Home';
 import './index.css';
 
@@ -96,6 +97,7 @@ function RouteRoot(props) {
     <>
       <a class="skip-link" href="#route-content">Sari la conținut</a>
       <ConnectionStatus />
+      <CommandPalette />
       <ErrorBoundary fallback={() => <RouteFailure />}>
         <Suspense fallback={<RouteLoading />}>
           <div id="route-content" class="route-content" tabindex="-1">{props.children}</div>
