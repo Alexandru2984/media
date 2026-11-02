@@ -1,7 +1,7 @@
 const DRAFT_VERSION = 1;
 const MAX_DRAFT_LENGTH = 500;
 const MAX_STORED_BYTES = 2048;
-const MAX_DRAFT_AGE_MS = 24 * 60 * 60 * 1000;
+export const POST_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
 function draftKey(userId) {
@@ -44,7 +44,7 @@ export function readPostDraft(userId, environment = globalThis, now = Date.now()
       && draft.content.length <= MAX_DRAFT_LENGTH
       && Number.isFinite(draft.savedAt)
       && draft.savedAt <= now + MAX_CLOCK_SKEW_MS
-      && now - draft.savedAt <= MAX_DRAFT_AGE_MS;
+      && now - draft.savedAt <= POST_DRAFT_MAX_AGE_MS;
 
     if (!valid) {
       removeStoredDraft(storage, key);

@@ -1,7 +1,12 @@
-import { createSignal, onMount, Show } from 'solid-js';
+import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
-import { readPostDraft, removePostDraft, storePostDraft } from '../utils/postDraft';
+import {
+  POST_DRAFT_MAX_AGE_MS,
+  readPostDraft,
+  removePostDraft,
+  storePostDraft,
+} from '../utils/postDraft';
 import { getImageUrl } from '../utils/urls';
 
 const MAX_CONTENT_LENGTH = 500;
@@ -19,6 +24,28 @@ export default function CreatePost(props) {
   const [draftStatus, setDraftStatus] = createSignal('');
   let fileInput;
   let contentInput;
+  let draftExpiryTimer;
+
+  const clearDraftExpiryTimer = () => {
+    if (draftExpiryTimer) window.clearTimeout(draftExpiryTimer);
+    draftExpiryTimer = undefined;
+  };
+
+  const scheduleDraftExpiry = (savedAt) => {
+    clearDraftExpiryTimer();
+    const remaining = Math.max(0, savedAt + POST_DRAFT_MAX_AGE_MS - Date.now());
+    draftExpiryTimer = window.setTimeout(() => {
+      const removed = removePostDraft(auth.user()?.id);
+      if (!removed) {
+        setDraftStatus('unavailable');
+        draftExpiryTimer = undefined;
+        return;
+      }
+      setRecoverableDraft(null);
+      setDraftStatus(content().trim() ? 'expired' : '');
+      draftExpiryTimer = undefined;
+    }, remaining);
+  };
 
   const draftSavedTime = () => {
     const savedAt = recoverableDraft()?.savedAt;
@@ -35,13 +62,18 @@ export default function CreatePost(props) {
     setContent(nextContent);
 
     if (!nextContent.trim()) {
-      removePostDraft(auth.user()?.id);
-      setDraftStatus('');
+      const removed = removePostDraft(auth.user()?.id);
+      if (removed) clearDraftExpiryTimer();
+      setDraftStatus(removed ? '' : 'unavailable');
     } else if (nextContent.length > MAX_CONTENT_LENGTH) {
-      removePostDraft(auth.user()?.id);
-      setDraftStatus('too-long');
+      const removed = removePostDraft(auth.user()?.id);
+      if (removed) clearDraftExpiryTimer();
+      setDraftStatus(removed ? 'too-long' : 'unavailable');
     } else {
-      setDraftStatus(storePostDraft(auth.user()?.id, nextContent) ? 'saved' : 'unavailable');
+      const savedAt = Date.now();
+      const stored = storePostDraft(auth.user()?.id, nextContent, globalThis, savedAt);
+      setDraftStatus(stored ? 'saved' : 'unavailable');
+      if (stored) scheduleDraftExpiry(savedAt);
     }
   };
 
@@ -51,11 +83,17 @@ export default function CreatePost(props) {
     setContent(draft.content);
     setRecoverableDraft(null);
     setDraftStatus('saved');
+    scheduleDraftExpiry(draft.savedAt);
     focusComposer();
   };
 
   const discardDraft = () => {
-    removePostDraft(auth.user()?.id);
+    const removed = removePostDraft(auth.user()?.id);
+    if (!removed) {
+      setDraftStatus('clear-failed');
+      return;
+    }
+    clearDraftExpiryTimer();
     setRecoverableDraft(null);
     setDraftStatus('');
     focusComposer();
@@ -108,9 +146,10 @@ export default function CreatePost(props) {
       }
 
       await api.createPost(postContent, imageUrl);
-      removePostDraft(auth.user()?.id);
+      const draftRemoved = removePostDraft(auth.user()?.id);
+      if (draftRemoved) clearDraftExpiryTimer();
       setContent('');
-      setDraftStatus('');
+      setDraftStatus(draftRemoved ? '' : 'clear-failed');
       clearImage();
       await props.onPostCreated?.();
     } catch (requestError) {
@@ -122,8 +161,12 @@ export default function CreatePost(props) {
   };
 
   onMount(() => {
-    setRecoverableDraft(readPostDraft(auth.user()?.id));
+    const draft = readPostDraft(auth.user()?.id);
+    setRecoverableDraft(draft);
+    if (draft) scheduleDraftExpiry(draft.savedAt);
   });
+
+  onCleanup(clearDraftExpiryTimer);
 
   return (
     <section class="surface composer" aria-label="Creează o postare">
@@ -233,7 +276,11 @@ export default function CreatePost(props) {
             <span>
               {draftStatus() === 'saved'
                 ? (imageFile() ? 'Text salvat temporar; imaginea nu este inclusă în schiță.' : 'Schiță salvată temporar în această filă.')
-                : (draftStatus() === 'too-long' ? 'Schița se salvează din nou când textul revine la maximum 500 de caractere.' : 'Salvarea temporară nu este disponibilă în acest browser.')}
+                : (draftStatus() === 'too-long'
+                  ? 'Schița se salvează din nou când textul revine la maximum 500 de caractere.'
+                  : (draftStatus() === 'expired'
+                    ? 'Copia temporară a expirat. Modifică textul pentru a o salva din nou.'
+                    : (draftStatus() === 'clear-failed' ? 'Copia temporară nu a putut fi ștearsă. Verifică setările browserului și încearcă din nou.' : 'Salvarea temporară nu este disponibilă în acest browser.')))}
             </span>
           </p>
         </Show>

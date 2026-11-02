@@ -3015,6 +3015,8 @@ body.command-palette-open {
 }
 
 .composer-draft-status.is-too-long,
+.composer-draft-status.is-expired,
+.composer-draft-status.is-clear-failed,
 .composer-draft-status.is-unavailable {
   color: var(--warning);
 }
