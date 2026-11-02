@@ -985,3 +985,39 @@ visible, short-lived recovery benefit is proportionate to the residual local/XSS
 risk. Do not expand to durable, cross-tab, image, server, or cross-device drafts
 without a new privacy model, explicit user control, quotas, deletion semantics,
 and a separate security review.
+
+## CISO review record — profile completion checklist
+
+**Date:** 2026-11-02
+
+- Top threats: malformed server counters creating misleading progress
+  (low/low), a checklist action navigating outside its intended route
+  (low/medium), and users interpreting UI completion as identity verification or
+  a security score (medium/low).
+- Blast radius: the feature renders only on the signed-in owner's profile and
+  reads four fields already returned by the profile endpoint. It adds no write,
+  privilege, credential, storage, tracking, processor, or background activity.
+  Clicking a CTA enters an existing flow whose normal server-side controls remain
+  authoritative.
+- Controls: counts are normalized to finite, non-negative integers and profile
+  text is reduced to a length check, never injected as checklist markup. Actions
+  are fixed functions for avatar settings, bio editing, home composer, and people
+  search. The UI calls itself progress/profile guidance, not verification,
+  reputation, trust, moderation, or security. It is hidden from non-owners and
+  removed at 100%.
+- Detection and response: 27 frontend tests and all bundle/static/dependency gates
+  passed. Direct and Tunnel copies of the lazy profile chunk matched the release
+  checksum and service monitoring remained healthy. Interaction/layout defects
+  are not covered by a real-browser suite on this host; roll back the frontend
+  pointer to `20261102T001238Z-2f36735` if the profile route regresses. No data
+  rollback is needed.
+- Regulatory: no new personal data is collected or inferred beyond a transient
+  presentation of existing profile fields and counts. No automated decision,
+  ranking, profiling record, or telemetry is created.
+- Vendors/supply chain: no dependency or external service was added. The existing
+  SolidJS/profile API delivery chain is unchanged and the locked npm audit has
+  zero findings.
+
+**Verdict:** ship. The feature is presentation-only, reversible, non-authoritative
+and data-minimizing. Do not evolve the percentage into ranking, recommendations,
+eligibility, or verification without a separate fairness/privacy/security review.

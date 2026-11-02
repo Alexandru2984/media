@@ -1176,6 +1176,39 @@ No backend, database, Nginx, Tunnel, external processor, or server-side user dat
 changed. To fully disable browser drafts rather than merely roll back the latest
 SEO artifact, use preserved release `20261102T000539Z-f0703ee`.
 
+### Profile-completion release checkpoint
+
+Frontend commit `3dccd58` adds a four-step checklist only to the authenticated
+owner's profile. It derives completion from the existing avatar URL, trimmed bio,
+post count, and following count; it creates no database field, browser storage,
+cookie, analytics event, external request, or vendor dependency. Numeric inputs
+are normalized to finite non-negative integers with a bounded loaded-post
+fallback. The display is guidance only and is not an authorization, identity,
+verification, or moderation signal.
+
+Each incomplete item invokes an existing user-controlled path: avatar settings,
+the profile bio editor, the post composer, or people search. Those destinations
+retain their existing session, validation, upload, and API authorization checks.
+The checklist exposes progressbar semantics, labeled ordered steps, completed
+states, touch-sized actions, and one-column layouts below 759 px with an
+additional 460 px compact treatment. Automated visual/browser/assistive-
+technology regression is still unavailable on this host and remains open.
+
+The frontend suite passes 27 tests, including empty/complete/malformed count
+cases. The feature remains in the lazy profile chunk: production build gates pass
+at 123,750 entry-JavaScript bytes, 77,966 stylesheet bytes, and 258,851 total
+JavaScript bytes; the profile chunk is 47,041 bytes. The locked npm audit reports
+zero findings.
+
+Immutable release `20261102T001513Z-3dccd58` is active. Direct-origin and
+Cloudflare Tunnel copies of `Profile-DbrhR6Wa.js` matched SHA-256
+`330021042351f5822c34447a46942e99992e836fec56a6efaf5cfe8a6391290d`
+and both contained the checklist marker. All four services, seven HTTP checks,
+and two certificate checks passed with zero API restarts. Filesystem use remains
+81% with about 99 GB free. The atomic rollback target is
+`20261102T001238Z-2f36735`; no backend, database, Nginx, Tunnel, user record, or
+processor configuration changed.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,

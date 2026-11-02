@@ -256,6 +256,11 @@ read and actively after 24 hours in an open tab. The crawlable and interactive
 privacy pages disclose this behavior; the release gate now rejects a missing
 static disclosure or stale sitemap/structured-data date. Durable opt-in drafts,
 cross-device sync, and a deliberately safe offline shell remain open.
+The owner's profile also has a responsive four-step completion checklist for
+avatar, a meaningful bio, first post, and first followed account. Progress is
+derived from existing profile counters with no new tracking record; incomplete
+steps link directly to the avatar setting, bio editor, composer, or people
+search. It disappears at 100% instead of becoming permanent dashboard clutter.
 
 ### Profiles and relationships
 
@@ -265,7 +270,8 @@ cross-device sync, and a deliberately safe offline shell remain open.
 - Account-level block across authenticated surfaces plus discreet mute, private
   report intake, and personal post hide. ✅ Add restrict, moderator-visible
   aggregates, and more granular audience controls.
-- Profile completion, QR/share card, pinned posts, and profile search.
+- Four-step profile completion checklist ✅. Add QR/share card, pinned posts,
+  richer profile fields, and expanded profile search.
 
 ### Publishing
 
