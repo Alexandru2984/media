@@ -1273,6 +1273,72 @@ monitor passed seven HTTP and two certificate boundaries. Filesystem use remains
 81%, inode use 13%, with about 96.4 GB free. No migration, production user row,
 post row, upload, Tunnel setting, or new external processor was introduced.
 
+### Public-profile preview release checkpoint
+
+Backend commit `6800ead` extracts one profile-visibility query shared by the JSON
+endpoint and a new server-rendered profile shell. The shell context-escapes HTML
+and JSON-LD separately, accepts avatar paths only from the bounded same-origin
+managed-avatar directory, and deliberately uses the generic Media image for Open
+Graph and Twitter metadata. It renders base profile identity and aggregate
+counts, but never embeds post bodies or connection membership. An account owner
+who blocked an authenticated viewer remains indistinguishable from a missing
+profile.
+
+Frontend commit `b86904d` allows anonymous viewing of the existing responsive
+profile route while keeping follow, mute, block, report, and connection-list
+navigation behind authentication. Public profile posts can be read without an
+account; private profile posts continue to show a login/access boundary. Author
+links now open the public profile directly. The server-rendered summary and the
+hydrated interface both collapse cleanly at the existing mobile breakpoints.
+
+Security commit `7482d7f` routes only UUID-v4 profile URLs to the renderer, adds
+the normal API rate limit, disables browser/edge storage, and emits
+`noindex, nofollow, noarchive`. Profiles remain absent from the sitemap and
+connection-list routes remain private SPA surfaces. The interactive and
+crawlable privacy pages now state exactly which base profile fields remain
+public for private accounts, the no-indexing policy, and the limits of external
+preview services. Search indexing remains blocked pending explicit member
+choice, legal/privacy approval, deletion expectations, enumeration monitoring,
+and automated authorization-regression detection.
+
+The backend suite passes 63 application and five seed tests. RustSec scanned all
+265 locked dependencies without a finding. The frontend passes 28 tests and the
+locked npm audit reports zero vulnerabilities. The final distribution gate
+reports 125,823 entry-JavaScript bytes, 80,845 stylesheet bytes, 267,267 total
+JavaScript bytes, and 24 lazy route chunks, all within budget. Nginx syntax tests
+passed against both the tracked source and installed configuration.
+
+A disposable MariaDB/backend integration canary proved public and private base
+profile HTML/API `200`, public posts `200`, private posts `403`, HTML and JSON
+escaping of a stored script payload, generic social metadata, managed avatar
+rendering only in the page body, and absence of private post text from the
+profile preview. The transient service and database were removed afterward.
+Production remained at zero users and zero posts.
+
+Backend and frontend release `20261102T135147Z-7482d7f` is active. The promoted
+backend SHA-256 is
+`75e6c99486801be501e6146e6e4a2b81e213891171ad29c75d3b136b482d3a05`;
+the prior binary is preserved at
+`/var/backups/media-binary-pre-backend-20261102T135147Z-7482d7f`. The frontend
+rollback target is `20261102T133449Z-2ea6619`. Installed and tracked Nginx
+configuration matched SHA-256
+`74c30cb38eca64184aaef9ff0f1bc1f3459570e9d1344168a4a945ba65ab8b1b`,
+with the prior configuration at
+`/var/backups/media-nginx-pre-profile-20261102T135147Z-7482d7f/media.micutu.com`.
+
+Direct-origin and Cloudflare requests for a missing valid profile returned the
+same `404` with `no-store` and `noindex`; Cloudflare classified the response
+`DYNAMIC`. Trailing-slash canonicalization returned `308` with the same policy,
+an invalid identifier returned a real `404`, and the public sitemap contained no
+profile URL. Direct and public copies of `index-CtW1j0Wh.js` matched SHA-256
+`e67998d8f5edc2cae22ce1b0288530425a273d2d28c3628728600bf439ed8d8a`;
+copies of `Profile-dLFH9ngA.js` matched
+`b76a7f252279afffd97b7dc166c1c13c4f7faa1720ecbc0ef046039527addf9f`.
+All four services remained active, API restarts stayed at zero, and the service
+monitor passed seven HTTP and two certificate boundaries. Filesystem use is 82%,
+inode use 13%, with about 95.1 GB free. No migration, upload, production data,
+Tunnel setting, dependency, tracker, credential, or processor was introduced.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
