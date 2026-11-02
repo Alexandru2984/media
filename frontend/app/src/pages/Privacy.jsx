@@ -28,6 +28,17 @@ const sections = [
     paragraphs: ['Traficul public trece prin Cloudflare Tunnel și Nginx către aplicația găzduită pe un VPS. Datele aplicației sunt stocate în MariaDB, iar Brevo este configurat pentru emailurile de verificare și recuperare. În prezent, autentificarea SMTP Brevo este defectă, astfel încât acele mesaje nu sunt livrate; eroarea nu schimbă controalele contului din aplicație.'],
   },
   {
+    id: 'stocare-browser',
+    title: 'Ce rămâne temporar în browser',
+    paragraphs: ['Sesiunea contului folosește un cookie HttpOnly, care nu este citit de codul JavaScript al interfeței. Preferința de temă este păstrată local în browser. Când scrii o postare, Media poate păstra temporar numai textul schiței în sessionStorage, separat pentru contul curent și fila curentă, ca să îl poți recupera după un refresh sau o eroare. Imaginea selectată nu intră în schiță.'],
+    items: [
+      'Schița este limitată la 500 de caractere și nu este trimisă către server înainte de publicare.',
+      'Restaurarea este o alegere explicită; poți șterge schița fără să o încarci în editor.',
+      'Copia temporară este eliminată la publicare, ștergere, golirea textului sau logout și expiră după maximum 24 de ore.',
+      'Dacă browserul blochează sessionStorage, postarea poate fi scrisă și publicată, dar recuperarea temporară nu este disponibilă.',
+    ],
+  },
+  {
     id: 'retentie',
     title: 'Păstrare și ștergere',
     paragraphs: ['Notificările sunt limitate la 500 de înregistrări per destinatar, iar activitatea de securitate afișată utilizatorului are o fereastră limitată. Ștergerea contului elimină în cascadă datele operaționale și programează eliminarea fișierelor administrate. Unele referințe de audit ale rolurilor de moderare pot rămâne pentru responsabilitate. Politica completă pentru backupuri, termene juridice și legal hold este încă în curs de formalizare și nu este prezentată aici ca fiind finalizată.'],
@@ -48,7 +59,7 @@ export default function Privacy() {
       eyebrow="Confidențialitate"
       title="Datele tale trebuie să rămână explicabile și controlabile."
       introduction="Această pagină descrie practicile tehnice observabile ale platformei și limitele care mai trebuie formalizate. Preferăm precizia în locul promisiunilor vagi."
-      updatedAt="30 octombrie 2026"
+      updatedAt="2 noiembrie 2026"
       sections={sections}
       notice={{ title: 'Transparență operațională', copy: 'Emailurile de verificare și recuperare nu sunt livrate momentan din cauza unei erori de autentificare SMTP Brevo. Sesiunile existente și controalele locale de securitate continuă să funcționeze.' }}
       callout={{
