@@ -7,7 +7,7 @@ const distRoot = resolve(frontendRoot, 'dist');
 const assetsRoot = resolve(distRoot, 'assets');
 const publicRoutes = ['', 'despre', 'reguli', 'confidentialitate', 'termeni', 'ajutor'];
 const requiredRouteCopy = new Map([
-  ['confidentialitate', ['Stocare temporară în browser', 'Linkuri de postare']],
+  ['confidentialitate', ['Stocare temporară în browser', 'Profiluri și linkuri publice', 'Linkuri de postare']],
 ]);
 const budgets = {
   entryJavaScript: 130_000,

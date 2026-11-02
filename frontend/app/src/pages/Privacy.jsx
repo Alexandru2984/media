@@ -23,6 +23,11 @@ const sections = [
     paragraphs: ['Identitatea de bază a profilului rămâne descoperibilă, însă un cont privat limitează postările, imaginile, comentariile și listele sociale la proprietar și urmăritorii acceptați. Blocarea se aplică pe suprafețele autentificate, iar raportările și controalele de siguranță sunt private. Mesajele nu sunt pagini publice.'],
   },
   {
+    id: 'profiluri-publice',
+    title: 'Profiluri și linkuri publice',
+    paragraphs: ['Pagina de bază a profilului poate fi deschisă fără autentificare și afișează numele de utilizator, biografia, avatarul, data aproximativă a înscrierii și numerele de postări, urmăritori și urmăriri. Setarea de cont privat protejează postările și listele sociale, dar nu ascunde această identitate de bază. Media nu include profilurile în sitemap și solicită motoarelor de căutare să nu le indexeze sau arhiveze. Un link distribuit poate fi procesat de un serviciu extern conform propriilor politici; preview-ul Media folosește imaginea generică a platformei, nu avatarul.'],
+  },
+  {
     id: 'linkuri-postari',
     title: 'Linkuri de distribuire pentru postări',
     paragraphs: ['Fiecare postare are un link direct. Pentru un cont public, linkul și preview-ul său pot fi deschise fără autentificare; pentru un cont privat, accesul rămâne limitat la proprietar și urmăritorii acceptați. Media verifică vizibilitatea, blocările, ascunderea și existența postării la fiecare acces și nu permite indexarea acestor pagini în motoare de căutare. Dacă distribui linkul într-un serviciu extern, acel serviciu poate genera și păstra propriul preview conform politicilor sale; trecerea contului în privat sau ștergerea oprește accesul nou prin Media, dar nu poate șterge copiile deja create în afara platformei.'],

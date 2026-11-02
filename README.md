@@ -124,9 +124,10 @@ The next project goals are:
    asynchronous large-account exports, DPIA screening, processor records, and
    formal legal review, operator contact details, and approved policy text.
 7. Add an explicit search-indexing preference and legal/privacy approval before
-   allowing the existing server-rendered post permalinks into sitemaps; then add
-   public-profile rendering, Search Console integration, structured-data
-   validation, and real-user Core Web Vitals monitoring.
+   allowing the existing server-rendered post permalinks and public-profile
+   previews into sitemaps; then add Search Console integration, structured-data
+   validation, authorization-regression alerts, and real-user Core Web Vitals
+   monitoring.
 
 See the [security audit](docs/SECURITY_AUDIT.md) and the
 [implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,

@@ -59,9 +59,30 @@ server {
         add_header X-Permitted-Cross-Domain-Policies "none" always;
     }
 
+    # Public profile previews are rendered by the API, but remain outside
+    # search indexes until members have an explicit indexing preference. Keep
+    # every request uncached so privacy changes and blocks take effect without
+    # an edge or browser retaining a previously authorized representation.
+    location ~ "^/profile/([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-4[0-9A-Fa-f]{3}-[89AaBb][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12})/$" {
+        return 308 /profile/$1;
+        include snippets/media-security-headers.conf;
+        add_header Cache-Control "no-store" always;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Permitted-Cross-Domain-Policies "none" always;
+    }
+
+    location ~ "^/profile/[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-4[0-9A-Fa-f]{3}-[89AaBb][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$" {
+        limit_req zone=media_api burst=60 nodelay;
+        include snippets/media-api-proxy.conf;
+        add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+    }
+
     # Private application routes must not enter a search index. Serve the SPA
-    # directly so the route keeps this response policy.
-    location ~ ^/(login|register|forgot-password|search|salvate|cereri|notificari|siguranta|moderare|profile/[^/]+(?:/(?:urmaritori|urmariri))?)/?$ {
+    # directly so the route keeps this response policy. Profile connection
+    # lists remain private even though the base profile has a public preview.
+    location ~ ^/(login|register|forgot-password|search|salvate|cereri|notificari|siguranta|moderare|profile/[^/]+/(?:urmaritori|urmariri))/?$ {
         try_files /index.html =404;
         include snippets/media-security-headers.conf;
         add_header Cache-Control "no-cache" always;

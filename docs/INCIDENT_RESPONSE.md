@@ -1066,3 +1066,53 @@ eligibility, or verification without a separate fairness/privacy/security review
 **Verdict:** mitigate then ship, with the mitigations implemented. Search
 indexing remains blocked until an explicit user control, legal/privacy approval,
 deletion expectations, and authorization-regression monitoring exist.
+
+## CISO review record — public profile previews
+
+**Date:** 2026-11-02
+
+- Data and boundaries: the preview processes an account UUID, username, optional
+  biography and managed avatar path, approximate join date, privacy state, and
+  aggregate post/follower/following counts. Requests cross Cloudflare Tunnel,
+  Nginx, the Rust renderer, and MariaDB. Email, sessions, messages, relationship
+  membership, reports, moderation data, and private post bodies are not rendered.
+- Top threats: IDOR disclosure of private posts or connection lists (critical),
+  stored XSS through a username or biography (high), shared-cache retention after
+  a privacy or block change (high), search indexing without an explicit member
+  choice (medium/high), profile enumeration (medium), and database amplification
+  through automated UUID probing (medium).
+- Controls: the base profile reuses one visibility query for API and HTML, and a
+  profile whose owner blocked an authenticated viewer fails closed as 404. The
+  preview contains no posts or connection membership; private-post APIs retain
+  their existing authorization. UUID-v4 routing, edge rate limiting, contextual
+  HTML/JSON escaping, managed same-origin avatar paths, `no-store`, and
+  `noindex, nofollow, noarchive` are enforced. Profiles do not enter the sitemap,
+  and external metadata deliberately uses the generic Media image instead of an
+  avatar. Connection-list pages remain private application routes.
+- Blast radius: a renderer or query defect could expose the base identity,
+  biography, avatar and aggregate counts of every account; an authorization
+  regression in a separate post endpoint could expand that impact to private
+  content. It does not directly grant messages, email, credentials, reports, or
+  moderation records. Production currently has zero persistent users, which
+  reduces the immediate incident size but is not a security control.
+- Detection and response: privacy-redacted logs retain route, status, latency and
+  request ID, and service monitoring covers API/Nginx/Tunnel availability. There
+  is no alert for unusual profile enumeration or silent authorization regression,
+  so MTTD for those classes remains unknown. Contain by disabling the Nginx
+  profile renderer locations, testing and reloading Nginx, preserving relevant
+  request IDs and edge logs, and removing or restricting affected data as
+  directed by the account holder. Assess external preview caches and apply the
+  normal breach assessment, including the GDPR 72-hour notification clock when
+  an unauthorized personal-data disclosure qualifies.
+- Regulatory and vendors: the privacy notice now states that base profile
+  identity remains public even for a private account and explains the limits of
+  third-party previews. Cloudflare continues to receive request metadata under
+  the existing Tunnel relationship. A recipient-selected social or messaging
+  service may fetch and retain a preview under its own policy. No new dependency,
+  SDK, tracker, credential, processor integration, cookie, or storage system is
+  added.
+
+**Verdict:** mitigate then ship, with the listed mitigations implemented. Keep
+search indexing and sitemap inclusion blocked until there is an explicit user
+choice, completed legal/privacy review, deletion expectations, enumeration
+monitoring, and automated authorization-regression detection.
