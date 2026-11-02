@@ -1209,6 +1209,70 @@ and two certificate checks passed with zero API restarts. Filesystem use remains
 `20261102T001238Z-2f36735`; no backend, database, Nginx, Tunnel, user record, or
 processor configuration changed.
 
+### Post-permalink and share-preview release checkpoint
+
+Backend commit `3df53aa` adds a single-post JSON endpoint and a server-rendered
+permalink shell. Both surfaces use one database query that enforces the author's
+current private-account state, accepted follows, bidirectional blocks, and the
+viewer's hidden-post state. Invalid UUIDs, missing posts, and unauthorized posts
+all return the same 404. The HTML renderer context-escapes metadata/body content,
+escapes `<`, `>`, and `&` inside JSON-LD, accepts an Open Graph image only from a
+bounded same-origin managed-post path, and preserves the active immutable
+frontend asset references.
+
+Frontend commit `d9c3408` adds `/post/:id`, direct links from every post card,
+native share with clipboard fallback, public comment reading, authenticated
+interaction prompts, and safe post-login return routing that rejects external,
+protocol-relative, backslash, control-character, and oversized destinations.
+The lazy detail route provides explicit loading/error states, author-controlled
+visibility guidance, keyboard-readable status updates, and responsive layouts
+down to the compact mobile breakpoints. The static application-root markers are
+now a release-gated contract between Vite output and the Rust renderer.
+
+Security commit `2ea6619` leaves every permalink out of the sitemap and applies
+UUID-v4 routing, ordinary API read limits, `Cache-Control: no-store`, and
+`X-Robots-Tag: noindex, nofollow, noarchive` at Nginx. Search indexing is
+deliberately blocked until Media has explicit user choice and completed
+privacy/legal review. The interactive and crawlable privacy pages disclose
+anonymous access for public-account posts, per-request authorization, external
+preview caching, and Media's inability to erase copies created outside the
+platform. The build gate retains both this disclosure and the earlier temporary-
+draft disclosure.
+
+The backend suite passes 61 application and five seed tests; RustSec scanned 265
+locked dependencies with no finding. A disposable MariaDB/backend integration
+canary proved public HTML/API `200`, private HTML/API `404`, active-asset
+selection, `noindex`, and HTML/JSON-LD XSS escaping, then removed its database,
+two scoped database principals, and transient service. No canary row entered the
+production database, which remains at zero persistent users and posts. The
+frontend passes 28 tests, the locked npm audit reports zero vulnerabilities, and
+the final gate reports 125,852 entry-JavaScript bytes, 80,274 stylesheet bytes,
+265,937 total JavaScript bytes, and 24 lazy route chunks, all within budget.
+
+Backend and frontend release `20261102T133449Z-2ea6619` is active. The promoted
+backend SHA-256 is
+`2d01452f2ed9476373c174d312aa88fe7ace25c4fe59ed54c067347b5383950e`;
+the prior binary is preserved at
+`/var/backups/media-binary-pre-backend-20261102T133449Z-2ea6619`. The frontend
+rollback target is `20261102T001513Z-3dccd58`. Installed and tracked Nginx
+configuration matched SHA-256
+`6909ac8c4cb1decf17987372ec976ce3f1e005008467b31fff74cbe04178e375`,
+with its prior copy under
+`/var/backups/media-nginx-pre-permalink-20261102T133449Z-2ea6619/`.
+
+Direct-origin and Cloudflare requests for a nonexistent valid permalink returned
+the same problem 404 with `no-store` and `noindex`; Cloudflare classified the
+response `DYNAMIC`. The canonical trailing-slash redirect retained those
+policies, and the public sitemap contained no post URL. Direct and public copies
+of `index-BMFhNXdZ.js` matched SHA-256
+`434a0ec34022b558b2a143abec418905237a186325e37ebaea7c37d88e188410`;
+copies of `PostDetails-BgyZkXwf.js` matched
+`14f49a3541ece1dfd83d4c510a9a66a5d9dbe1a6b2fdb8384b82dce55492bc6e`.
+All four services remained active, API restarts stayed at zero, and the service
+monitor passed seven HTTP and two certificate boundaries. Filesystem use remains
+81%, inode use 13%, with about 96.4 GB free. No migration, production user row,
+post row, upload, Tunnel setting, or new external processor was introduced.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
