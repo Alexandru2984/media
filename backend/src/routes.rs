@@ -166,6 +166,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
 
     let public_routes = Router::new()
         .route("/post/:id", get(public_pages::post_page))
+        .route("/profile/:id", get(public_pages::profile_page))
         .with_state(pool)
         .layer(middleware::from_fn(security::api_response_policy))
         .layer(middleware::from_fn(security::request_observability));

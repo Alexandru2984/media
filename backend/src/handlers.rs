@@ -933,25 +933,22 @@ pub async fn get_current_user(pool: &MySqlPool, headers: &HeaderMap) -> Result<S
 }
 
 // User handlers
-pub async fn get_profile(
-    State(pool): State<MySqlPool>,
-    Path(user_id): Path<String>,
-    headers: HeaderMap,
-) -> Result<Json<ProfileDetail>, StatusCode> {
-    if Uuid::parse_str(&user_id).is_err() {
-        return Err(StatusCode::NOT_FOUND);
-    }
-    let current_user_id = get_current_user(&pool, &headers).await.ok();
+pub(crate) async fn visible_profile(
+    pool: &MySqlPool,
+    headers: &HeaderMap,
+    user_id: &str,
+) -> Result<Option<ProfileDetail>, StatusCode> {
+    let current_user_id = get_current_user(pool, headers).await.ok();
     if let Some(current_user_id) = current_user_id.as_deref() {
         if current_user_id != user_id {
-            let directions = block_directions(&pool, current_user_id, &user_id).await?;
+            let directions = block_directions(pool, current_user_id, user_id).await?;
             if directions.blocked_by {
-                return Err(StatusCode::NOT_FOUND);
+                return Ok(None);
             }
         }
     }
 
-    let profile = query_as::<_, ProfileDetail>(
+    query_as::<_, ProfileDetail>(
         "SELECT u.id, u.username, u.bio, u.avatar_url,
                 (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS posts_count,
                 (SELECT COUNT(*) FROM follows WHERE followed_id = u.id) AS followers_count,
@@ -1005,14 +1002,26 @@ pub async fn get_profile(
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
     .bind(current_user_id.as_deref())
-    .bind(&user_id)
-    .fetch_optional(&pool)
+    .bind(user_id)
+    .fetch_optional(pool)
     .await
     .map_err(|error| {
         tracing::error!(error = %error, "failed to fetch profile");
         StatusCode::INTERNAL_SERVER_ERROR
-    })?
-    .ok_or(StatusCode::NOT_FOUND)?;
+    })
+}
+
+pub async fn get_profile(
+    State(pool): State<MySqlPool>,
+    Path(user_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<ProfileDetail>, StatusCode> {
+    if Uuid::parse_str(&user_id).is_err() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let profile = visible_profile(&pool, &headers, &user_id)
+        .await?
+        .ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(profile))
 }
