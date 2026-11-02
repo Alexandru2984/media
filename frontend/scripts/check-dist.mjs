@@ -6,6 +6,9 @@ const frontendRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const distRoot = resolve(frontendRoot, 'dist');
 const assetsRoot = resolve(distRoot, 'assets');
 const publicRoutes = ['', 'despre', 'reguli', 'confidentialitate', 'termeni', 'ajutor'];
+const requiredRouteCopy = new Map([
+  ['confidentialitate', 'Stocare temporară în browser'],
+]);
 const budgets = {
   entryJavaScript: 130_000,
   stylesheet: 85_000,
@@ -151,6 +154,10 @@ for (const route of publicRoutes) {
   }
   if (!html.includes('<main class="public-page" id="main-content">')) {
     throw new Error(`Missing crawlable public content for /${route}`);
+  }
+  const requiredCopy = requiredRouteCopy.get(route);
+  if (requiredCopy && !html.includes(requiredCopy)) {
+    throw new Error(`Missing required crawlable disclosure for /${route}`);
   }
   if (html.includes('noindex')) {
     throw new Error(`Public route /${route} must remain indexable`);
