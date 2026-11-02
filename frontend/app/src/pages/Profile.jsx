@@ -8,7 +8,7 @@ import ProfileCompletion from '../components/ProfileCompletion';
 import ProfileSettings from '../components/ProfileSettings';
 import PageMeta from '../components/PageMeta';
 import ReportDialog from '../components/ReportDialog';
-import { getImageUrl, profilePath } from '../utils/urls';
+import { getImageUrl, loginPath, profilePath } from '../utils/urls';
 
 function joinedDate(dateString) {
   const date = new Date(dateString);
@@ -185,10 +185,6 @@ export default function Profile() {
   createEffect(() => {
     const userId = params.id;
     if (auth.loading()) return;
-    if (!auth.isAuthenticated()) {
-      navigate('/login');
-      return;
-    }
     if (userId && loadedProfileId() !== userId) {
       setLoadedProfileId(userId);
       setProfile(null);
@@ -204,8 +200,9 @@ export default function Profile() {
     <>
       <PageMeta
         title={profile()?.username ? `${profile().username} — Media` : 'Profil — Media'}
-        description="Profil de utilizator pe Media."
+        description={profile()?.bio?.trim() || 'Profil de utilizator pe Media.'}
         canonicalPath={profilePath(params.id)}
+        openGraphType="profile"
         noIndex
       />
       <Navbar />
@@ -262,43 +259,48 @@ export default function Profile() {
                     </div>
                   </Show>
                   <Show when={!isOwnProfile() && profile()}>
-                    <div class="profile-relationship-actions">
-                      <Show when={!profile()?.is_blocked}>
+                    <Show
+                      when={auth.isAuthenticated()}
+                      fallback={<A href={loginPath(profilePath(params.id))} class="btn btn-primary">Conectează-te pentru a interacționa</A>}
+                    >
+                      <div class="profile-relationship-actions">
+                        <Show when={!profile()?.is_blocked}>
+                          <button
+                            type="button"
+                            class={`btn ${(profile()?.is_following || profile()?.follow_request_pending) ? 'btn-secondary' : 'btn-primary'}`}
+                            onClick={handleFollow}
+                            disabled={relationshipPending()}
+                          >
+                            {relationshipPending()
+                              ? 'Se actualizează…'
+                              : (profile()?.is_following ? 'Urmărești' : (profile()?.follow_request_pending ? 'Cerere trimisă' : 'Urmărește'))}
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-secondary"
+                            onClick={handleMute}
+                            disabled={relationshipPending()}
+                            aria-pressed={Boolean(profile()?.is_muted)}
+                          >
+                            {profile()?.is_muted ? 'Reactivează' : 'Silențiază'}
+                          </button>
+                        </Show>
                         <button
                           type="button"
-                          class={`btn ${(profile()?.is_following || profile()?.follow_request_pending) ? 'btn-secondary' : 'btn-primary'}`}
-                          onClick={handleFollow}
+                          class="btn btn-danger-ghost"
+                          onClick={handleBlock}
                           disabled={relationshipPending()}
                         >
-                          {relationshipPending()
-                            ? 'Se actualizează…'
-                            : (profile()?.is_following ? 'Urmărești' : (profile()?.follow_request_pending ? 'Cerere trimisă' : 'Urmărește'))}
+                          {profile()?.is_blocked ? 'Deblochează' : 'Blochează'}
                         </button>
-                        <button
-                          type="button"
-                          class="btn btn-secondary"
-                          onClick={handleMute}
-                          disabled={relationshipPending()}
-                          aria-pressed={Boolean(profile()?.is_muted)}
-                        >
-                          {profile()?.is_muted ? 'Reactivează' : 'Silențiază'}
-                        </button>
-                      </Show>
-                      <button
-                        type="button"
-                        class="btn btn-danger-ghost"
-                        onClick={handleBlock}
-                        disabled={relationshipPending()}
-                      >
-                        {profile()?.is_blocked ? 'Deblochează' : 'Blochează'}
-                      </button>
-                      <ReportDialog
-                        targetType="user"
-                        targetId={profile()?.id}
-                        subjectLabel={`contul ${profile()?.username}`}
-                        class="btn btn-danger-ghost"
-                      />
-                    </div>
+                        <ReportDialog
+                          targetType="user"
+                          targetId={profile()?.id}
+                          subjectLabel={`contul ${profile()?.username}`}
+                          class="btn btn-danger-ghost"
+                        />
+                      </div>
+                    </Show>
                   </Show>
                 </div>
 
@@ -336,12 +338,22 @@ export default function Profile() {
                     <div class="profile-meta">
                       <span><strong>{profile()?.posts_count ?? posts().length}</strong> {Number(profile()?.posts_count ?? posts().length) === 1 ? 'postare' : 'postări'}</span>
                       <Show when={!profile()?.is_blocked && profile()?.can_view_content}>
-                        <A href={`${profilePath(params.id)}/urmaritori`} class="profile-meta-link">
-                          <strong>{profile()?.followers_count ?? 0}</strong> urmăritori
-                        </A>
-                        <A href={`${profilePath(params.id)}/urmariri`} class="profile-meta-link">
-                          <strong>{profile()?.following_count ?? 0}</strong> urmăriri
-                        </A>
+                        <Show
+                          when={auth.isAuthenticated()}
+                          fallback={
+                            <>
+                              <span><strong>{profile()?.followers_count ?? 0}</strong> urmăritori</span>
+                              <span><strong>{profile()?.following_count ?? 0}</strong> urmăriri</span>
+                            </>
+                          }
+                        >
+                          <A href={`${profilePath(params.id)}/urmaritori`} class="profile-meta-link">
+                            <strong>{profile()?.followers_count ?? 0}</strong> urmăritori
+                          </A>
+                          <A href={`${profilePath(params.id)}/urmariri`} class="profile-meta-link">
+                            <strong>{profile()?.following_count ?? 0}</strong> urmăriri
+                          </A>
+                        </Show>
                       </Show>
                       <Show when={joinedDate(profile()?.created_at)}>
                         <span>
@@ -388,7 +400,7 @@ export default function Profile() {
                 <h2 id="profile-posts-title">Postări</h2>
                 <Show
                   when={posts().length > 0}
-                  fallback={<div class="surface state-card"><div><span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg></span><h2>{profile()?.is_blocked ? 'Cont blocat' : (!profile()?.can_view_content ? 'Acest cont este privat' : 'Nicio postare încă')}</h2><p>{profile()?.is_blocked ? 'Deblochează acest cont pentru a-i vedea din nou postările.' : (!profile()?.can_view_content ? (profile()?.follow_request_pending ? 'Cererea ta a fost trimisă. Postările devin vizibile după acceptare.' : 'Trimite o cerere de urmărire pentru a vedea postările și conexiunile acestui profil.') : 'Postările publicate de acest utilizator vor apărea aici.')}</p></div></div>}
+                  fallback={<div class="surface state-card"><div><span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg></span><h2>{profile()?.is_blocked ? 'Cont blocat' : (!profile()?.can_view_content ? 'Acest cont este privat' : 'Nicio postare încă')}</h2><p>{profile()?.is_blocked ? 'Deblochează acest cont pentru a-i vedea din nou postările.' : (!profile()?.can_view_content ? (auth.isAuthenticated() ? (profile()?.follow_request_pending ? 'Cererea ta a fost trimisă. Postările devin vizibile după acceptare.' : 'Trimite o cerere de urmărire pentru a vedea postările și conexiunile acestui profil.') : 'Conectează-te pentru a solicita acces la postările și conexiunile acestui profil.') : 'Postările publicate de acest utilizator vor apărea aici.')}</p></div></div>}
                 >
                   <div class="feed-list"><For each={posts()}>{(post) => <PostCard post={post} onDelete={() => loadProfile(params.id, false)} onUpdate={() => loadProfile(params.id, false)} />}</For></div>
                 </Show>

@@ -64,7 +64,7 @@ export default function PostCard(props) {
   };
   const openProfile = (userId) => {
     const path = profilePath(userId);
-    navigate(auth.isAuthenticated() ? path : loginPath(currentPostPath()));
+    navigate(path);
   };
 
   const reloadComments = async () => {

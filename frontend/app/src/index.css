@@ -3534,6 +3534,33 @@ body.command-palette-open {
   font-weight: 750;
 }
 
+.profile-public-badge {
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border));
+  background: color-mix(in srgb, var(--success) 9%, var(--bg-elevated));
+  color: var(--success);
+}
+
+.profile-static-summary {
+  display: flex;
+  width: min(860px, 100%);
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  margin: 18px auto 0;
+  padding: 18px 20px;
+}
+
+.profile-static-summary p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.profile-static-summary .btn {
+  flex: 0 0 auto;
+}
+
 .profile-bio {
   margin: 0;
   color: var(--text-soft);
@@ -5047,6 +5074,15 @@ body.command-palette-open {
 
   .profile-action-row {
     min-height: 58px;
+  }
+
+  .profile-static-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profile-static-summary .btn {
+    width: 100%;
   }
 
   .profile-relationship-actions {
