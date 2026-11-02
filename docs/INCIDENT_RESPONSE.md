@@ -936,3 +936,52 @@ exists. After provisioning, purge the legacy URL and require repeated public
 **Verdict:** ship. The feature is bounded, role-aware, keyboard-safe, reversible,
 and does not expand data or vendor scope. Add automated browser and assistive-
 technology regression before treating accessibility as continuously verified.
+
+## CISO review record — temporary post drafts
+
+**Date:** 2026-11-02
+
+- Top threats: plaintext draft text being read by malicious same-origin script or
+  someone with access to an unlocked browser tab (low/high), one account seeing
+  another account's draft on a shared device (low/medium), retention exceeding
+  the stated limit in a long-lived/restored tab (medium/medium), and failed
+  storage deletion being presented as success (medium/low).
+- Blast radius: at most one 500-character text draft per account per top-level
+  browser tab under this versioned key. No selected image, cookie, credential,
+  server record, cross-device copy, or third-party request is included. The text
+  may still contain sensitive personal data chosen by the author and is readable
+  by JavaScript running on the Media origin; existing XSS prevention therefore
+  remains a prerequisite.
+- Controls: `sessionStorage` provides tab/session scoping; the key is isolated by
+  encoded account ID. Reads enforce version, type, nonblank content, 500-character
+  size, 2 KiB serialization, 24-hour age, and bounded future-clock skew. Invalid
+  values are removed. Recovery is explicit and the composer is disabled until
+  restore/delete is chosen, preventing silent overwrite. Publication, logout,
+  explicit deletion, blank/over-limit text, read-time expiry, and an active
+  24-hour timer remove the copy when browser storage permits. Images are excluded
+  and blocked until the recovery choice is resolved. Storage/removal failures are
+  visible and never block server publication.
+- Detection and response: 24 frontend tests cover account isolation, limits,
+  malformed/oversized/expired cleanup, explicit removal, and denied storage. The
+  build gate checks the crawlable privacy disclosure and sitemap/JSON-LD date;
+  direct and Tunnel production content matched. Draft text is deliberately absent
+  from application telemetry, so support cannot inspect or remotely delete it.
+  A user can delete it in the composer, publish, logout, or end the browser
+  session. To disable the feature, activate preserved pre-draft release
+  `20261102T000539Z-f0703ee`; note that a server-side rollback cannot purge keys
+  in already open browser tabs.
+- Regulatory: a draft may be personal data, but processing stays on the user's
+  device until publication. Purpose, scope, 24-hour limit, exclusions, controls,
+  and storage-failure behavior are disclosed on the interactive and crawlable
+  privacy page. A broader legal-basis/retention assessment remains part of the
+  unfinished formal privacy program.
+- Vendors/supply chain: no dependency, processor, API, cookie, or external
+  storage was added. Browser implementation/session-restore behavior is the only
+  new platform dependency; the application revalidates age whenever it can read
+  the stored value instead of trusting browser lifecycle semantics alone.
+
+**Verdict:** mitigate then ship, with the mitigations implemented. The bounded,
+visible, short-lived recovery benefit is proportionate to the residual local/XSS
+risk. Do not expand to durable, cross-tab, image, server, or cross-device drafts
+without a new privacy model, explicit user control, quotas, deletion semantics,
+and a separate security review.

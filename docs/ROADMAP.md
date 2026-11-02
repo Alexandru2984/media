@@ -247,6 +247,16 @@ future-notification preferences are also deployed and enforced server-side;
 quiet hours/digests, appeals, user notices, richer publishing, and multiple named
 collections remain open.
 
+**Progress (2026-11-02):** the post composer now autosaves a text-only temporary
+draft per account and browser tab, offers explicit restore/delete after refresh,
+reports unavailable storage, and clears the copy on publication, logout, empty
+text, or user deletion. Drafts are schema/size validated, limited to 500
+characters, excluded from network requests and image storage, and expire both on
+read and actively after 24 hours in an open tab. The crawlable and interactive
+privacy pages disclose this behavior; the release gate now rejects a missing
+static disclosure or stale sitemap/structured-data date. Durable opt-in drafts,
+cross-device sync, and a deliberately safe offline shell remain open.
+
 ### Profiles and relationships
 
 - Unique handles, display names, pronouns, bio, links, avatar, cover, and badges.
@@ -259,13 +269,15 @@ collections remain open.
 
 ### Publishing
 
-- Text posts with drafts, autosave, mentions, hashtags, link previews, and polls.
+- Text posts with bounded per-tab temporary drafts and autosave ✅. Add opt-in
+  durable drafts, mentions, hashtags, link previews, and polls.
 - Multi-image carousel, cropping, alt text, captions, and later short video.
 - Edit history, delete/restore window, scheduling, audience, and content warnings.
 - Private bookmarks and a saved feed. ✅ Add named collections, reposts, quote
   posts, richer reactions, and share links.
 - Threaded comments, mentions, sorting, pagination, editing, and moderation.
-- Optimistic updates with correct rollback and offline draft recovery.
+- Optimistic updates with correct rollback and offline draft recovery. Temporary
+  refresh/crash recovery is deployed; true offline publication remains open.
 
 ### Feed and discovery
 

@@ -1138,6 +1138,44 @@ is now 80% with about 104 GB free, still inside the 85%/10 GiB alert gates. The
 atomic rollback target is `20261101T140635Z-706ef08`; no backend, database,
 Nginx, Tunnel, user data, or vendor configuration changed.
 
+### Temporary post-draft release checkpoint
+
+Commit `e9fe52c` adds explicit recovery for text typed into the post composer.
+The draft is never sent to the server before publication and is stored only in
+same-origin `sessionStorage`, namespaced by encoded account ID and browser tab.
+Strict parsing accepts only schema version 1, nonblank text of at most 500
+characters, a bounded 2 KiB serialized value, and a timestamp no older than 24
+hours or more than five minutes in the future. Malformed, oversized, stale, and
+over-limit values are rejected and removed when storage permits; storage access
+errors fail safely without blocking normal publication.
+
+Commit `5197550` closes a retention edge found during release review: each
+successful autosave now schedules active expiry in a tab left open for 24 hours,
+not only expiry on the next read/reload. The timer is renewed on edit and removed
+on component teardown. It never erases text still visible in the editor; it
+removes only the browser copy and tells the user to edit again to resave. Failed
+deletion is reported rather than falsely claiming success. Publication, logout,
+explicit deletion, blank content, and over-limit content all attempt immediate
+removal; selected images are never persisted as drafts.
+
+Commit `fdff937` adds a dedicated interactive privacy disclosure, and commit
+`2f36735` aligns the crawlable pre-render, sitemap `lastmod`, and JSON-LD
+`dateModified` at 2026-11-02. The distribution gate now fails if the static
+disclosure disappears. The final build passes 24 tests and all SEO/PWA/bundle
+checks at 123,657 entry-JavaScript bytes, 74,972 stylesheet bytes, and 254,220
+total JavaScript bytes. `npm audit --audit-level=low` reports zero findings.
+
+Immutable release `20261102T001238Z-2f36735` is active. Direct-origin and
+Cloudflare Tunnel copies of `index-CLkuel5v.js` matched SHA-256
+`d0c64c1fc6e8be17faecc7c485b42d47ee361882d6931add5abf5422fb084145`.
+Both paths exposed the new crawlable disclosure and matching structured-data
+date; the public sitemap matched. Four services, seven HTTP boundaries, and two
+certificate boundaries passed with zero API restarts. Root filesystem use is
+81%, inode use 13%, and free space about 99 GB, inside the existing alert gates.
+No backend, database, Nginx, Tunnel, external processor, or server-side user data
+changed. To fully disable browser drafts rather than merely roll back the latest
+SEO artifact, use preserved release `20261102T000539Z-f0703ee`.
+
 ### Blast radius
 
 Worst case: all account emails and password hashes, private messages, posts,
