@@ -3502,6 +3502,139 @@ body.command-palette-open {
   border-bottom-color: var(--brand);
 }
 
+.profile-completion {
+  width: min(860px, 100%);
+  margin: 0 auto 26px;
+  padding: clamp(18px, 4vw, 24px);
+  border-color: color-mix(in srgb, var(--brand) 18%, var(--border));
+  background:
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 19rem),
+    var(--bg-elevated);
+}
+
+.profile-completion-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.profile-completion-header h2 {
+  margin: 4px 0 6px;
+  font-size: clamp(1.1rem, 4vw, 1.35rem);
+  letter-spacing: -0.035em;
+}
+
+.profile-completion-header > div > p:last-child {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.profile-completion-ring {
+  position: relative;
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: conic-gradient(var(--brand) var(--profile-progress), var(--bg-soft) 0);
+}
+
+.profile-completion-ring::before {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  border-radius: inherit;
+  background: var(--bg-elevated);
+  content: '';
+}
+
+.profile-completion-ring span {
+  position: relative;
+  color: var(--brand);
+  font-size: 0.83rem;
+  font-weight: 900;
+}
+
+.profile-completion-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.profile-completion-step {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-soft) 54%, var(--bg-elevated));
+}
+
+.profile-completion-step.is-complete {
+  border-color: color-mix(in srgb, var(--success) 20%, var(--border));
+  background: color-mix(in srgb, var(--success) 7%, var(--bg-elevated));
+}
+
+.profile-completion-step-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--bg-elevated);
+  color: var(--brand);
+}
+
+.profile-completion-step.is-complete .profile-completion-step-icon {
+  background: color-mix(in srgb, var(--success) 12%, var(--bg-elevated));
+  color: var(--success);
+}
+
+.profile-completion-step-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.profile-completion-step-copy {
+  min-width: 0;
+}
+
+.profile-completion-step-copy strong,
+.profile-completion-step-copy small {
+  display: block;
+}
+
+.profile-completion-step-copy strong {
+  font-size: 0.82rem;
+}
+
+.profile-completion-step-copy small {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 0.69rem;
+  line-height: 1.4;
+}
+
+.profile-completion-step.is-complete .profile-completion-step-copy small {
+  color: var(--success);
+  font-weight: 750;
+}
+
+.profile-completion-step .btn {
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
 .profile-feed {
   width: min(680px, 100%);
   margin-inline: auto;
@@ -4267,6 +4400,10 @@ body.command-palette-open {
     width: min(100% - 24px, 680px);
   }
 
+  .profile-completion-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .site-nav {
     gap: 10px;
   }
@@ -4772,14 +4909,48 @@ body.command-palette-open {
   }
 
   .profile-tabs,
+  .profile-completion,
   .profile-feed,
   .settings-layout {
     width: calc(100% - 24px);
   }
 
+  .profile-completion-steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-completion-step {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
   .profile-tabs button {
     flex: 1;
     justify-content: center;
+  }
+
+  .profile-completion-header {
+    align-items: start;
+    gap: 13px;
+  }
+
+  .profile-completion-ring {
+    width: 62px;
+    height: 62px;
+  }
+
+  .profile-completion-ring::before {
+    width: 47px;
+    height: 47px;
+  }
+
+  .profile-completion-step {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .profile-completion-step .btn {
+    width: max-content;
+    max-width: 100%;
+    grid-column: 2;
   }
 
   .connection-card {

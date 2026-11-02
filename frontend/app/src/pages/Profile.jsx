@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
+import ProfileCompletion from '../components/ProfileCompletion';
 import ProfileSettings from '../components/ProfileSettings';
 import PageMeta from '../components/PageMeta';
 import ReportDialog from '../components/ReportDialog';
@@ -28,10 +29,35 @@ export default function Profile() {
   const [username, setUsername] = createSignal('');
   const [bio, setBio] = createSignal('');
   const [activeTab, setActiveTab] = createSignal('posts');
+  const [settingsInitialTab, setSettingsInitialTab] = createSignal('privacy');
   const [loadedProfileId, setLoadedProfileId] = createSignal(null);
   const [relationshipPending, setRelationshipPending] = createSignal(false);
 
   const isOwnProfile = () => auth.user()?.id === params.id;
+
+  const focusAfterNavigation = (selector) => {
+    window.setTimeout(() => document.querySelector(selector)?.focus({ preventScroll: true }), 100);
+  };
+
+  const openAvatarSettings = () => {
+    setSettingsInitialTab('avatar');
+    setActiveTab('settings');
+  };
+
+  const editProfileBio = () => {
+    setEditing(true);
+    focusAfterNavigation('#profile-bio');
+  };
+
+  const createFirstPost = () => {
+    navigate('/');
+    focusAfterNavigation('#new-post-content');
+  };
+
+  const discoverPeople = () => {
+    navigate('/search');
+    focusAfterNavigation('#global-search');
+  };
 
   const loadProfile = async (userId = params.id, showLoader = true) => {
     try {
@@ -168,6 +194,7 @@ export default function Profile() {
       setProfile(null);
       setPosts([]);
       setActiveTab('posts');
+      setSettingsInitialTab('privacy');
       setEditing(false);
       loadProfile(userId);
     }
@@ -336,11 +363,24 @@ export default function Profile() {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8m-8 4h8m-8 4h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
                   Postări
                 </button>
-                <button type="button" role="tab" aria-selected={activeTab() === 'settings'} class={activeTab() === 'settings' ? 'is-active' : ''} onClick={() => setActiveTab('settings')}>
+                <button type="button" role="tab" aria-selected={activeTab() === 'settings'} class={activeTab() === 'settings' ? 'is-active' : ''} onClick={() => { setSettingsInitialTab('privacy'); setActiveTab('settings'); }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" /></svg>
                   Setări
                 </button>
               </div>
+            </Show>
+
+            <Show when={isOwnProfile() && activeTab() === 'posts'}>
+              <ProfileCompletion
+                profile={profile()}
+                postCount={posts().length}
+                actions={{
+                  avatar: openAvatarSettings,
+                  bio: editProfileBio,
+                  post: createFirstPost,
+                  connection: discoverPeople,
+                }}
+              />
             </Show>
 
             <Show when={activeTab() === 'posts' || !isOwnProfile()}>
@@ -356,7 +396,7 @@ export default function Profile() {
             </Show>
 
             <Show when={activeTab() === 'settings' && isOwnProfile()}>
-              <ProfileSettings profile={profile()} onUpdate={() => loadProfile(params.id, false)} />
+              <ProfileSettings profile={profile()} initialTab={settingsInitialTab()} onUpdate={() => loadProfile(params.id, false)} />
             </Show>
           </Show>
         </Show>

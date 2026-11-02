@@ -60,7 +60,7 @@ function normalizedNotificationPreferences(value) {
 
 export default function ProfileSettings(props) {
   const auth = useAuth();
-  const [activeTab, setActiveTab] = createSignal('privacy');
+  const [activeTab, setActiveTab] = createSignal(props.initialTab || 'privacy');
   const [updatingPrivacy, setUpdatingPrivacy] = createSignal(false);
   const [avatarFile, setAvatarFile] = createSignal(null);
   const [avatarPreview, setAvatarPreview] = createSignal(null);
