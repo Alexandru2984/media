@@ -1,5 +1,6 @@
 import { createSignal, createContext, useContext, onMount } from 'solid-js';
 import { api } from './api';
+import { removePostDraft } from './utils/postDraft';
 
 const AuthContext = createContext();
 
@@ -44,9 +45,11 @@ export function AuthProvider(props) {
   };
 
   const logout = async () => {
+    const userId = user()?.id;
     try {
       await api.logout();
     } finally {
+      removePostDraft(userId);
       setUser(null);
     }
   };
