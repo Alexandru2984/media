@@ -1,5 +1,6 @@
 import { Show, createSignal } from 'solid-js';
 import { api } from '../api';
+import Modal from './Modal';
 
 const reasons = [
   ['spam', 'Spam sau înșelătorie'],
@@ -75,23 +76,7 @@ export default function ReportDialog(props) {
         </Show>
       </button>
 
-      <Show when={open()}>
-        <div
-          class="report-dialog-backdrop"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) close();
-          }}
-        >
-          <section
-            class="surface report-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`report-title-${props.targetType}-${props.targetId}`}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') close();
-            }}
-          >
+      <Modal open={open()} busy={pending()} onClose={close} labelledBy={`report-title-${props.targetType}-${props.targetId}`}>
             <div class="report-dialog-head">
               <div>
                 <p class="sidebar-eyebrow">Raportare confidențială</p>
@@ -108,6 +93,7 @@ export default function ReportDialog(props) {
                 <select
                   id={`report-reason-${props.targetType}-${props.targetId}`}
                   class="input"
+                  disabled={pending()}
                   value={reason()}
                   onInput={(event) => setReason(event.currentTarget.value)}
                   autofocus
@@ -120,6 +106,7 @@ export default function ReportDialog(props) {
                 <textarea
                   id={`report-details-${props.targetType}-${props.targetId}`}
                   class="textarea"
+                  disabled={pending()}
                   value={details()}
                   onInput={(event) => setDetails(event.currentTarget.value)}
                   maxlength="1000"
@@ -135,9 +122,7 @@ export default function ReportDialog(props) {
                 <button type="submit" class="btn btn-primary" disabled={pending()}>{pending() ? 'Se trimite…' : 'Trimite raportarea'}</button>
               </div>
             </form>
-          </section>
-        </div>
-      </Show>
+      </Modal>
     </>
   );
 }

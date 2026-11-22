@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
 import PostCard from '../components/PostCard';
+import ShareLink from '../components/ShareLink';
 import { getImageUrl, loginPath, postPath } from '../utils/urls';
 
 function postDescription(content, maximumCharacters = 180) {
@@ -21,68 +22,43 @@ export default function PostDetails() {
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal('');
   const [loadedPostId, setLoadedPostId] = createSignal(null);
-  const [shareStatus, setShareStatus] = createSignal('');
-  let shareStatusTimer;
+  const [loadedViewer, setLoadedViewer] = createSignal(undefined);
+  let requestVersion = 0;
 
   const loadPost = async (postId = params.id) => {
+    const version = ++requestVersion;
+    const viewer = auth.user()?.id || null;
+    const isCurrent = () => version === requestVersion && params.id === postId && (auth.user()?.id || null) === viewer;
     setLoading(true);
     setError('');
     try {
-      setPost(await api.getPost(postId));
+      const data = await api.getPost(postId);
+      if (isCurrent()) setPost(data);
     } catch (requestError) {
+      if (!isCurrent()) return;
       console.error('Failed to load post:', requestError);
       setPost(null);
       setError(requestError.status === 404
         ? 'Postarea nu există sau nu este disponibilă pentru contul tău.'
         : 'Postarea nu a putut fi încărcată. Încearcă din nou.');
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const showShareStatus = (message) => {
-    window.clearTimeout(shareStatusTimer);
-    setShareStatus(message);
-    shareStatusTimer = window.setTimeout(() => setShareStatus(''), 3500);
-  };
-
-  const sharePost = async () => {
-    const current = post();
-    if (!current) return;
-    const url = `${window.location.origin}${postPath(current.id)}`;
-    const shareData = {
-      title: `Postare de ${current.user.username} — Media`,
-      text: postDescription(current.content, 140),
-      url,
-    };
-
-    if (typeof navigator.share === 'function') {
-      try {
-        await navigator.share(shareData);
-        showShareStatus('Postarea a fost distribuită.');
-        return;
-      } catch (shareError) {
-        if (shareError?.name === 'AbortError') return;
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      showShareStatus('Link copiat.');
-    } catch {
-      showShareStatus('Linkul nu a putut fi copiat automat.');
+      if (isCurrent()) setLoading(false);
     }
   };
 
   createEffect(() => {
     const postId = params.id;
-    if (postId && loadedPostId() !== postId) {
+    if (auth.loading()) return;
+    const viewer = auth.user()?.id || null;
+    if (postId && (loadedPostId() !== postId || loadedViewer() !== viewer)) {
       setLoadedPostId(postId);
+      setLoadedViewer(viewer);
+      setPost(null);
       void loadPost(postId);
     }
   });
 
-  onCleanup(() => window.clearTimeout(shareStatusTimer));
+  onCleanup(() => { requestVersion += 1; });
 
   return (
     <>
@@ -101,14 +77,9 @@ export default function PostDetails() {
             <span aria-hidden="true">←</span> Înapoi la flux
           </A>
           <Show when={post()}>
-            <button type="button" class="btn btn-secondary" onClick={sharePost}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="18" cy="5" r="3" stroke="currentColor" stroke-width="1.8" /><circle cx="6" cy="12" r="3" stroke="currentColor" stroke-width="1.8" /><circle cx="18" cy="19" r="3" stroke="currentColor" stroke-width="1.8" /><path d="m8.7 10.7 6.6-4.2m-6.6 6.8 6.6 4.2" stroke="currentColor" stroke-width="1.8" /></svg>
-              Distribuie
-            </button>
+            <ShareLink path={postPath(post().id)} title={`Postare de ${post().user.username} — Media`} />
           </Show>
         </div>
-
-        <Show when={shareStatus()}><p class="post-share-status" role="status">{shareStatus()}</p></Show>
 
         <Show
           when={!loading()}

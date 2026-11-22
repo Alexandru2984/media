@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
+import Modal from '../components/Modal';
 import { profilePath } from '../utils/urls';
 
 const PAGE_SIZE = 20;
@@ -111,7 +112,10 @@ export default function Moderation() {
   };
 
   const closeDialog = () => {
-    if (!submitting()) setDialog(null);
+    if (!submitting()) {
+      setDialog(null);
+      setPassword('');
+    }
   };
 
   const submitAction = async (event) => {
@@ -157,6 +161,7 @@ export default function Moderation() {
         setError('Acțiunea nu a putut fi aplicată. Încearcă din nou.');
       }
     } finally {
+      setPassword('');
       setSubmitting(false);
     }
   };
@@ -317,9 +322,7 @@ export default function Moderation() {
         </Show>
       </main>
 
-      <Show when={dialog()}>
-        <div class="report-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}>
-          <section class="surface report-dialog moderation-dialog" role="dialog" aria-modal="true" aria-labelledby="moderation-dialog-title" onKeyDown={(event) => { if (event.key === 'Escape') closeDialog(); }}>
+      <Modal open={Boolean(dialog())} busy={submitting()} onClose={closeDialog} class="surface report-dialog moderation-dialog" labelledBy="moderation-dialog-title">
             <div class="report-dialog-head">
               <div>
                 <p class="sidebar-eyebrow">Confirmare privilegiată</p>
@@ -335,20 +338,20 @@ export default function Moderation() {
               <Show when={dialog()?.type === 'decision'}>
                 <div>
                   <label class="field-label" for="moderation-decision">Decizie</label>
-                  <select id="moderation-decision" class="input" value={decision()} onInput={(event) => setDecision(event.currentTarget.value)}>
+                  <select id="moderation-decision" class="input" value={decision()} disabled={submitting()} onInput={(event) => setDecision(event.currentTarget.value)}>
                     <option value="resolved">Rezolvată administrativ</option>
                     <option value="dismissed">Închisă fără acțiune</option>
                   </select>
                 </div>
                 <div>
                   <label class="field-label" for="moderation-note">Notă internă obligatorie</label>
-                  <textarea id="moderation-note" class="textarea" rows="4" maxlength="1000" value={note()} onInput={(event) => setNote(event.currentTarget.value)} placeholder="Motivul concis al deciziei; nu copia date sensibile inutile." />
+                  <textarea id="moderation-note" class="textarea" rows="4" maxlength="1000" value={note()} disabled={submitting()} onInput={(event) => setNote(event.currentTarget.value)} placeholder="Motivul concis al deciziei; nu copia date sensibile inutile." />
                   <div class="character-count">{note().length}/1000</div>
                 </div>
               </Show>
               <div>
                 <label class="field-label" for="moderation-password">Confirmă cu parola actuală</label>
-                <input id="moderation-password" class="input" type="password" autocomplete="current-password" value={password()} onInput={(event) => setPassword(event.currentTarget.value)} required autofocus />
+                <input id="moderation-password" class="input" type="password" autocomplete="current-password" value={password()} disabled={submitting()} onInput={(event) => setPassword(event.currentTarget.value)} required autofocus />
               </div>
               <p class="moderation-step-up-note">Parola este verificată pentru această acțiune și nu este păstrată în jurnalul de audit.</p>
               <Show when={error()}><p class="alert alert-error" role="alert">{error()}</p></Show>
@@ -357,9 +360,7 @@ export default function Moderation() {
                 <button type="submit" class="btn btn-primary" disabled={submitting() || !password()}>{submitting() ? 'Se confirmă…' : 'Confirmă acțiunea'}</button>
               </div>
             </form>
-          </section>
-        </div>
-      </Show>
+      </Modal>
     </>
   );
 }

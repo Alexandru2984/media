@@ -1,5 +1,25 @@
 # Product, Security, Design, and SEO Roadmap
 
+**2026-11-22 sharing and dialogs follow-up:** profiles now have native share,
+clipboard copy and an accessible manual-copy fallback. Post links use the same
+flow; only the canonical link and title are passed to native sharing. URL
+queries, fragments, foreign destinations and credentials are rejected. Cancelling
+native sharing performs no clipboard write. Profile and post requests are
+scoped to the current route and viewer, with stale responses discarded.
+
+Report, manual-copy and privileged moderation dialogs use a shared native modal
+with focus containment/restoration, background scroll lock and dismissal guards
+during submission. Report inputs stay stable while a request is pending;
+moderation password fields clear after cancellation and every submitted attempt.
+Eight viewport/theme cases pass for sharing/reporting, another eight for
+moderation, and explicit same-component profile/post route races pass. Four
+sharing contract tests bring the Node suite to 38 passing tests.
+
+The landing now loads independently from the authenticated feed. The final
+build has 124,285 entry JavaScript bytes, 84,203 CSS bytes and 278,646 total
+JavaScript bytes, below the unchanged budgets. Modal implementation follows the
+[HTML dialog contract](https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element).
+
 **2026-11-22 publishing follow-up:** the composer has an on-demand preview of
 text, hashtags, selected image and the account's current public/private state.
 Previewing never uploads or publishes, and its hashtags cannot navigate away.

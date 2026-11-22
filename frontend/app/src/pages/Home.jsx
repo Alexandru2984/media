@@ -1,19 +1,19 @@
 import { A } from '@solidjs/router';
-import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createSignal, For, lazy, onCleanup, Show, Suspense } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import { api } from '../api';
 import CreatePost from '../components/CreatePost';
 import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import PageMeta from '../components/PageMeta';
-import Landing from '../components/Landing';
 import { getImageUrl, profilePath, withQuery } from '../utils/urls';
 
 const FEED_PAGE_SIZE = 10;
+const Landing = lazy(() => import('../components/Landing'));
 
-function LoadingFeed() {
+function LoadingFeed(props) {
   return (
-    <div class="loading-stack" aria-label="Se încarcă postările" aria-busy="true">
+    <div class="loading-stack" aria-label={props.label || 'Se încarcă postările'} aria-busy="true">
       <For each={[1, 2]}>
         {() => (
           <div class="surface skeleton">
@@ -142,7 +142,11 @@ export default function Home() {
           </main>
         }
       >
-        <Show when={auth.isAuthenticated()} fallback={<Landing />}>
+        <Show when={auth.isAuthenticated()} fallback={
+          <Suspense fallback={<main class="page-shell app-container"><LoadingFeed label="Se încarcă pagina de prezentare" /></main>}>
+            <Landing />
+          </Suspense>
+        }>
           <main class="page-shell app-container">
             <div class="home-grid">
               <aside class="sidebar sidebar-left" aria-label="Profil rapid">

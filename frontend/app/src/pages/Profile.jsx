@@ -1,5 +1,5 @@
 import { A, useNavigate, useParams } from '@solidjs/router';
-import { createEffect, createSignal, For, Show } from 'solid-js';
+import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
@@ -8,6 +8,7 @@ import ProfileCompletion from '../components/ProfileCompletion';
 import ProfileSettings from '../components/ProfileSettings';
 import PageMeta from '../components/PageMeta';
 import ReportDialog from '../components/ReportDialog';
+import ShareLink from '../components/ShareLink';
 import { getImageUrl, loginPath, profilePath } from '../utils/urls';
 
 function joinedDate(dateString) {
@@ -31,6 +32,9 @@ export default function Profile() {
   const [activeTab, setActiveTab] = createSignal('posts');
   const [settingsInitialTab, setSettingsInitialTab] = createSignal('privacy');
   const [loadedProfileId, setLoadedProfileId] = createSignal(null);
+  const [loadedProfileViewer, setLoadedProfileViewer] = createSignal(undefined);
+  let requestVersion = 0;
+  onCleanup(() => { requestVersion += 1; });
   const [relationshipPending, setRelationshipPending] = createSignal(false);
 
   const isOwnProfile = () => auth.user()?.id === params.id;
@@ -60,19 +64,25 @@ export default function Profile() {
   };
 
   const loadProfile = async (userId = params.id, showLoader = true) => {
+    const version = ++requestVersion;
+    const viewer = auth.user()?.id || null;
+    const isCurrent = () => version === requestVersion && params.id === userId && (auth.user()?.id || null) === viewer;
     try {
       if (showLoader) setLoading(true);
       setError('');
       const profileData = await api.getProfile(userId);
+      if (!isCurrent()) return;
       setProfile(profileData);
       setUsername(profileData.username);
       setBio(profileData.bio || '');
-      setPosts(profileData.can_view_content ? await api.getUserPosts(userId) : []);
+      const profilePosts = profileData.can_view_content ? await api.getUserPosts(userId) : [];
+      if (isCurrent()) setPosts(profilePosts);
     } catch (requestError) {
+      if (!isCurrent()) return;
       console.error('Failed to load profile:', requestError);
       setError('Profilul nu a putut fi încărcat. Este posibil să nu mai existe.');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
@@ -185,8 +195,10 @@ export default function Profile() {
   createEffect(() => {
     const userId = params.id;
     if (auth.loading()) return;
-    if (userId && loadedProfileId() !== userId) {
+    const viewer = auth.user()?.id || null;
+    if (userId && (loadedProfileId() !== userId || loadedProfileViewer() !== viewer)) {
       setLoadedProfileId(userId);
+      setLoadedProfileViewer(viewer);
       setProfile(null);
       setPosts([]);
       setActiveTab('posts');
@@ -240,7 +252,10 @@ export default function Profile() {
                   </Show>
                 </div>
 
-                <div class="profile-action-row">
+                <div class="profile-action-row profile-relationship-actions">
+                  <Show when={!editing() && profile() && !profile()?.is_blocked}>
+                    <ShareLink path={profilePath(params.id)} title={`Profilul lui ${profile()?.username} — Media`} label="Distribuie profilul" />
+                  </Show>
                   <Show when={isOwnProfile() && !editing()}>
                     <div class="profile-owner-actions">
                       <Show when={Number(profile()?.pending_follow_requests_count || 0) > 0}>

@@ -1380,20 +1380,11 @@ a {
   line-height: 1.5;
 }
 
-.report-dialog-backdrop {
-  position: fixed;
-  z-index: 120;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgb(3 7 18 / 62%);
-  backdrop-filter: blur(4px);
-}
 
 .report-dialog {
   overflow: auto;
-  width: min(100%, 520px);
+  width: min(520px, calc(100% - 24px));
+  margin: auto;
   max-height: min(760px, calc(100vh - 40px));
   padding: clamp(20px, 5vw, 28px);
   box-shadow: var(--shadow-lg);
@@ -2935,18 +2926,6 @@ body.command-palette-open {
   margin-top: 20px;
 }
 
-.post-share-status {
-  width: max-content;
-  max-width: min(100%, 680px);
-  margin: -8px auto 14px;
-  padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--border));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--brand-soft) 64%, var(--bg-elevated));
-  color: var(--brand-strong);
-  font-size: 0.82rem;
-  font-weight: 750;
-}
 
 .post-detail-privacy-note {
   display: flex;
@@ -4557,10 +4536,6 @@ body.command-palette-open {
     grid-column: 1 / -1;
   }
 
-  .report-dialog-backdrop {
-    align-items: end;
-    padding: 0;
-  }
 
   .report-dialog {
     width: 100%;
@@ -4955,7 +4930,7 @@ body.command-palette-open {
 .image-viewer-media { display: block; width: 100%; max-height: calc(100dvh - 170px); object-fit: contain; background: var(--bg-soft); }
 .image-viewer-caption { margin: 12px 0 0; color: var(--text-muted); font-size: .75rem; }
 .image-viewer-error { display: grid; min-height: 160px; align-content: center; padding: 24px; text-align: center; color: var(--text-soft); line-height: 1.6; }
-body:has(.image-viewer[open]) { overflow: hidden; }
+body:has(dialog[open]) { overflow: hidden; }
 .feed-topic-links, .feed-quick-links { margin: 18px 0 0; padding: 0; list-style: none; }
 .feed-topic-links li + li, .feed-quick-links li + li { border-top: 1px solid var(--border); }
 .feed-topic-links a { display: grid; min-height: 64px; align-content: center; gap: 4px; color: var(--brand-strong); font-size: .875rem; font-weight: 700; }
@@ -4972,3 +4947,4 @@ body:has(.image-viewer[open]) { overflow: hidden; }
 .composer-publish-preview .post-media { max-height: 300px; }
 .composer-preview-notice { margin: 0 0 14px; color: var(--text-muted); font-size: .75rem; line-height: 1.6; }
 .composer-preview-notice:last-child { margin: 14px 0 0; }
+.report-dialog::backdrop { background: rgb(3 7 18 / 62%); backdrop-filter: blur(4px); }
