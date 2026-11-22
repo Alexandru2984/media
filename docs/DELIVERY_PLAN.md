@@ -18,6 +18,13 @@ not a remediation option.
   lockfile finding and the Chrono maintenance warning remain visible.
 - Credential changes revoke pending recovery/email-change links. Thirty-two
   isolated HTTP checks pass, including concurrent resets and media audiences.
+- Follow-up verification adds three actual HTTP/storage checks for Unicode
+  publishing boundaries, for 35 checks total. SMTP now runs in a bounded blocking
+  pool with cancellation-safe capacity, explicit I/O timeout and redacted errors.
+- Publishing gains a local preview, Ctrl/Cmd+Enter and matching Unicode counts.
+  Profiles/posts have canonical-link sharing with manual-copy fallback; native
+  report/moderation dialogs contain focus and retain safe pending states.
+  The Node suite now has 38 passing tests and the Rust suite has 73.
 - The editorial landing, four interactive conversation examples, hashtag links,
   search filters/topics, stale-request protection, correct feed offsets, image
   viewer and useful feed shortcuts are live.

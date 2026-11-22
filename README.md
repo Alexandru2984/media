@@ -7,6 +7,10 @@ topic entry points, cancelled stale searches and reliable feed continuation.
 Application-level upload checks now enforce post audiences even on direct
 backend reads; successful API responses prohibit caching independently of Nginx.
 See the [current delivery plan](docs/DELIVERY_PLAN.md) for priorities and scope.
+Follow-up releases add a local post preview, Ctrl/Cmd+Enter publishing, matching
+Unicode character limits, profile sharing with manual-copy fallback, and native
+accessible report/moderation dialogs. SMTP delivery now runs in a bounded blocking
+pool. Cloudflare edge and Tunnel remain mandatory parts of the architecture.
 The application currently provides account management, email verification and
 password recovery, user profiles, avatars, posts, image uploads, likes, and
 comments. It also includes a paginated feed, community search, responsive mobile
@@ -190,6 +194,8 @@ and range requests, unsupported paths/methods, avatars and cache policy.
 Another 13 HTTP checks verify credential-link revocation, password/email
 changes, session rotation, expired links and a single winner for concurrent
 resets using different links. No SMTP is sent by these fixtures.
+Three publishing checks persist a full 500-emoji post and reject oversized and
+control-character payloads, bringing the disposable HTTP suite to 35 checks.
 
 The complete local environment, frontend release flow, migrations, health
 checks, and incident-response procedures still need consolidation. Production

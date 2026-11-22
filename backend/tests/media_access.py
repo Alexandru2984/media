@@ -165,6 +165,16 @@ def main():
                     identity_checks += 1
                     return status, cookie_value
 
+                # Exercise the browser/API Unicode contract against actual
+                # storage, without sending email or touching production data.
+                publishing_cookie = f"media_session={tokens['public']}"
+                identity_request("/api/posts", {"content": "📷" * 500}, publishing_cookie)
+                assert sql(f"SELECT CHAR_LENGTH(content) FROM posts WHERE user_id='{ids['public']}' AND image_url IS NULL", database) == "500"
+                identity_request("/api/posts", {"content": "📷" * 501}, publishing_cookie, expected=400)
+                identity_request("/api/posts", {"content": "hidden\u0000control"}, publishing_cookie, expected=400)
+                print(f"publishing_checks={identity_checks}; passed; 500 emoji persisted, oversized/control payloads rejected")
+                identity_checks = 0
+
                 def account_token(kind, expired=False):
                     raw = secrets.token_hex(24)
                     stored = hashlib.sha256(raw.encode()).hexdigest()
