@@ -15,7 +15,11 @@ Post images also accept optional plain-text descriptions of up to 300 Unicode
 characters. Creation, editing, preview, image viewing, public post HTML and
 account export preserve the description under the post's current audience.
 Temporary drafts exclude images and their descriptions. Account exports use
-format version 8.
+format version 9, including the profile's pinned-post ID and timestamp.
+Members can pin one of their own posts at the top of their profile, including
+an older post outside the first page. Pinning preserves private-account,
+block and personal-hide policies and does not reorder chronological feeds.
+Replacing a pin is atomic; an older unpin request cannot remove a newer choice.
 The application currently provides account management, email verification and
 password recovery, user profiles, avatars, posts, image uploads, likes, and
 comments. It also includes a paginated feed, community search, responsive mobile
@@ -212,6 +216,21 @@ changes, session rotation, expired links and a single winner for concurrent
 resets using different links. No SMTP is sent by these fixtures.
 Three publishing checks persist a full 500-emoji post and reject oversized and
 control-character payloads, bringing the disposable HTTP suite to 35 checks.
+Image-description checks cover real uploads, validation, all full-post reads,
+escaping, replacement and export. Pin checks cover ownership, exact origins,
+private/follower/block/hide policy, atomic replacement, stale unpin, concurrent
+choices, posts outside the first page, export v9 and deletion cascades.
+To also verify the full migration runner and the preceding production binary,
+set `MEDIA_TEST_MIGRATION_RUNNER=true` and `MEDIA_COMPATIBILITY_BINARY` to the
+reviewed rollback binary when invoking the suite through `sudo env`. The current
+pin rollback check expects a pre-pin API; all accounts are disposable fixtures.
+
+For responsive pin UI checks, start a built Vite preview on loopback port 18307
+and run `node frontend/scripts/check-profile-pins.cjs` using an installed
+Playwright/Chromium. External installations can be selected with
+`MEDIA_PLAYWRIGHT_MODULE` and `MEDIA_CHROMIUM_PATH`; `MEDIA_PREVIEW_URL` overrides
+the local preview URL. The script mocks API responses and checks both themes at
+320/390/768/1440 px, keyboard focus, retry, audience controls and route races.
 
 The complete local environment, frontend release flow, migrations, health
 checks, and incident-response procedures still need consolidation. Production

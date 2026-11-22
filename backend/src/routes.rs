@@ -7,7 +7,10 @@ use axum::{
 };
 use sqlx::MySqlPool;
 
-use crate::{handlers, health, media, moderation, notifications, public_pages, safety, security};
+use crate::{
+    handlers, health, media, moderation, notifications, profile_pins, public_pages, safety,
+    security,
+};
 
 pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
     let media_routes = media::routes(pool.clone(), "uploads");
@@ -78,6 +81,7 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
             post(handlers::verify_email_change),
         )
         .route("/users/:id/posts", get(handlers::get_user_posts))
+        .route("/users/:id/pinned-post", get(profile_pins::get_pin))
         // Post routes
         .route("/posts", get(handlers::get_posts))
         .route("/posts", post(handlers::create_post))
@@ -95,6 +99,10 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
                 .delete(handlers::delete_post),
         )
         .route("/posts/:id/like", post(handlers::like_post))
+        .route(
+            "/posts/:id/pin",
+            put(profile_pins::pin).delete(profile_pins::unpin),
+        )
         .route("/posts/:id/save", post(handlers::save_post))
         .route(
             "/posts/:id/hide",

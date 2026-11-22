@@ -62,6 +62,18 @@ class ApiService {
     return this.request(`/users/${encodePathSegment(userId)}`);
   }
 
+  async getProfilePin(userId) {
+    return this.request(`/users/${encodePathSegment(userId)}/pinned-post`);
+  }
+
+  async pinPost(postId) {
+    return this.request(`/posts/${encodePathSegment(postId)}/pin`, { method: 'PUT' });
+  }
+
+  async unpinPost(postId) {
+    return this.request(`/posts/${encodePathSegment(postId)}/pin`, { method: 'DELETE' });
+  }
+
   async followUser(userId) {
     return this.request(`/users/${encodePathSegment(userId)}/follow`, { method: 'PUT' });
   }

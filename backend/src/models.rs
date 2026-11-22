@@ -210,4 +210,5 @@ pub struct PostWithUser {
     pub user: UserProfile,
     pub is_liked: bool,
     pub is_saved: bool,
+    pub is_pinned: bool,
 }

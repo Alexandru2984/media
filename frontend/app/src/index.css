@@ -2712,6 +2712,7 @@ body.command-palette-open {
 }
 
 .post-author-name {
+  display: block;
   overflow: hidden;
   margin: 0;
   font-size: 0.92rem;
@@ -2739,6 +2740,11 @@ body.command-palette-open {
   border-color: transparent;
   background: transparent;
 }
+
+.post-owner-actions .profile-pin-button { width: 44px; height: 44px; }
+.profile-pin-button[aria-pressed="true"] { color: var(--accent); }
+.profile-pinned > .privacy-badge { margin-bottom: 8px; }
+.profile-pinned { min-width: 0; }
 
 .post-owner-actions .danger:hover {
   background: color-mix(in srgb, var(--danger) 10%, transparent);

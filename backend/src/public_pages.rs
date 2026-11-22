@@ -573,6 +573,7 @@ mod tests {
             },
             is_liked: false,
             is_saved: false,
+            is_pinned: false,
         }
     }
 

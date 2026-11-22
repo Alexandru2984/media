@@ -9,6 +9,7 @@ import PostImage from './PostImage';
 import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid } from '../utils/postContent';
 import { imageAltIsValid } from '../utils/imageAlt';
 import ImageAltField from './ImageAltField';
+import ProfilePinButton from './ProfilePinButton';
 
 const MAX_CONTENT_LENGTH = POST_CHARACTER_LIMIT;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -297,6 +298,7 @@ export default function PostCard(props) {
 
         <Show when={isOwn() && !editing()}>
           <div class="post-owner-actions" aria-label="Acțiuni postare">
+            <ProfilePinButton postId={props.post.id} authorId={props.post.user.id} pinned={props.post.is_pinned} onError={setError} onChange={props.onPinChange} />
             <button type="button" class="icon-button" onClick={() => { resetEditor(); setError(''); setEditing(true); }} aria-label="Editează postarea" title="Editează">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L20 6.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
             </button>

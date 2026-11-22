@@ -100,6 +100,7 @@ const routes = [
     sections: [
       ['Acces la cont', 'Sesiunile folosesc cookie-uri HttpOnly. Dintr-o sesiune activă poți schimba parola și revoca dispozitivele necunoscute. Recuperarea necesită acces la adresa de email a contului.'],
       ['Notificări și vizibilitate', 'Poți controla separat notificările viitoare și poți limita conținutul prin profilul privat.'],
+      ['O postare în prim-plan', 'Poți fixa o singură postare proprie la începutul profilului. O alegere nouă o înlocuiește pe cea anterioară; vizibilitatea contului și ordinea cronologică a feedului rămân aceleași.'],
       ['Siguranță și date', 'Blocarea, silențierea, raportarea, exportul și ștergerea sunt disponibile din interfața contului.'],
     ],
   },

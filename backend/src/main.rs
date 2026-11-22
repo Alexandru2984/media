@@ -9,6 +9,7 @@ mod moderation;
 mod notifications;
 mod pagination;
 mod passwords;
+mod profile_pins;
 mod public_pages;
 mod routes;
 mod safety;

@@ -23,6 +23,7 @@ export default function Profile() {
   const auth = useAuth();
   const [profile, setProfile] = createSignal(null);
   const [posts, setPosts] = createSignal([]);
+  const [pinnedPost, setPinnedPost] = createSignal(null);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal('');
   const [editing, setEditing] = createSignal(false);
@@ -75,10 +76,17 @@ export default function Profile() {
       setProfile(profileData);
       setUsername(profileData.username);
       setBio(profileData.bio || '');
-      const profilePosts = profileData.can_view_content ? await api.getUserPosts(userId) : [];
-      if (isCurrent()) setPosts(profilePosts);
+      const [profilePosts, pin] = profileData.can_view_content
+        ? await Promise.all([api.getUserPosts(userId), api.getProfilePin(userId)])
+        : [[], null];
+      if (isCurrent()) {
+        setPosts(profilePosts);
+        setPinnedPost(pin);
+      }
     } catch (requestError) {
       if (!isCurrent()) return;
+      setPosts([]);
+      setPinnedPost(null);
       console.error('Failed to load profile:', requestError);
       setError('Profilul nu a putut fi încărcat. Este posibil să nu mai existe.');
     } finally {
@@ -90,6 +98,14 @@ export default function Profile() {
     setEditing(false);
     setUsername(profile()?.username || '');
     setBio(profile()?.bio || '');
+  };
+
+  const refreshPin = async (postId) => {
+    const userId = params.id;
+    await loadProfile(userId, false);
+    if (params.id === userId && isOwnProfile()) {
+      (document.querySelector(`[data-profile-pin="${CSS.escape(postId)}"]`) || document.querySelector('#profile-posts-title'))?.focus({ preventScroll: true });
+    }
   };
 
   const handleSave = async () => {
@@ -166,6 +182,7 @@ export default function Profile() {
           followers_count: Math.max(0, Number(current.followers_count || 0) - (current.is_following ? 1 : 0)),
         }));
         setPosts([]);
+        setPinnedPost(null);
       }
     } catch (requestError) {
       console.error('Failed to update block relationship:', requestError);
@@ -201,6 +218,7 @@ export default function Profile() {
       setLoadedProfileViewer(viewer);
       setProfile(null);
       setPosts([]);
+      setPinnedPost(null);
       setActiveTab('posts');
       setSettingsInitialTab('privacy');
       setEditing(false);
@@ -412,12 +430,20 @@ export default function Profile() {
 
             <Show when={activeTab() === 'posts' || !isOwnProfile()}>
               <section class="profile-feed" aria-labelledby="profile-posts-title">
-                <h2 id="profile-posts-title">Postări</h2>
+                <h2 id="profile-posts-title" tabIndex="-1">Postări</h2>
                 <Show
-                  when={posts().length > 0}
+                  when={profile()?.can_view_content && (posts().length > 0 || pinnedPost())}
                   fallback={<div class="surface state-card"><div><span class="state-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v12H8l-4 4V5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg></span><h2>{profile()?.is_blocked ? 'Cont blocat' : (!profile()?.can_view_content ? 'Acest cont este privat' : 'Nicio postare încă')}</h2><p>{profile()?.is_blocked ? 'Deblochează acest cont pentru a-i vedea din nou postările.' : (!profile()?.can_view_content ? (auth.isAuthenticated() ? (profile()?.follow_request_pending ? 'Cererea ta a fost trimisă. Postările devin vizibile după acceptare.' : 'Trimite o cerere de urmărire pentru a vedea postările și conexiunile acestui profil.') : 'Conectează-te pentru a solicita acces la postările și conexiunile acestui profil.') : 'Postările publicate de acest utilizator vor apărea aici.')}</p></div></div>}
                 >
-                  <div class="feed-list"><For each={posts()}>{(post) => <PostCard post={post} onDelete={() => loadProfile(params.id, false)} onUpdate={() => loadProfile(params.id, false)} />}</For></div>
+                  <div class="feed-list">
+                    <Show when={pinnedPost()} keyed>{(post) =>
+                      <section class="profile-pinned" aria-label="Postare fixată">
+                        <span class="privacy-badge">Fixată pe profil</span>
+                        <PostCard post={post} onDelete={() => loadProfile(params.id, false)} onUpdate={() => loadProfile(params.id, false)} onPinChange={refreshPin} />
+                      </section>
+                    }</Show>
+                    <For each={posts().filter((post) => post.id !== pinnedPost()?.id)}>{(post) => <PostCard post={post} onDelete={() => loadProfile(params.id, false)} onUpdate={() => loadProfile(params.id, false)} onPinChange={refreshPin} />}</For>
+                  </div>
                 </Show>
               </section>
             </Show>

@@ -85,6 +85,7 @@ struct PostFeedRow {
     user_created_at: DateTime<Utc>,
     is_liked: bool,
     is_saved: bool,
+    is_pinned: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -205,6 +206,8 @@ struct ExportProfile {
     role: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+    pinned_post_id: Option<String>,
+    pinned_post_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -372,6 +375,7 @@ fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
         },
         is_liked: row.is_liked,
         is_saved: row.is_saved,
+        is_pinned: row.is_pinned,
     }
 }
 
@@ -444,6 +448,26 @@ async fn user_content_access(
         tracing::error!(error = %error, "failed to evaluate private content access");
         StatusCode::INTERNAL_SERVER_ERROR
     })
+}
+
+pub(crate) async fn profile_content_is_visible(
+    pool: &MySqlPool,
+    viewer_id: Option<&str>,
+    user_id: &str,
+) -> Result<bool, StatusCode> {
+    let access = user_content_access(pool, viewer_id, user_id)
+        .await?
+        .ok_or(StatusCode::NOT_FOUND)?;
+    if access.blocked_by {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    if access.viewer_blocks {
+        return Ok(false);
+    }
+    if !access.can_view(viewer_id == Some(user_id)) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    Ok(true)
 }
 
 async fn can_interact_with_user(
@@ -1903,7 +1927,9 @@ pub async fn export_account_data(
 
     let profile = query_as::<_, ExportProfile>(
         "SELECT id, username, email, (email_verified <> 0) AS email_verified,
-                bio, avatar_url, (is_private <> 0) AS is_private, role, created_at, updated_at
+                bio, avatar_url, (is_private <> 0) AS is_private, role, created_at, updated_at,
+                (SELECT post_id FROM profile_pins WHERE user_id = users.id) AS pinned_post_id,
+                (SELECT pinned_at FROM profile_pins WHERE user_id = users.id) AS pinned_post_at
          FROM users WHERE id = ?",
     )
     .bind(&authenticated_session.user_id)
@@ -2154,7 +2180,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 8,
+            format_version: 9,
             exported_at,
             profile,
             counts,
@@ -2402,13 +2428,22 @@ pub(crate) async fn visible_post(
     post_id: &str,
 ) -> Result<Option<PostWithUser>, StatusCode> {
     let current_user_id = get_current_user(pool, headers).await.ok();
+    visible_post_for_viewer(pool, current_user_id.as_deref(), post_id).await
+}
+
+pub(crate) async fn visible_post_for_viewer(
+    pool: &MySqlPool,
+    current_user_id: Option<&str>,
+    post_id: &str,
+) -> Result<Option<PostWithUser>, StatusCode> {
     let row = query_as::<_, PostFeedRow>(
         "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
                 (current_like.id IS NOT NULL) AS is_liked,
-                (current_save.user_id IS NOT NULL) AS is_saved
+                (current_save.user_id IS NOT NULL) AS is_saved,
+                EXISTS(SELECT 1 FROM profile_pins pin WHERE pin.user_id = p.user_id AND pin.post_id = p.id) AS is_pinned
          FROM posts p
          INNER JOIN users u ON u.id = p.user_id
          INNER JOIN (
@@ -2441,14 +2476,14 @@ pub(crate) async fn visible_post(
            )
          LIMIT 1",
     )
-    .bind(current_user_id.as_deref())
-    .bind(current_user_id.as_deref())
+    .bind(current_user_id)
+    .bind(current_user_id)
     .bind(post_id)
-    .bind(current_user_id.as_deref())
-    .bind(current_user_id.as_deref())
-    .bind(current_user_id.as_deref())
-    .bind(current_user_id.as_deref())
-    .bind(current_user_id.as_deref())
+    .bind(current_user_id)
+    .bind(current_user_id)
+    .bind(current_user_id)
+    .bind(current_user_id)
+    .bind(current_user_id)
     .fetch_optional(pool)
     .await
     .map_err(|error| {
@@ -2489,7 +2524,8 @@ pub async fn get_posts(
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
                 (current_like.id IS NOT NULL) AS is_liked,
-                (current_save.user_id IS NOT NULL) AS is_saved
+                (current_save.user_id IS NOT NULL) AS is_saved,
+                EXISTS(SELECT 1 FROM profile_pins pin WHERE pin.user_id = p.user_id AND pin.post_id = p.id) AS is_pinned
          FROM posts p
          INNER JOIN users u ON u.id = p.user_id
          INNER JOIN (
@@ -2560,7 +2596,8 @@ pub async fn get_following_feed(
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
                 (current_like.id IS NOT NULL) AS is_liked,
-                (current_save.user_id IS NOT NULL) AS is_saved
+                (current_save.user_id IS NOT NULL) AS is_saved,
+                EXISTS(SELECT 1 FROM profile_pins pin WHERE pin.user_id = p.user_id AND pin.post_id = p.id) AS is_pinned
          FROM follows relationship
          INNER JOIN posts p ON p.user_id = relationship.followed_id
          INNER JOIN users u ON u.id = p.user_id
@@ -2796,7 +2833,8 @@ pub async fn get_saved_posts(
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
                 (current_like.id IS NOT NULL) AS is_liked,
-                TRUE AS is_saved
+                TRUE AS is_saved,
+                EXISTS(SELECT 1 FROM profile_pins pin WHERE pin.user_id = p.user_id AND pin.post_id = p.id) AS is_pinned
          FROM saved_posts saved
          INNER JOIN posts p ON p.id = saved.post_id
          INNER JOIN users u ON u.id = p.user_id
@@ -3927,17 +3965,8 @@ pub async fn get_user_posts(
     if Uuid::parse_str(&user_id).is_err() {
         return Err(StatusCode::NOT_FOUND);
     }
-    let access = user_content_access(&pool, current_user_id.as_deref(), &user_id)
-        .await?
-        .ok_or(StatusCode::NOT_FOUND)?;
-    if access.blocked_by {
-        return Err(StatusCode::NOT_FOUND);
-    }
-    if access.viewer_blocks {
+    if !profile_content_is_visible(&pool, current_user_id.as_deref(), &user_id).await? {
         return Ok(Json(Vec::new()));
-    }
-    if !access.can_view(current_user_id.as_deref() == Some(user_id.as_str())) {
-        return Err(StatusCode::FORBIDDEN);
     }
     let (limit, offset) =
         bounded_pagination(&params, 50, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
@@ -3948,7 +3977,8 @@ pub async fn get_user_posts(
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
                 (current_like.id IS NOT NULL) AS is_liked,
-                (current_save.user_id IS NOT NULL) AS is_saved
+                (current_save.user_id IS NOT NULL) AS is_saved,
+                EXISTS(SELECT 1 FROM profile_pins pin WHERE pin.user_id = p.user_id AND pin.post_id = p.id) AS is_pinned
          FROM posts p
          INNER JOIN users u ON u.id = p.user_id
          INNER JOIN (
@@ -4032,7 +4062,8 @@ pub async fn search(
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
                 (current_like.id IS NOT NULL) AS is_liked,
-                (current_save.user_id IS NOT NULL) AS is_saved
+                (current_save.user_id IS NOT NULL) AS is_saved,
+                EXISTS(SELECT 1 FROM profile_pins pin WHERE pin.user_id = p.user_id AND pin.post_id = p.id) AS is_pinned
          FROM posts p
          INNER JOIN users u ON u.id = p.user_id
          INNER JOIN (
@@ -4432,7 +4463,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 8,
+            format_version: 9,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),
@@ -4445,6 +4476,8 @@ mod tests {
                 role: "user".to_owned(),
                 created_at: now,
                 updated_at: now,
+                pinned_post_id: None,
+                pinned_post_at: None,
             },
             counts: ExportCounts {
                 posts: 0,

@@ -13,6 +13,11 @@ const sections = [
     paragraphs: ['Un profil privat cere aprobarea urmăritorilor înainte de a le oferi acces la postări și media protejată. Poți anula cereri, elimina relații prin unfollow și bloca un cont. Identitatea de bază a profilului rămâne descoperibilă pentru ca oamenii să poată găsi contul corect.'],
   },
   {
+    id: 'postare-fixata',
+    title: 'O postare în prim-plan',
+    paragraphs: ['Apasă pictograma de fixare din acțiunile unei postări proprii pentru a o afișa prima pe profil. Poți fixa o singură postare; o alegere nouă o înlocuiește pe cea anterioară. Apasă din nou pentru a anula fixarea. Vizibilitatea rămâne cea a contului, iar feedul păstrează ordinea cronologică.'],
+  },
+  {
     id: 'notificari',
     title: 'Notificări',
     paragraphs: ['Inboxul din aplicație funcționează independent de email. Din Setări → Notificări poți opri separat cererile de urmărire, acceptările, urmăritorii noi, aprecierile și comentariile. Preferința se aplică evenimentelor viitoare și nu rescrie istoricul existent.'],
