@@ -15,6 +15,7 @@ owner's existing identity without generated-by or coauthor attribution.
 | P2 | CSP permits inline scripts for Cloudflare challenges | Current public header confirmed. Coordinate an edge nonce/hash-compatible policy before tightening; do not silently break the challenge. |
 | P2 | Auth throttling depends heavily on shared infrastructure | Add durable account-aware budgets, passkeys/TOTP, breached-password checks and login alerts. |
 | P2 | Automated audience coverage is incomplete | Add a disposable-database matrix for owner, anonymous, follower, removed follower, blocked users, hidden posts, media, exports and moderation. |
+| Supply chain | New audit: eight vulnerable lockfile reports and a Chrono maintenance warning | Patched seven reports with lettre 0.11.24, url 2.5.9 and SQLx 0.9.1. Optional, uncompiled SQLite binding still requires an upstream-compatible update; keep the full audit failure visible. Plan a Chrono replacement. |
 | Product | Landing uses generic gradients, floating example cards and repeated promises | Replace with an editorial layout, stronger typography, a clear product demonstration and truthful calls to action. |
 | Product / correctness | Search can display stale responses after a later query; feed offsets derive from deduplicated visible rows | Add request sequencing and explicit server offsets before expanding discovery. |
 

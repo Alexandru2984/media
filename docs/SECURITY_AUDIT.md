@@ -41,6 +41,18 @@ The current locked npm audit reports zero vulnerabilities. Public CSP still
 permits inline scripts for Cloudflare challenges. SMTP delivery was not retried
 against real recipients; its previously documented failure remains unresolved.
 
+The patch updates lettre to 0.11.24, url to 2.5.9 and the SQLx family to 0.9.1,
+with minimum patched versions in Cargo.toml. This removes seven of the eight
+vulnerability reports. One remains: SQLx 0.9.1 still locks the optional SQLite
+driver to libsqlite3-sys 0.37.0. The production MySQL feature graph does not
+compile that dependency (`cargo tree --locked -i libsqlite3-sys` is empty).
+There is no ignore entry: the full lockfile audit remains visibly failing until
+upstream supports the patched SQLite binding or the unused driver is removed
+from resolution. Enabling SQLite requires resolving this first. Chrono's
+unmaintained warning also remains and needs a deliberate storage/API-compatible
+date-library migration. Locked tests (65 application + 5 seed), strict Clippy,
+format checks and the optimized backend build pass after the updates.
+
 The review covered the deployed frontend bundle, the compiled Rust backend,
 public HTTP behavior, Nginx virtual-host configuration, the systemd service,
 filesystem permissions, TLS behavior, and recoverable Rust dependency metadata.
