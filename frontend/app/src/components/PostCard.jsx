@@ -6,8 +6,9 @@ import { getImageUrl, loginPath, postPath, profilePath } from '../utils/urls';
 import ReportDialog from './ReportDialog';
 import PostText from './PostText';
 import PostImage from './PostImage';
+import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid } from '../utils/postContent';
 
-const MAX_CONTENT_LENGTH = 500;
+const MAX_CONTENT_LENGTH = POST_CHARACTER_LIMIT;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const relativeTime = new Intl.RelativeTimeFormat('ro', { numeric: 'auto' });
@@ -165,7 +166,7 @@ export default function PostCard(props) {
 
   const handleEditPost = async () => {
     const content = editContent().trim();
-    if (!content || content.length > MAX_CONTENT_LENGTH || saving()) return;
+    if (!postContentIsValid(content) || saving()) return;
 
     setSaving(true);
     setError('');
@@ -324,11 +325,12 @@ export default function PostCard(props) {
             id={`edit-post-${props.post.id}`}
             class="textarea"
             value={editContent()}
+            disabled={saving()}
             onInput={(event) => setEditContent(event.currentTarget.value)}
             rows="4"
           />
-          <div class={`character-count ${editContent().length > MAX_CONTENT_LENGTH ? 'is-over' : ''}`}>
-            {editContent().length}/{MAX_CONTENT_LENGTH}
+          <div class={`character-count ${countPostCharacters(editContent()) > MAX_CONTENT_LENGTH ? 'is-over' : ''}`}>
+            {countPostCharacters(editContent())}/{MAX_CONTENT_LENGTH}
           </div>
 
           <Show when={editImagePreview() || (props.post.image_url && !removeImage())}>
@@ -351,6 +353,7 @@ export default function PostCard(props) {
               id={`edit-image-${props.post.id}`}
               accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
               onChange={handleEditImageChange}
+              disabled={saving()}
             />
             <label for={`edit-image-${props.post.id}`} class="btn btn-secondary">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="m4 17 5-4 4 4 3-3 4 4" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
@@ -367,7 +370,7 @@ export default function PostCard(props) {
               type="button"
               class="btn btn-primary"
               onClick={handleEditPost}
-              disabled={saving() || !editContent().trim() || editContent().length > MAX_CONTENT_LENGTH}
+              disabled={saving() || !postContentIsValid(editContent())}
             >
               {saving() ? 'Se salvează…' : 'Salvează'}
             </button>

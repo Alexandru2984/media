@@ -1,6 +1,7 @@
+import { postContentIsValid } from './postContent.js';
+
 const DRAFT_VERSION = 1;
-const MAX_DRAFT_LENGTH = 500;
-const MAX_STORED_BYTES = 2048;
+const MAX_STORED_CODE_UNITS = 2048;
 export const POST_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 
@@ -25,7 +26,7 @@ export function readPostDraft(userId, environment = globalThis, now = Date.now()
     if (!storage) return null;
     const rawDraft = storage.getItem(key);
     if (!rawDraft) return null;
-    if (rawDraft.length > MAX_STORED_BYTES) {
+    if (rawDraft.length > MAX_STORED_CODE_UNITS) {
       removeStoredDraft(storage, key);
       return null;
     }
@@ -39,9 +40,7 @@ export function readPostDraft(userId, environment = globalThis, now = Date.now()
     }
     const valid = draft
       && draft.version === DRAFT_VERSION
-      && typeof draft.content === 'string'
-      && draft.content.trim().length > 0
-      && draft.content.length <= MAX_DRAFT_LENGTH
+      && postContentIsValid(draft.content)
       && Number.isFinite(draft.savedAt)
       && draft.savedAt <= now + MAX_CLOCK_SKEW_MS
       && now - draft.savedAt <= POST_DRAFT_MAX_AGE_MS;
@@ -61,9 +60,7 @@ export function storePostDraft(userId, content, environment = globalThis, now = 
   const key = draftKey(userId);
   if (
     !key
-    || typeof content !== 'string'
-    || !content.trim()
-    || content.length > MAX_DRAFT_LENGTH
+    || !postContentIsValid(content)
     || !Number.isFinite(now)
   ) return false;
 

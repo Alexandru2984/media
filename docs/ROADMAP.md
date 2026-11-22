@@ -1,5 +1,18 @@
 # Product, Security, Design, and SEO Roadmap
 
+**2026-11-22 publishing follow-up:** the composer has an on-demand preview of
+text, hashtags, selected image and the account's current public/private state.
+Previewing never uploads or publishes, and its hashtags cannot navigate away.
+Ctrl/Cmd+Enter publishes with composition/repeat and duplicate-submit guards;
+the text and image controls stay stable during submission. Failed submissions
+preserve the draft and preview for retry; successful publication clears them.
+Composer, post editor and temporary drafts now use Unicode scalar counts matching
+the Rust API, so 500 emoji are accepted without treating them as 1,000 characters.
+Forbidden controls are rejected consistently. Eight Chromium viewport/theme
+cases cover limits, escaping, previews, draft restore, local images, shortcuts,
+duplicate requests, failure/retry and clearing. All 34 Node tests and unchanged
+artifact budgets pass; the preview loads in its own lazy chunk.
+
 See [the current delivery plan](DELIVERY_PLAN.md) for the 2026-11-22 re-audit,
 remaining dependency findings and the next concrete releases.
 

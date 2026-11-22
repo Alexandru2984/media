@@ -4962,3 +4962,13 @@ body:has(.image-viewer[open]) { overflow: hidden; }
 .feed-topic-links a span { color: var(--text-muted); font-size: .75rem; font-weight: 400; }
 .feed-quick-links a { display: flex; min-height: 44px; align-items: center; padding-block: 10px; color: var(--text-soft); font-size: .875rem; }
 .feed-topic-links a:hover, .feed-quick-links a:hover { color: var(--brand-strong); text-decoration: underline; text-underline-offset: 3px; }
+
+.composer-preview-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 18px; padding: 0 20px 12px; }
+.composer-preview-tools button { min-height: 44px; border: 0; background: transparent; cursor: pointer; font-size: .8125rem; }
+.composer-preview-tools button:disabled { opacity: .55; cursor: default; }
+.composer-preview-tools > span { color: var(--text-muted); font-size: .75rem; }
+.composer-publish-preview { margin: 0 16px 16px; padding: 16px; border: 1px dashed var(--border-strong); border-radius: 8px; background: var(--bg); }
+.composer-publish-preview .post-content { padding: 16px 0; }
+.composer-publish-preview .post-media { max-height: 300px; }
+.composer-preview-notice { margin: 0 0 14px; color: var(--text-muted); font-size: .75rem; line-height: 1.6; }
+.composer-preview-notice:last-child { margin: 14px 0 0; }

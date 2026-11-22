@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, Show } from 'solid-js';
+import { createSignal, lazy, onCleanup, onMount, Show, Suspense } from 'solid-js';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import {
@@ -8,8 +8,10 @@ import {
   storePostDraft,
 } from '../utils/postDraft';
 import { getImageUrl } from '../utils/urls';
+import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid } from '../utils/postContent';
 
-const MAX_CONTENT_LENGTH = 500;
+const MAX_CONTENT_LENGTH = POST_CHARACTER_LIMIT;
+const ComposerPreview = lazy(() => import('./ComposerPreview'));
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -22,6 +24,8 @@ export default function CreatePost(props) {
   const [error, setError] = createSignal('');
   const [recoverableDraft, setRecoverableDraft] = createSignal(null);
   const [draftStatus, setDraftStatus] = createSignal('');
+  const [showPreview, setShowPreview] = createSignal(false);
+  const contentLength = () => countPostCharacters(content());
   let fileInput;
   let contentInput;
   let draftExpiryTimer;
@@ -65,7 +69,7 @@ export default function CreatePost(props) {
       const removed = removePostDraft(auth.user()?.id);
       if (removed) clearDraftExpiryTimer();
       setDraftStatus(removed ? '' : 'unavailable');
-    } else if (nextContent.length > MAX_CONTENT_LENGTH) {
+    } else if (!postContentIsValid(nextContent)) {
       const removed = removePostDraft(auth.user()?.id);
       if (removed) clearDraftExpiryTimer();
       setDraftStatus(removed ? 'too-long' : 'unavailable');
@@ -134,7 +138,7 @@ export default function CreatePost(props) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     const postContent = content().trim();
-    if (!postContent || postContent.length > MAX_CONTENT_LENGTH || submitting()) return;
+    if (!postContentIsValid(postContent) || recoverableDraft() || submitting()) return;
 
     setSubmitting(true);
     setError('');
@@ -149,6 +153,7 @@ export default function CreatePost(props) {
       const draftRemoved = removePostDraft(auth.user()?.id);
       if (draftRemoved) clearDraftExpiryTimer();
       setContent('');
+      setShowPreview(false);
       setDraftStatus(draftRemoved ? '' : 'clear-failed');
       clearImage();
       await props.onPostCreated?.();
@@ -203,7 +208,14 @@ export default function CreatePost(props) {
               class="composer-textarea"
               value={content()}
               onInput={handleContentInput}
-              disabled={Boolean(recoverableDraft())}
+              onKeyDown={(event) => {
+                if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.isComposing && !event.repeat) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              aria-keyshortcuts="Control+Enter Meta+Enter"
+              disabled={Boolean(recoverableDraft()) || submitting()}
               placeholder={`Ce vrei să împărtășești, ${auth.user()?.username || 'azi'}?`}
               aria-describedby="new-post-count new-post-draft-status new-post-error"
             />
@@ -211,7 +223,7 @@ export default function CreatePost(props) {
             <Show when={imagePreview()}>
               <div class="composer-preview">
                 <img src={imagePreview()} alt="Previzualizarea imaginii selectate" />
-                <button type="button" class="media-remove" onClick={clearImage} aria-label="Elimină imaginea">
+                <button type="button" class="media-remove" onClick={clearImage} disabled={submitting()} aria-label="Elimină imaginea">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                   </svg>
@@ -230,9 +242,9 @@ export default function CreatePost(props) {
               id="post-image"
               accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
               onChange={handleImageChange}
-              disabled={Boolean(recoverableDraft())}
+              disabled={Boolean(recoverableDraft()) || submitting()}
             />
-            <label class={`media-picker ${recoverableDraft() ? 'is-disabled' : ''}`} for="post-image" aria-disabled={Boolean(recoverableDraft())}>
+            <label class={`media-picker ${recoverableDraft() || submitting() ? 'is-disabled' : ''}`} for="post-image" aria-disabled={Boolean(recoverableDraft()) || submitting()}>
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8" />
                 <circle cx="8.5" cy="9" r="1.5" stroke="currentColor" stroke-width="1.6" />
@@ -240,15 +252,15 @@ export default function CreatePost(props) {
               </svg>
               <span>{imageFile() ? 'Schimbă imaginea' : 'Adaugă imagine'}</span>
             </label>
-            <span id="new-post-count" class={`character-count ${content().length > MAX_CONTENT_LENGTH ? 'is-over' : ''}`}>
-              {content().length}/{MAX_CONTENT_LENGTH}
+            <span id="new-post-count" class={`character-count ${contentLength() > MAX_CONTENT_LENGTH ? 'is-over' : ''}`}>
+              {contentLength()}/{MAX_CONTENT_LENGTH}
             </span>
           </div>
 
           <button
             type="submit"
             class="btn btn-primary"
-            disabled={Boolean(recoverableDraft()) || submitting() || !content().trim() || content().length > MAX_CONTENT_LENGTH}
+            disabled={Boolean(recoverableDraft()) || submitting() || !postContentIsValid(content())}
           >
             <Show when={submitting()} fallback="Publică">
               <svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -259,6 +271,20 @@ export default function CreatePost(props) {
             </Show>
           </button>
         </div>
+
+        <div class="composer-preview-tools">
+          <button type="button" class="text-link" aria-expanded={showPreview()} aria-controls="post-publish-preview" disabled={Boolean(recoverableDraft()) || (!showPreview() && !content().trim() && !imagePreview())} onClick={() => setShowPreview(!showPreview())}>
+            {showPreview() ? 'Închide previzualizarea' : 'Previzualizează postarea'}
+          </button>
+          <span>Ctrl / ⌘ + Enter pentru publicare</span>
+        </div>
+        <Show when={showPreview()}>
+          <div id="post-publish-preview">
+            <Suspense fallback={<p class="comments-status" role="status">Se încarcă previzualizarea…</p>}>
+              <ComposerPreview content={content()} image={imagePreview()} user={auth.user()} />
+            </Suspense>
+          </div>
+        </Show>
 
         <Show when={error()}>
           <p id="new-post-error" class="composer-message" role="alert">{error()}</p>
@@ -277,7 +303,7 @@ export default function CreatePost(props) {
               {draftStatus() === 'saved'
                 ? (imageFile() ? 'Text salvat temporar; imaginea nu este inclusă în schiță.' : 'Schiță salvată temporar în această filă.')
                 : (draftStatus() === 'too-long'
-                  ? 'Schița se salvează din nou când textul revine la maximum 500 de caractere.'
+                  ? 'Schița se salvează din nou când textul este valid și are maximum 500 de caractere.'
                   : (draftStatus() === 'expired'
                     ? 'Copia temporară a expirat. Modifică textul pentru a o salva din nou.'
                     : (draftStatus() === 'clear-failed' ? 'Copia temporară nu a putut fi ștearsă. Verifică setările browserului și încearcă din nou.' : 'Salvarea temporară nu este disponibilă în acest browser.')))}
