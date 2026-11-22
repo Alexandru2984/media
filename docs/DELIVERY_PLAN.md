@@ -46,12 +46,22 @@ a legacy hostname in local configuration is not evidence of an active provider.
   page, without duplication or reordering chronological feeds. The API enforces
   owner/audience/block/hide rules, atomic replacement and conditional unpin;
   database foreign keys enforce ownership and deletion cascades. Export is now
-  v9. The suite passes 79 Rust, 40 Node and 139 isolated HTTP checks, plus eight
+  v9 in that release. Its suite passed 79 Rust, 40 Node and 139 isolated HTTP checks, plus eight
   pin viewport/theme cases and a stale-route case. See the
-  [verified pinned-post release](RELEASE_2026-11-22_PINS.md) for current artifacts.
+  [verified pinned-post release](RELEASE_2026-11-22_PINS.md) for that snapshot.
+- Private named bookmark collections are live as of 2026-11-23: up to 30 per
+  account, 60-character names, CRUD, one optional collection per save, filing and
+  filters. Deleting a collection preserves saves. Owner-only export v10 and FK
+  cleanup cover both new tables. Stale viewer/filter responses and saved-feed
+  pagination/removal are corrected. All 80 Rust, 42 Node and 254 isolated HTTP
+  checks pass, plus eight viewport/theme collection workflows and a viewer race,
+  checked locally and on Cloudflare-delivered assets with API fixtures.
+- Backend canaries now default to free loopback port 18085, with a validated
+  override and occupied-port checks in dry-run and activation. Nginx's existing
+  18084 listener was preserved. No Cloudflare routing or policy was changed.
 
 This is a verified release increment, not completion of every backlog item.
-The [pinned-post release report](RELEASE_2026-11-22_PINS.md) records the current
+The [collection release report](RELEASE_2026-11-23_COLLECTIONS.md) records the current
 artifacts, validation scope, Cloudflare constraint and remaining work. Earlier
 release reports are historical snapshots.
 
@@ -83,9 +93,9 @@ release reports are historical snapshots.
 3. **Useful discovery.** Search filters for people/posts, topic entry points,
    safe hashtag navigation, clear result/empty/error states, stale-request
    protection, and correct feed continuation. No fabricated trends or members.
-4. **Publishing and profiles.** Image descriptions, accessible viewing and pinned
-   posts are delivered. Next: named private bookmark collections, richer profiles,
-   multiple images with derivatives and content warnings. Design each
+4. **Publishing and profiles.** Image descriptions, accessible viewing, pinned
+   posts and named private bookmark collections are delivered. Next: richer
+   profiles, content warnings and multiple images with derivatives. Design each
    storage migration and its rollback separately.
 5. **Interaction.** Polls, mentions, threaded replies, notification quiet hours,
    saved searches and transparent suggested follows. Build anti-spam quotas and

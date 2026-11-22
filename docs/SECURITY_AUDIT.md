@@ -2,7 +2,7 @@
 
 **System:** Media (`media.micutu.com`)
 
-**Audit date:** 2026-10-30; targeted re-audit 2026-11-22
+**Audit date:** 2026-10-30; targeted re-audits 2026-11-22 and 2026-11-23
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
@@ -24,6 +24,44 @@ authorization, appeals/enforcement policy, privacy governance, alerting, and
 recovery work remain open.
 
 ## Scope and limitations
+
+### Private bookmark collections, 2026-11-23
+
+Collection list/create/rename/delete and bookmark assignment require an active
+session; mutations use the existing exact-origin guard. Every query scopes
+ownership to the authenticated account, with foreign/missing collection IDs
+returning the same 404. UUIDs are canonicalized; names are trimmed, bounded to
+60 Unicode scalars and reject controls. Database uniqueness handles duplicates
+within an account. A per-account lock enforces the 30-collection cap even under
+concurrent creation and serializes metadata edits.
+
+Composite foreign keys require both an owned collection and an existing owned
+bookmark. One assignment per bookmark is enforced by its primary key. Folder
+deletion removes assignments while retaining saved posts. Unsave, hide, post
+deletion and account deletion remove assignments through database cascades; a
+rollback binary need not know the new tables. Assignment only edits the owner's
+existing bookmark reference; it never grants access to the referenced post.
+Filtered reads retain current private/follower/block/mute/hide checks. Public
+post/profile DTOs expose neither collection names nor assignment metadata.
+
+Owner-only export v10 includes both new tables and their counts within the
+10,000-record export budget. The interface adds no browser persistence for names
+or assignments and guards asynchronous results by current viewer, filter and
+component lifetime. Privacy/help copy disclose storage, export and deletion.
+The disposable suite covers ownership, origins, Unicode/control boundaries,
+duplicate names, quota/assignment/unsave/delete races, visibility revocation,
+filtered paging, FK rejection, old-binary unsave and account cleanup.
+
+The additive migration is live as `20261122002000`, after a restored and verified
+backup. Fifteen migrations succeed. Deployment initially refused the occupied
+18084 canary port before changing the live API; Nginx retained that listener.
+Canaries now default to 18085, reject invalid/live/occupied ports in preflight and
+activation, and allow a validated override. Existing API cache/auth/origin and
+Cloudflare protections remain in place. See the
+[release record](RELEASE_2026-11-23_COLLECTIONS.md) for evidence and rollback paths.
+The existing runtime DB grant, CSP/edge coordination, auth throttling/MFA, optional
+SQLite lockfile and Chrono maintenance work remain open; no dependency versions
+or provider integrations changed in this increment.
 
 ### Profile pins, 2026-11-22
 

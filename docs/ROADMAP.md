@@ -1,5 +1,27 @@
 # Product, Security, Design, and SEO Roadmap
 
+**2026-11-23 private collections:** saved posts can be organized into up to 30
+owner-only collections, with 1–60 Unicode character names. Create, rename, delete,
+move and all/collection/unfiled filters are delivered. A bookmark has one optional
+collection; deleting a folder preserves its saves. Post access still follows
+current audience, block, mute and hide policy. Export v10 includes names and
+assignments, with both counted against the export record budget. Composite
+foreign keys enforce ownership and remove assignments on unsave/hide/post/account
+deletion, including unsave by the preceding production API after rollback.
+
+The saved page rejects stale responses after filter or viewer changes, keeps
+pagination offsets independent of deduplicated visible rows and refreshes the
+visible prefix after removals. Rename retains native select state; modal focus,
+pending guards, failure/retry and long names work on mobile. Validation passes
+80 Rust, 42 Node and 254 disposable HTTP checks, eight viewport/theme workflows
+and a viewer-switch race. The same UI checks pass on Cloudflare-delivered assets
+with API fixtures, while separate real API canaries verify auth/origin/cache
+boundaries. Canary-port conflicts are detected in dry runs and can use a validated
+alternative without changing other listeners. See the
+[current release](RELEASE_2026-11-23_COLLECTIONS.md) for artifacts and limitations.
+Next: richer profiles, content warnings and multiple images. SEO and CI remain
+in the final phase.
+
 **2026-11-22 pinned profiles:** a member can feature one owned post, replace it
 atomically or remove that specific pin. The profile fetches it independently of
 the first 50 posts and shows one copy. Feed ordering is unchanged. Private-account
@@ -14,8 +36,8 @@ application. All 79 Rust, 40 Node and 139 disposable HTTP checks pass; browser Q
 covers eight pin viewport/theme cases, a stale pinned-post route response and
 eight image-description regressions. Live origin/Cloudflare checks pass. See
 [current production artifacts and remaining work](RELEASE_2026-11-22_PINS.md).
-The next product increment is named private bookmark collections; SEO expansion
-and CI setup remain in the final phase.
+Named private bookmark collections followed in the 2026-11-23 release; SEO
+expansion and CI setup remain in the final phase.
 
 **2026-11-22 image descriptions:** optional 300-character Unicode image
 descriptions now flow through create/edit, previews, thumbnails, the image viewer,
@@ -378,8 +400,8 @@ search. It disappears at 100% instead of becoming permanent dashboard clutter.
   links ✅. Add opt-in durable drafts, mentions, link previews and polls.
 - Image alt text ✅. Add multi-image carousel, cropping, captions and later short video.
 - Edit history, delete/restore window, scheduling, audience, and content warnings.
-- Private bookmarks, a saved feed and canonical post sharing ✅. Add named
-  collections, reposts, quote posts and richer reactions.
+- Private bookmarks, named private collections, a saved feed and canonical post
+  sharing ✅. Add reposts, quote posts and richer reactions.
 - Threaded comments, mentions, sorting, pagination, editing, and moderation.
 - Optimistic updates with correct rollback and offline draft recovery. Temporary
   refresh/crash recovery is deployed; true offline publication remains open.
