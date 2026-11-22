@@ -16,7 +16,7 @@ moderation, and explicit same-component profile/post route races pass. Four
 sharing contract tests bring the Node suite to 38 passing tests.
 
 The landing now loads independently from the authenticated feed. The final
-build has 124,285 entry JavaScript bytes, 84,203 CSS bytes and 278,646 total
+build has 124,285 entry JavaScript bytes, 84,278 CSS bytes and 278,684 total
 JavaScript bytes, below the unchanged budgets. Modal implementation follows the
 [HTML dialog contract](https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element).
 

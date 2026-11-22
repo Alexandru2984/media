@@ -34,6 +34,8 @@ not a remediation option.
   SEO expansion and CI setup remain in the final planned phase.
 
 This is a verified release increment, not completion of every backlog item.
+The [follow-up release report](RELEASE_2026-11-22_FOLLOWUP.md) records the current
+artifacts, validation scope, Cloudflare constraint and remaining work.
 
 ## Findings from the current re-audit
 
