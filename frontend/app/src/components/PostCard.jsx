@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import { getImageUrl, loginPath, postPath, profilePath } from '../utils/urls';
 import ReportDialog from './ReportDialog';
 import PostText from './PostText';
+import PostImage from './PostImage';
 
 const MAX_CONTENT_LENGTH = 500;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -312,13 +313,7 @@ export default function PostCard(props) {
       <Show when={!editing()}>
         <p class="post-content"><PostText text={props.post.content} /></p>
         <Show when={props.post.image_url}>
-          <img
-            class="post-media"
-            src={getImageUrl(props.post.image_url)}
-            alt={`Imagine publicată de ${props.post.user.username}`}
-            loading="lazy"
-            decoding="async"
-          />
+          <PostImage src={props.post.image_url} author={props.post.user.username} />
         </Show>
       </Show>
 

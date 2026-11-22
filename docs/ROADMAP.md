@@ -22,6 +22,15 @@ Chromium checked filters, hashtag navigation, literal markup rendering, racing
 queries, failures, topics and overlapping pagination at 320/390/768/1440 px.
 The frontend passes 31 contract tests and the production artifact gate.
 
+**2026-11-22 reading update:** post images open in a responsive native dialog
+with keyboard focus containment/restoration, Escape and backdrop dismissal,
+background scroll lock and an unavailable-image state. Eight Chromium viewport /
+theme combinations passed. The feed replaces generic advice cards with useful
+topic and account shortcuts, and labels its community ordering explicitly.
+Buttons, branding and the page shell use a flatter visual treatment. The final
+reading build remains within existing budgets (126,980 entry JS bytes and
+83,876 stylesheet bytes); no budget increase was needed.
+
 This roadmap is deliberately security-first. A polished interface on top of an
 unpatchable or weakly isolated service only increases the blast radius.
 

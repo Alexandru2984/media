@@ -7,7 +7,7 @@ import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import PageMeta from '../components/PageMeta';
 import Landing from '../components/Landing';
-import { getImageUrl, profilePath } from '../utils/urls';
+import { getImageUrl, profilePath, withQuery } from '../utils/urls';
 
 const FEED_PAGE_SIZE = 10;
 
@@ -168,8 +168,8 @@ export default function Home() {
               <section class="feed-column" aria-labelledby="feed-title">
                 <div class="feed-heading">
                   <div>
-                    <h1 id="feed-title">{feedMode() === 'following' ? 'Urmărești' : 'Pentru tine'}</h1>
-                    <p>{feedMode() === 'following' ? 'Noutăți de la oamenii pe care îi urmărești' : 'Idei și momente din comunitate'}</p>
+                    <h1 id="feed-title">{feedMode() === 'following' ? 'Urmărești' : 'Comunitate'}</h1>
+                    <p>{feedMode() === 'following' ? 'Noutăți de la oamenii pe care îi urmărești' : 'Conversații noi, în ordine cronologică'}</p>
                   </div>
                   <button type="button" class="icon-button" onClick={loadPosts} aria-label="Reîncarcă feedul" title="Reîncarcă">
                     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -186,7 +186,7 @@ export default function Home() {
                     class={feedMode() === 'discover' ? 'is-active' : ''}
                     onClick={() => selectFeed('discover')}
                   >
-                    Pentru tine
+                    Descoperă
                   </button>
                   <button
                     type="button"
@@ -262,14 +262,16 @@ export default function Home() {
 
               <aside class="sidebar sidebar-right" aria-label="Despre comunitate">
                 <div class="surface sidebar-card">
-                  <p class="sidebar-eyebrow">Media</p>
-                  <h2 class="sidebar-title">Un spațiu mai bun</h2>
-                  <p class="sidebar-copy">Publică responsabil, respectă comunitatea și păstrează conversațiile constructive.</p>
+                  <p class="sidebar-eyebrow">Pornește de la o idee</p>
+                  <h2 class="sidebar-title">Explorează subiecte</h2>
+                  <ul class="feed-topic-links">
+                    <For each={['#fotografie', '#tehnologie', '#cărți', '#natură']}>{(topic) => <li><A href={withQuery('/search', { q: topic, type: 'posts' })}>{topic}<span>Vezi conversațiile</span></A></li>}</For>
+                  </ul>
                 </div>
                 <div class="surface sidebar-card">
-                  <p class="sidebar-eyebrow">Sfat</p>
-                  <h2 class="sidebar-title">Fă-ți profilul memorabil</h2>
-                  <p class="sidebar-copy">Adaugă un avatar și o descriere scurtă ca oamenii să te recunoască ușor.</p>
+                  <p class="sidebar-eyebrow">Spațiul tău</p>
+                  <h2 class="sidebar-title">La îndemână</h2>
+                  <ul class="feed-quick-links"><li><A href="/salvate">Postări păstrate</A></li><li><A href="/cereri">Cereri de urmărire</A></li><li><A href="/siguranta">Siguranță și preferințe</A></li></ul>
                 </div>
               </aside>
             </div>
