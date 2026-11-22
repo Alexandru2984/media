@@ -5,6 +5,24 @@ finished only after its failure states, authorization boundaries, responsive
 layout, checks, release and rollback are verified. Commits use the repository
 owner's existing identity without generated-by or coauthor attribution.
 
+## Delivered and verified in this session
+
+- Direct media authorization, restricted upload namespaces and independent
+  application cache policy are live.
+- Seven vulnerable dependency reports are patched; one uncompiled SQLite
+  lockfile finding and the Chrono maintenance warning remain visible.
+- Credential changes revoke pending recovery/email-change links. Thirty-two
+  isolated HTTP checks pass, including concurrent resets and media audiences.
+- The editorial landing, four interactive conversation examples, hashtag links,
+  search filters/topics, stale-request protection, correct feed offsets, image
+  viewer and useful feed shortcuts are live.
+- Browser checks cover 320/390/768/1440 px, both themes for the landing and image
+  viewer, and real public Cloudflare rendering at 390/1440 px in both themes.
+- Frontend/backend deployers now reject overlapping activations before mutation.
+  SEO expansion and CI setup remain in the final planned phase.
+
+This is a verified release increment, not completion of every backlog item.
+
 ## Findings from the current re-audit
 
 | Priority | Finding | Evidence / action |
