@@ -36,10 +36,32 @@ backup_binary="/var/backups/media-binary-pre-backend-$release_id"
 live_next="$backend_root/social-media-backend.next-$release_id"
 live_rollback="$backend_root/social-media-backend.rollback-$release_id"
 database_name=${MEDIA_DATABASE_NAME:-social_media}
-canary_port=18084
+canary_port=${MEDIA_BACKEND_CANARY_PORT:-18085}
 canary_unit="media-backend-canary-$release_id.service"
 origin=https://media.micutu.com
 resolve_origin=media.micutu.com:443:127.0.0.1
+
+if [[ ! $canary_port =~ ^[1-9][0-9]{3,4}$ ]] \
+    || (( canary_port < 1024 || canary_port > 65535 || canary_port == 8083 )); then
+  echo "Invalid canary port; use an unprivileged TCP port other than the live API port" >&2
+  exit 64
+fi
+
+require_canary_port_free() {
+  local listeners
+  if ! command -v ss >/dev/null; then
+    echo "Required command is unavailable: ss" >&2
+    return 69
+  fi
+  if ! listeners=$(ss -ltnH "( sport = :$canary_port )"); then
+    echo "Could not inspect the canary port" >&2
+    return 69
+  fi
+  if [[ -n $listeners ]]; then
+    echo "Canary port is already in use: $canary_port" >&2
+    return 69
+  fi
+}
 
 if [[ ! $database_name =~ ^[A-Za-z0-9_]+$ ]]; then
   echo "Invalid database name" >&2
@@ -80,7 +102,9 @@ live_hash=$(sha256sum -- "$live_binary" | awk '{print $1}')
 latest_source_migration=${source_versions[${#source_versions[@]}-1]}
 
 if [[ $dry_run -eq 1 ]]; then
+  require_canary_port_free
   echo "dry_run=passed"
+  echo "canary_port=$canary_port"
   echo "source=$source_binary"
   echo "source_sha256=$source_hash"
   echo "live_sha256=$live_hash"
@@ -122,10 +146,7 @@ for service in social-media.service nginx.service cloudflared.service; do
     exit 69
   fi
 done
-if ss -ltnH "( sport = :$canary_port )" | grep -q .; then
-  echo "Canary port is already in use: $canary_port" >&2
-  exit 69
-fi
+require_canary_port_free
 
 failed_migrations=$(mariadb --batch --skip-column-names "$database_name" \
   -e 'SELECT COUNT(*) FROM _sqlx_migrations WHERE success <> 1')
@@ -281,4 +302,5 @@ echo "release_sha256=$source_hash"
 echo "rollback_binary=$backup_binary"
 echo "rollback_sha256=$live_hash"
 echo "latest_migration=$latest_source_migration"
+echo "canary_port=$canary_port"
 echo "rollback=not-needed"

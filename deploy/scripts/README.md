@@ -68,12 +68,23 @@ the separately reviewed migration workflow with a database dump.
 
 The script copies an immutable `root:www-data` mode-`0750` candidate under a
 non-public root-owned directory, launches it as `www-data` on loopback port
-`18084`, and disables only that process's background
+`18085` by default, and disables only that process's background
 upload-maintenance worker. Read-only health, feed, auth-boundary, pagination, and
 journal gates run before the live binary is touched. Promotion saves a root-only
 rollback binary, replaces the live binary atomically, restarts the API, and runs
 direct-origin plus Cloudflare Tunnel canaries. Any failure restores the exact
 prior hash and restarts it.
+
+`MEDIA_BACKEND_CANARY_PORT` can select another free loopback port between 1024
+and 65535, excluding the live API port 8083. Both dry-run and activation reject
+an occupied port; activation rechecks after taking the release lock. Existing
+listeners are never stopped or reconfigured. Port 18084 is already used by Nginx
+on this VPS, so it is no longer the canary default. For an explicit override:
+
+```bash
+sudo env MEDIA_BACKEND_CANARY_PORT=18085 bash deploy/scripts/deploy-backend.sh --dry-run "$release_id"
+sudo env MEDIA_BACKEND_CANARY_PORT=18085 bash deploy/scripts/deploy-backend.sh "$release_id"
+```
 
 Build and audit without root:
 
