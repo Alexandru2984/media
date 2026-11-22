@@ -3,7 +3,35 @@ use lettre::{
     message::header::ContentType, transport::smtp::authentication::Credentials, Address, Message,
     SmtpTransport, Transport,
 };
+use std::{
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
+use tokio::sync::Semaphore;
 use url::Url;
+
+const MAXIMUM_CONCURRENT_EMAIL_JOBS: usize = 2;
+const SMTP_IO_TIMEOUT: Duration = Duration::from_secs(10);
+static EMAIL_JOB_LIMIT: LazyLock<Arc<Semaphore>> =
+    LazyLock::new(|| Arc::new(Semaphore::new(MAXIMUM_CONCURRENT_EMAIL_JOBS)));
+
+async fn run_email_job<F>(limit: Arc<Semaphore>, work: F) -> Result<()>
+where
+    F: FnOnce() -> Result<()> + Send + 'static,
+{
+    // No unbounded queue of retained recipients, message bodies or credentials.
+    let permit = limit
+        .try_acquire_owned()
+        .context("email delivery capacity reached")?;
+    tokio::task::spawn_blocking(move || {
+        // A cancelled HTTP request must not release capacity while SMTP is
+        // still running in the blocking pool.
+        let _permit = permit;
+        work()
+    })
+    .await
+    .context("email delivery worker failed")?
+}
 
 pub struct EmailService {
     smtp_username: String,
@@ -218,23 +246,33 @@ impl EmailService {
             .header(ContentType::TEXT_HTML)
             .body(html_body.to_string())?;
 
-        let creds = Credentials::new(self.smtp_username.clone(), self.smtp_password.clone());
+        let credentials = Credentials::new(self.smtp_username.clone(), self.smtp_password.clone());
+        let server = self.smtp_server.clone();
+        let port = self.smtp_port;
 
-        let mailer = SmtpTransport::starttls_relay(&self.smtp_server)?
-            .credentials(creds)
-            .port(self.smtp_port)
-            .build();
-
-        match mailer.send(&email) {
-            Ok(_) => {
-                tracing::info!("email sent");
-                Ok(())
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "email delivery failed");
-                Err(e.into())
-            }
-        }
+        run_email_job(Arc::clone(&EMAIL_JOB_LIMIT), move || {
+            // Transport construction can resolve hosts or initialize TLS too;
+            // keep all synchronous provider work outside async runtime threads.
+            let mailer = SmtpTransport::starttls_relay(&server)
+                .context("failed to prepare email transport")?
+                .credentials(credentials)
+                .port(port)
+                .timeout(Some(SMTP_IO_TIMEOUT))
+                .build();
+            mailer.send(&email).map_err(|error| {
+                // Provider response text may contain a recipient or token.
+                // Record only a numeric status and a safe timeout indicator.
+                tracing::warn!(
+                    smtp_status = ?error.status(),
+                    timed_out = error.is_timeout(),
+                    "email delivery failed"
+                );
+                anyhow::anyhow!("email delivery failed")
+            })?;
+            tracing::info!("email sent");
+            Ok(())
+        })
+        .await
     }
 }
 
@@ -290,7 +328,65 @@ fn one_time_link(app_url: &str, route: &str, token: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{escape_html, one_time_link, validate_app_url};
+    use super::{escape_html, one_time_link, run_email_job, validate_app_url};
+    use std::{sync::Arc, time::Duration};
+    use tokio::sync::{oneshot, Semaphore};
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn stalled_delivery_does_not_block_runtime_or_escape_its_limit_on_cancellation() {
+        let limit = Arc::new(Semaphore::new(1));
+        let (started_tx, started_rx) = oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let task = tokio::spawn(run_email_job(Arc::clone(&limit), move || {
+            let _ = started_tx.send(());
+            let _ = release_rx.recv();
+            Ok(())
+        }));
+        tokio::time::timeout(Duration::from_secs(2), started_rx)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(limit.available_permits(), 0);
+        assert!(run_email_job(Arc::clone(&limit), || Ok(())).await.is_err());
+
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert_eq!(limit.available_permits(), 0);
+        assert!(run_email_job(Arc::clone(&limit), || Ok(())).await.is_err());
+        release_tx.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while limit.available_permits() == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(run_email_job(limit, || Ok(())).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn failed_delivery_releases_capacity() {
+        let limit = Arc::new(Semaphore::new(1));
+        assert!(
+            run_email_job(Arc::clone(&limit), || anyhow::bail!("fixture failure"))
+                .await
+                .is_err()
+        );
+        assert_eq!(limit.available_permits(), 1);
+        assert!(run_email_job(limit, || Ok(())).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn panicking_delivery_releases_capacity() {
+        let limit = Arc::new(Semaphore::new(1));
+        assert!(
+            run_email_job(Arc::clone(&limit), || panic!("fixture worker panic"))
+                .await
+                .is_err()
+        );
+        assert_eq!(limit.available_permits(), 1);
+        assert!(run_email_job(limit, || Ok(())).await.is_ok());
+    }
 
     #[test]
     fn escapes_user_content_for_html_email() {

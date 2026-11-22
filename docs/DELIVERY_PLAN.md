@@ -5,6 +5,11 @@ finished only after its failure states, authorization boundaries, responsive
 layout, checks, release and rollback are verified. Commits use the repository
 owner's existing identity without generated-by or coauthor attribution.
 
+**Architecture constraint:** Cloudflare edge and Cloudflare Tunnel are mandatory
+and retained by explicit operator instruction. CSP work must remain compatible
+with the deployed Cloudflare protections; replacing or bypassing Cloudflare is
+not a remediation option.
+
 ## Delivered and verified in this session
 
 - Direct media authorization, restricted upload namespaces and independent

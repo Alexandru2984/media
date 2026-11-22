@@ -92,6 +92,24 @@ it onto a bounded blocking worker or an async delivery queue in the next
 operations release. Account-aware abuse throttling and the previously recorded
 SMTP credential repair remain priorities.
 
+### SMTP runtime isolation follow-up, 2026-11-22
+
+Delivery transport initialization and synchronous SMTP now run in the blocking
+pool, behind a process-wide limit of two jobs. Saturation fails immediately
+instead of retaining an unbounded queue of recipients, messages and credentials.
+The permit remains inside the blocking job if its caller is cancelled. SMTP
+network operations have an explicit ten-second timeout; this is an I/O timeout,
+not a promise of a total DNS/TLS/delivery deadline. Provider error text is no
+longer logged or propagated: logs retain only status code and timeout flag, so a
+server reply cannot put a recipient or token into the journal.
+
+Three regression tests cover async-runtime responsiveness during a stalled
+job, capacity enforcement after cancellation, failure and panic recovery. The
+suite passes 68 application and five seed tests plus strict Clippy. The existing
+SMTP credential incident is still open; no real email was sent to test it.
+Cloudflare and Tunnel are explicitly retained by operator instruction; strict
+CSP must be implemented compatibly with that architecture.
+
 The review covered the deployed frontend bundle, the compiled Rust backend,
 public HTTP behavior, Nginx virtual-host configuration, the systemd service,
 filesystem permissions, TLS behavior, and recoverable Rust dependency metadata.
