@@ -11,6 +11,7 @@ owner's existing identity without generated-by or coauthor attribution.
 | --- | --- | --- |
 | P1, defense in depth | Axum directly serves the entire uploads directory without the audience checks used by Nginx | `main.rs` attaches an unrestricted `ServeDir`; protect both namespaces in the application and reject all other paths. No public bypass has been demonstrated: API listens on loopback. |
 | P2 | Successful direct API responses have no cache prohibition | Observed on loopback readiness; enforce private/no-store in application middleware, including success and failure. |
+| P1 | Outstanding credential links survive password/email changes | Revoke reset/email-change tokens transactionally on credential changes, serialize issuance and consumption with account locks, and check expiration at consumption. Add concurrent reset and old-session regressions. |
 | P1, previously reported | Verification and password recovery depend on an SMTP credential previously rejected by Brevo | Still unresolved in the repository. Needs operator credential rotation and an actual delivery test; do not call the historical failure a freshly reproduced incident. |
 | P2 | CSP permits inline scripts for Cloudflare challenges | Current public header confirmed. Coordinate an edge nonce/hash-compatible policy before tightening; do not silently break the challenge. |
 | P2 | Auth throttling depends heavily on shared infrastructure | Add durable account-aware budgets, passkeys/TOTP, breached-password checks and login alerts. |
@@ -41,7 +42,8 @@ owner's existing identity without generated-by or coauthor attribution.
    block/private-account enforcement into each feature.
 6. **Identity and operations.** Repair SMTP, add passkeys/MFA and recovery codes,
    account-aware rate limits, least-privilege migration jobs, metrics and alert
-   ownership. Verify backup restore and the outstanding exact-URL cache purge.
+   ownership. Isolate synchronous SMTP delivery from async runtime workers.
+   Verify backup restore and the outstanding exact-URL cache purge.
 7. **Product completion.** Accessible dialogs/toasts, real moderation notices
    and appeals, retention and export jobs, privacy contact/policy approval,
    installation flows and a safe offline shell.

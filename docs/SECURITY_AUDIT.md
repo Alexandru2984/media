@@ -62,6 +62,36 @@ namespaces, traversal and methods; public avatars; and cache/header policy.
 The temporary database, database identity, listener and uploads are removed.
 No production accounts, images or environment secrets are used.
 
+### Additional credential-link revocation finding, 2026-11-22
+
+Password reset consumed only its presented token, leaving other already-issued
+reset tokens usable. Password changes did not cancel pending reset/email-change
+links, and a verified email change left password-reset links sent to the old
+address valid. Possession of one of those outstanding links could reverse an
+account owner's credential recovery; no exploitation was observed.
+
+Password change, reset and verified email change now transactionally revoke all
+pending password-reset and email-change tokens. Reset and email-change flows
+lock the user row before token consumption, matching password-change lock order;
+distinct concurrent reset links cannot both succeed. Reset expiry is rechecked
+when consuming the token. Recovery issuance selects the email and persists its
+token under the same account lock, preventing an email change from slipping
+between those operations and issuing a valid token to the previous address.
+Existing session revocation and the authenticated password-change replacement
+session remain in place. The disposable integration suite covers these flows,
+old-cookie rejection, expired links and concurrent resets; no SMTP is sent.
+The rebuilt binary passes all 19 media and 13 identity HTTP checks, 65 application
+and five seed unit tests, strict Clippy and the optimized build.
+
+Operational review confirmed the installed Nginx vhost/snippets/rate budgets and
+systemd unit match their tracked copies. The API remains loopback-only, its
+secret environment is root:root 0600, uploads are www-data:www-data 0750, and
+systemd-analyze reports 1.5 exposure (a hardening heuristic, not a vulnerability
+assessment). SMTP still uses a synchronous transport inside async tasks; move
+it onto a bounded blocking worker or an async delivery queue in the next
+operations release. Account-aware abuse throttling and the previously recorded
+SMTP credential repair remain priorities.
+
 The review covered the deployed frontend bundle, the compiled Rust backend,
 public HTTP behavior, Nginx virtual-host configuration, the systemd service,
 filesystem permissions, TLS behavior, and recoverable Rust dependency metadata.

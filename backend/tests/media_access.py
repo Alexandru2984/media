@@ -6,6 +6,8 @@ Only randomly named test databases/users and a temporary upload tree are touched
 No production environment file, credentials, accounts or upload paths are used.
 """
 import hashlib
+import json
+from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
 import secrets
@@ -137,6 +139,72 @@ def main():
                 sql(f"UPDATE users SET is_private=1 WHERE id='{ids['private']}'", database)
                 require("made private again", private_path, 403)
                 print(f"media_access_checks={checks}; passed; isolated database and uploads")
+
+                identity_checks = 0
+
+                def identity_request(path, payload=None, cookie=None, expected=200):
+                    nonlocal identity_checks
+                    headers = {"Origin": "http://127.0.0.1:3005"}
+                    if cookie:
+                        headers["Cookie"] = cookie
+                    data = None
+                    if payload is not None:
+                        headers["Content-Type"] = "application/json"
+                        data = json.dumps(payload).encode()
+                    request = urllib.request.Request(base + path, data=data, headers=headers)
+                    try:
+                        response = urllib.request.urlopen(request, timeout=10)
+                    except urllib.error.HTTPError as error:
+                        response = error
+                    with response:
+                        response.read()
+                        if expected is not None:
+                            assert response.status == expected, f"{path}: {response.status} != {expected}"
+                        cookie_value = response.headers.get("Set-Cookie", "").split(";")[0]
+                        status = response.status
+                    identity_checks += 1
+                    return status, cookie_value
+
+                def account_token(kind, expired=False):
+                    raw = secrets.token_hex(24)
+                    stored = hashlib.sha256(raw.encode()).hexdigest()
+                    if kind == "email_change":
+                        stored += ":updated@example.invalid"
+                    expiry = "DATE_SUB(NOW(),INTERVAL 1 HOUR)" if expired else "DATE_ADD(NOW(),INTERVAL 1 HOUR)"
+                    sql(f"INSERT INTO email_tokens (id,user_id,token,token_type,expires_at) VALUES ('{uuid.uuid4()}','{ids['private']}','{stored}','{kind}',{expiry})", database)
+                    return raw
+
+                def assert_no_credential_tokens():
+                    assert sql(f"SELECT COUNT(*) FROM email_tokens WHERE user_id='{ids['private']}' AND token_type IN ('password_reset','email_change')", database) == "0"
+
+                expired = account_token("password_reset", expired=True)
+                identity_request("/api/auth/reset-password", {"token": expired, "password": "A fresh account password 2026!"}, expected=410)
+                first, second = account_token("password_reset"), account_token("password_reset")
+                account_token("email_change")
+                identity_request("/api/auth/reset-password", {"token": first, "password": "A fresh account password 2026!"})
+                assert_no_credential_tokens()
+                identity_request("/api/auth/reset-password", {"token": second, "password": "Another fresh password 2026!"}, expected=404)
+                identity_request("/api/auth/me", cookie=f"media_session={tokens['private']}", expected=401)
+                _, login_cookie = identity_request("/api/auth/login", {"email": "private@example.invalid", "password": "A fresh account password 2026!"})
+                account_token("password_reset")
+                account_token("email_change")
+                _, changed_cookie = identity_request("/api/users/me/change-password", {"old_password": "A fresh account password 2026!", "new_password": "A changed account password 2026!"}, login_cookie)
+                assert_no_credential_tokens()
+                identity_request("/api/auth/me", cookie=login_cookie, expected=401)
+                identity_request("/api/auth/me", cookie=changed_cookie)
+                old_address_reset = account_token("password_reset")
+                change = account_token("email_change")
+                identity_request("/api/users/verify-email-change", {"token": change})
+                assert_no_credential_tokens()
+                identity_request("/api/auth/reset-password", {"token": old_address_reset, "password": "Old address attack password 2026!"}, expected=404)
+                identity_request("/api/auth/me", cookie=changed_cookie, expected=401)
+                assert sql(f"SELECT email FROM users WHERE id='{ids['private']}'", database) == "updated@example.invalid"
+                race_tokens = [account_token("password_reset"), account_token("password_reset")]
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    attempts = list(executor.map(lambda token: identity_request("/api/auth/reset-password", {"token": token, "password": "Concurrent reset password 2026!"}, expected=None)[0], race_tokens))
+                assert sorted(attempts) == [200, 404], f"Concurrent reset statuses: {attempts}"
+                assert_no_credential_tokens()
+                print(f"identity_checks={identity_checks}; passed; credential links revoked, sessions rotated, concurrent reset single winner")
                 process.terminate()
                 process.wait(timeout=15)
                 process = None

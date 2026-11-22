@@ -3109,6 +3109,13 @@ pub async fn change_password(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
+    // A password change must also revoke links issued before this change.
+    query("DELETE FROM email_tokens WHERE user_id = ? AND token_type IN ('password_reset', 'email_change')")
+        .bind(&user_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     query("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
         .bind(Utc::now())
         .bind(&user_id)
@@ -3249,6 +3256,14 @@ pub async fn verify_email_change(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    // Serialize credential changes before consuming tokens. All credential
+    // flows use the same user-row-first lock order.
+    query_scalar::<_, String>("SELECT id FROM users WHERE id = ? FOR UPDATE")
+        .bind(&user_id)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+
     let consumed = query("DELETE FROM email_tokens WHERE id = ?")
         .bind(&token_id)
         .execute(&mut *transaction)
@@ -3276,8 +3291,8 @@ pub async fn verify_email_change(
             }
         })?;
 
-    // Consume every outstanding email-change token for this account atomically.
-    query("DELETE FROM email_tokens WHERE user_id = ? AND token_type = 'email_change'")
+    // Revoke pending credential links, including resets sent to the old email.
+    query("DELETE FROM email_tokens WHERE user_id = ? AND token_type IN ('password_reset', 'email_change')")
         .bind(&user_id)
         .execute(&mut *transaction)
         .await
@@ -4202,12 +4217,17 @@ pub async fn forgot_password(
     }
     let email_service = EmailService::new().map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     // A missing account is intentionally indistinguishable from an existing one.
     let user = query_as::<_, (String, String, String)>(
-        "SELECT id, email, username FROM users WHERE email = ?",
+        "SELECT id, email, username FROM users WHERE email = ? FOR UPDATE",
     )
     .bind(email)
-    .fetch_optional(&pool)
+    .fetch_optional(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -4225,9 +4245,14 @@ pub async fn forgot_password(
         .bind(&user_id)
         .bind(&stored_token)
         .bind(expires_at)
-        .execute(&pool)
+        .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        transaction
+            .commit()
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         tokio::spawn(async move {
             if let Err(error) = email_service
@@ -4237,6 +4262,11 @@ pub async fn forgot_password(
                 tracing::error!(error = %error, "password reset email delivery failed");
             }
         });
+    } else {
+        transaction
+            .commit()
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
 
     Ok(Json(json!({
@@ -4282,8 +4312,17 @@ pub async fn reset_password(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let consumed = query("DELETE FROM email_tokens WHERE id = ?")
+    // Serialize credential changes before consuming tokens. All credential
+    // flows use the same user-row-first lock order.
+    query_scalar::<_, String>("SELECT id FROM users WHERE id = ? FOR UPDATE")
+        .bind(&token_record.1)
+        .fetch_one(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+
+    let consumed = query("DELETE FROM email_tokens WHERE id = ? AND expires_at > ?")
         .bind(&token_record.0)
+        .bind(Utc::now())
         .execute(&mut *transaction)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -4294,6 +4333,13 @@ pub async fn reset_password(
     query("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
         .bind(&password_hash)
         .bind(Utc::now())
+        .bind(&token_record.1)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // A password change must also revoke links issued before this change.
+    query("DELETE FROM email_tokens WHERE user_id = ? AND token_type IN ('password_reset', 'email_change')")
         .bind(&token_record.1)
         .execute(&mut *transaction)
         .await

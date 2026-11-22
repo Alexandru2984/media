@@ -187,6 +187,9 @@ sudo python3 backend/tests/media_access.py
 Its 19 checks cover owner/follower/anonymous/outsider access, immediate follow
 and privacy revocation, blocks in both directions, forged headers, conditional
 and range requests, unsupported paths/methods, avatars and cache policy.
+Another 13 HTTP checks verify credential-link revocation, password/email
+changes, session rotation, expired links and a single winner for concurrent
+resets using different links. No SMTP is sent by these fixtures.
 
 The complete local environment, frontend release flow, migrations, health
 checks, and incident-response procedures still need consolidation. Production

@@ -41,6 +41,7 @@ out/
 coverage/
 .nyc_output/
 *.tsbuildinfo
+__pycache__/
 
 # Package-manager and tool logs
 *.log
