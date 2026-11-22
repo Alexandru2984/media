@@ -166,6 +166,12 @@ health canaries cannot process production cleanup queues or files.
 
 ## Development and deployment
 
+API startup validates migration history and checksums without applying schema
+changes. Initialize a development database explicitly with the `migrate` binary
+(`cargo run --locked --manifest-path backend/Cargo.toml --bin migrate -- apply
+EXPECTED_DATABASE`) and its development `DATABASE_URL`. Production uses the
+[backup-verified migration workflow](deploy/scripts/README.md#backend).
+
 Backend checks and a release build can now be reproduced with Cargo:
 
 ```bash

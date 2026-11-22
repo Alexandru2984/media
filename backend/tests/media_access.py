@@ -65,6 +65,34 @@ def main():
                 "SMTP_SERVER": "smtp.example.invalid", "SMTP_USERNAME": "fixture", "SMTP_PASSWORD": "fixture",
                 "FROM_EMAIL": "fixture@example.invalid", "UPLOAD_MAINTENANCE_ENABLED": "false",
             }
+            migration_binary = binary.with_name("migrate")
+            manifest = subprocess.run([str(migration_binary), "manifest"], capture_output=True, text=True, check=True)
+            assert json.loads(manifest.stdout), "empty migration manifest"
+            for expected_database in [database, database]:
+                result = subprocess.run([str(migration_binary), "apply", expected_database], cwd=root, env=environment, capture_output=True, text=True)
+                assert result.returncode == 0, "isolated migration application failed"
+            mismatch = subprocess.run([str(migration_binary), "apply", "different_expected_database"], cwd=root, env=environment, capture_output=True, text=True)
+            assert mismatch.returncode != 0, "migration target mismatch accepted"
+            print("offline_migration_checks=passed; manifest, application, idempotence, target mismatch")
+            if os.environ.get("MEDIA_TEST_MIGRATION_RUNNER") == "true":
+                # This is a disposable database only. Simulate one pending
+                # migration so the complete production runner can be exercised.
+                entries = json.loads(manifest.stdout)
+                latest = entries[-1]["version"]
+                assert latest == 20261030000000, "update runner fixture for the current last migration"
+                sql(f"DROP TABLE notification_preferences; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
+                fixture_environment = root / "migration.env"
+                fixture_environment.write_text("DATABASE_URL=" + environment["DATABASE_URL"] + "\n")
+                fixture_environment.chmod(0o600)
+                import datetime
+                stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                release = stamp + "-" + secrets.token_hex(4)
+                runner = Path(__file__).resolve().parents[2] / "deploy/scripts/apply-migrations.py"
+                runner_environment = {**os.environ, "MEDIA_DATABASE_NAME": database, "MEDIA_MIGRATION_ENV_FILE": str(fixture_environment)}
+                for flags in [["--dry-run"], []]:
+                    result = subprocess.run([str(runner), *flags, release], env=runner_environment, capture_output=True, text=True)
+                    assert result.returncode == 0, "backup-verified migration runner failed: " + result.stderr
+                print("migration_runner_checks=passed; backup, isolated restore, sandboxed application, manifest parity")
             with tempfile.TemporaryFile() as log:
                 process = subprocess.Popen([str(binary)], cwd=root, env=environment, stdout=log, stderr=log)
                 base = f"http://127.0.0.1:{port}"

@@ -35,6 +35,32 @@ after their rollback value has expired.
 
 ## Backend
 
+API startup validates installed migration checksums without running DDL. Apply
+reviewed migrations with the separate `migrate` binary before starting a clean
+development database. `migrate manifest` requires no credentials; `migrate apply
+EXPECTED_DATABASE` verifies its connected database before touching the schema.
+
+For production, `apply-migrations.py` requires root, shares the deploy lock,
+matches the compiled manifest to source and installed history, and permits at
+most one pending migration. It retains a root-only compressed database backup
+only after restoring it into an isolated database and verifying table counts,
+migration history and `mariadb-check`. An immutable sandboxed migration job then
+applies the change without starting HTTP, email or maintenance workers:
+
+```bash
+cargo build --release --locked --manifest-path backend/Cargo.toml
+sudo deploy/scripts/apply-migrations.py --dry-run YYYYMMDDTHHMMSSZ-GIT_SHA
+sudo deploy/scripts/apply-migrations.py YYYYMMDDTHHMMSSZ-GIT_SHA
+```
+
+Only additive changes compatible with the preceding API binary are eligible.
+The API permits later successful migrations so that the preceding compatible
+binary can still restart after a rollback. Missing compiled migrations, changed
+checksums, failed rows or unexpected older versions prevent startup. No automatic
+schema down-migration or production database restore is performed on failure.
+The existing application DB identity still has legacy DDL privileges; a separate
+least-privilege migration identity remains future work.
+
 `deploy-backend.sh` consumes the already validated Cargo release binary. It
 requires exact parity between every embedded migration and the live SQLx history;
 pending, failed, extra, or reordered migrations stop the deployment and must use
