@@ -161,8 +161,8 @@ class ApiService {
     });
   }
 
-  async getSavedPosts(limit = 10, offset = 0) {
-    return this.request(withQuery('/saved-posts', { limit, offset }));
+  async getSavedPosts(limit = 10, offset = 0, collectionId) {
+    return this.request(withQuery('/saved-posts', { limit, offset, collection_id: collectionId || undefined }));
   }
 
   async hidePost(postId) {

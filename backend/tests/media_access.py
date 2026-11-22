@@ -89,6 +89,8 @@ def main():
                     sql(f"DROP TRIGGER posts_image_alt_cleanup; ALTER TABLE posts DROP CONSTRAINT chk_posts_image_alt, DROP COLUMN image_alt; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
                 elif latest == 20261122001000:
                     sql(f"DROP TABLE profile_pins; ALTER TABLE posts DROP INDEX uq_posts_id_owner; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
+                elif latest == 20261122002000:
+                    sql(f"DROP TABLE saved_collection_posts; DROP TABLE saved_collections; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
                 else:
                     raise AssertionError("Update runner fixture for the current last migration")
                 fixture_environment = root / "migration.env"
@@ -351,7 +353,7 @@ def main():
                         else:
                             raise AssertionError("Prior API did not start against the new schema")
                         old_post = alt_request("GET", post_path, target_base=compatibility_base)
-                        assert "is_pinned" not in old_post
+                        assert old_post["id"] == created["id"]
                         alt_request("PUT", post_path, {"content": "Imagine eliminată de versiunea veche", "image_url": None}, target_base=compatibility_base)
                         assert alt_request("GET", post_path)["image_alt"] is None
                         third_image = upload_image()
@@ -373,11 +375,15 @@ def main():
                 _, public_cookie = identity_request("/api/auth/login", {"email": "public@example.invalid", "password": "Export fixture password 2026!"})
                 tokens["public"] = public_cookie.split("=", 1)[1]
                 exported = alt_request("POST", "/api/users/me/export", {"password": "Export fixture password 2026!"})
-                assert exported["format_version"] == 9
+                assert exported["format_version"] == 10
                 assert any(item["id"] == created["id"] and item["image_alt"] == description for item in exported["posts"])
-                print(f"image_alt_checks={alt_checks}; passed; validation, upload, feeds, search, saved, privacy, escaping, replacement and export v9")
+                print(f"image_alt_checks={alt_checks}; passed; validation, upload, feeds, search, saved, privacy, escaping, replacement and export v10")
+                from saved_collections import check_saved_collections
+                check_saved_collections(base, ids, tokens, sql, database, environment, root, log)
                 from profile_pins import check_profile_pins
                 check_profile_pins(base, ids, tokens, sql, database, environment, root, log)
+                for table in ["saved_collections", "saved_collection_posts"]:
+                    assert sql(f"SELECT COUNT(*) FROM {table} WHERE user_id='{ids['public']}'", database) == "0", "account deletion left collection data"
                 process.terminate()
                 process.wait(timeout=15)
                 process = None

@@ -20,6 +20,7 @@ use crate::{
     notifications::{delete_notification_event, upsert_notification, NotificationKind},
     pagination::{bounded_pagination, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET},
     passwords::{hash_password, spend_password_work, verify_password},
+    saved_collections::SavedCollection,
     security_events::{
         recent_security_events, record_security_event, SecurityEventKind,
         SECURITY_EVENT_RETENTION_DAYS,
@@ -143,6 +144,8 @@ struct ExportCounts {
     comments: i64,
     likes: i64,
     saved_posts: i64,
+    saved_collections: i64,
+    saved_collection_posts: i64,
     messages: i64,
     sessions: i64,
     security_events: i64,
@@ -170,6 +173,8 @@ impl ExportCounts {
             self.comments,
             self.likes,
             self.saved_posts,
+            self.saved_collections,
+            self.saved_collection_posts,
             self.messages,
             self.sessions,
             self.security_events,
@@ -220,6 +225,13 @@ struct ExportLike {
 struct ExportSavedPost {
     post_id: String,
     created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct ExportCollectionPost {
+    post_id: String,
+    collection_id: String,
+    assigned_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -336,6 +348,8 @@ pub(crate) struct AccountDataExport {
     comments: Vec<Comment>,
     likes: Vec<ExportLike>,
     saved_posts: Vec<ExportSavedPost>,
+    saved_collections: Vec<SavedCollection>,
+    saved_collection_posts: Vec<ExportCollectionPost>,
     messages: Vec<Message>,
     sessions: Vec<ExportSession>,
     security_events: Vec<ExportSecurityEvent>,
@@ -1870,6 +1884,8 @@ pub async fn export_account_data(
             (SELECT COUNT(*) FROM comments WHERE user_id = ?) AS comments,
             (SELECT COUNT(*) FROM likes WHERE user_id = ?) AS likes,
             (SELECT COUNT(*) FROM saved_posts WHERE user_id = ?) AS saved_posts,
+            (SELECT COUNT(*) FROM saved_collections WHERE user_id = ?) AS saved_collections,
+            (SELECT COUNT(*) FROM saved_collection_posts WHERE user_id = ?) AS saved_collection_posts,
             (SELECT COUNT(*) FROM messages WHERE sender_id = ? OR receiver_id = ?) AS messages,
             (SELECT COUNT(*) FROM sessions WHERE user_id = ?) AS sessions,
             (SELECT COUNT(*) FROM security_events WHERE user_id = ?) AS security_events,
@@ -1889,6 +1905,8 @@ pub async fn export_account_data(
             (SELECT COUNT(*) FROM notifications WHERE recipient_id = ?) AS notifications,
             (SELECT COUNT(*) FROM notification_preferences WHERE user_id = ?) AS notification_preferences",
     )
+    .bind(&authenticated_session.user_id)
+    .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
     .bind(&authenticated_session.user_id)
@@ -1973,6 +1991,11 @@ pub async fn export_account_data(
     .fetch_all(&mut *transaction)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let saved_collections = query_as::<_, SavedCollection>("SELECT id, name, created_at, updated_at FROM saved_collections WHERE user_id = ? ORDER BY created_at ASC, id ASC")
+        .bind(&authenticated_session.user_id).fetch_all(&mut *transaction).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let saved_collection_posts = query_as::<_, ExportCollectionPost>("SELECT post_id, collection_id, assigned_at FROM saved_collection_posts WHERE user_id = ? ORDER BY assigned_at ASC, post_id ASC")
+        .bind(&authenticated_session.user_id).fetch_all(&mut *transaction).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let messages = query_as::<_, Message>(
         "SELECT id, sender_id, receiver_id, content, `read`, created_at
@@ -2180,7 +2203,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 9,
+            format_version: 10,
             exported_at,
             profile,
             counts,
@@ -2188,6 +2211,8 @@ pub async fn export_account_data(
             comments,
             likes,
             saved_posts,
+            saved_collections,
+            saved_collection_posts,
             messages,
             sessions,
             security_events,
@@ -2818,24 +2843,61 @@ pub async fn save_post(
     Ok(Json(json!({ "saved": saved })))
 }
 
+#[derive(sqlx::FromRow)]
+struct SavedPostCollectionRow {
+    #[sqlx(flatten)]
+    post: PostFeedRow,
+    collection_id: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct SavedPostWithCollection {
+    #[serde(flatten)]
+    post: PostWithUser,
+    collection_id: Option<String>,
+}
+
 pub async fn get_saved_posts(
     State(pool): State<MySqlPool>,
     Query(params): Query<HashMap<String, String>>,
     headers: HeaderMap,
-) -> Result<Json<Vec<PostWithUser>>, StatusCode> {
+) -> Result<Json<Vec<SavedPostWithCollection>>, StatusCode> {
     let user_id = get_current_user(&pool, &headers).await?;
     let (limit, offset) =
         bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
-    let rows = query_as::<_, PostFeedRow>(
+    let collection_filter = match params.get("collection_id").map(String::as_str) {
+        None => None,
+        Some("unfiled") => Some("unfiled".to_owned()),
+        Some(value) => {
+            let id = Uuid::parse_str(value)
+                .map_err(|_| StatusCode::BAD_REQUEST)?
+                .to_string();
+            let owned = query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM saved_collections WHERE id = ? AND user_id = ?",
+            )
+            .bind(&id)
+            .bind(&user_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            if owned == 0 {
+                return Err(StatusCode::NOT_FOUND);
+            }
+            Some(id)
+        }
+    };
+    let rows = query_as::<_, SavedPostCollectionRow>(
         "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
                 (current_like.id IS NOT NULL) AS is_liked,
                 TRUE AS is_saved,
-                EXISTS(SELECT 1 FROM profile_pins pin WHERE pin.user_id = p.user_id AND pin.post_id = p.id) AS is_pinned
+                EXISTS(SELECT 1 FROM profile_pins pin WHERE pin.user_id = p.user_id AND pin.post_id = p.id) AS is_pinned,
+                assignment.collection_id
          FROM saved_posts saved
+         LEFT JOIN saved_collection_posts assignment ON assignment.user_id = saved.user_id AND assignment.post_id = saved.post_id
          INNER JOIN posts p ON p.id = saved.post_id
          INNER JOIN users u ON u.id = p.user_id
          INNER JOIN (
@@ -2868,7 +2930,8 @@ pub async fn get_saved_posts(
                      AND private_follow.followed_id = p.user_id
                )
            )
-         ORDER BY saved.created_at DESC
+           AND (? IS NULL OR (? = 'unfiled' AND assignment.collection_id IS NULL) OR assignment.collection_id = ?)
+         ORDER BY saved.created_at DESC, saved.post_id DESC
          LIMIT ? OFFSET ?",
     )
     .bind(&user_id)
@@ -2879,6 +2942,9 @@ pub async fn get_saved_posts(
     .bind(&user_id)
     .bind(&user_id)
     .bind(&user_id)
+    .bind(&collection_filter)
+    .bind(&collection_filter)
+    .bind(&collection_filter)
     .bind(limit)
     .bind(offset)
     .fetch_all(&pool)
@@ -2889,7 +2955,12 @@ pub async fn get_saved_posts(
     })?;
 
     Ok(Json(
-        rows.into_iter().map(post_feed_row_to_response).collect(),
+        rows.into_iter()
+            .map(|row| SavedPostWithCollection {
+                post: post_feed_row_to_response(row.post),
+                collection_id: row.collection_id,
+            })
+            .collect(),
     ))
 }
 
@@ -4463,7 +4534,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 9,
+            format_version: 10,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),
@@ -4484,6 +4555,8 @@ mod tests {
                 comments: 0,
                 likes: 0,
                 saved_posts: 0,
+                saved_collections: 0,
+                saved_collection_posts: 0,
                 messages: 0,
                 sessions: 0,
                 security_events: 0,
@@ -4507,6 +4580,8 @@ mod tests {
             comments: vec![],
             likes: vec![],
             saved_posts: vec![],
+            saved_collections: vec![],
+            saved_collection_posts: vec![],
             messages: vec![],
             sessions: vec![],
             security_events: vec![],

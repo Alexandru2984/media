@@ -9,7 +9,7 @@ use sqlx::MySqlPool;
 
 use crate::{
     handlers, health, media, moderation, notifications, profile_pins, public_pages, safety,
-    security,
+    saved_collections, security,
 };
 
 pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
@@ -87,6 +87,18 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .route("/posts", post(handlers::create_post))
         .route("/feed/following", get(handlers::get_following_feed))
         .route("/saved-posts", get(handlers::get_saved_posts))
+        .route(
+            "/saved-collections",
+            get(saved_collections::list).post(saved_collections::create),
+        )
+        .route(
+            "/saved-collections/:id",
+            put(saved_collections::rename).delete(saved_collections::delete),
+        )
+        .route(
+            "/saved-posts/:id/collection",
+            put(saved_collections::assign),
+        )
         .route("/hidden-posts", get(safety::list_hidden_posts))
         .route(
             "/posts/upload-image",

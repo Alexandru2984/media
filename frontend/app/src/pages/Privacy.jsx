@@ -8,6 +8,7 @@ const sections = [
     items: [
       'Date de cont și profil: adresă de email, nume de utilizator, biografie, avatar și preferințe.',
       'Conținut și relații: postări, imagini și descrierile lor, comentarii, aprecieri, urmăritori, mesaje și elemente salvate.',
+      'Colecții private: numele colecțiilor și încadrarea postărilor salvate sunt vizibile doar proprietarului, sunt incluse în export și se șterg odată cu contul.',
       'Siguranță: sesiuni, evenimente de securitate, blocări, silențieri, raportări și audit de moderare.',
       'Date tehnice limitate: identificator de cerere, metodă, cale, stare și durată; corpurile, parolele și query string-urile nu intră în jurnalul aplicației.',
     ],
@@ -69,7 +70,7 @@ export default function Privacy() {
       eyebrow="Confidențialitate"
       title="Datele tale trebuie să rămână explicabile și controlabile."
       introduction="Această pagină descrie practicile tehnice observabile ale platformei și limitele care mai trebuie formalizate. Preferăm precizia în locul promisiunilor vagi."
-      updatedAt="22 noiembrie 2026"
+      updatedAt="23 noiembrie 2026"
       sections={sections}
       notice={{ title: 'Controlul contului', copy: 'Revizuiește vizibilitatea profilului, sesiunile active și datele de contact din setări. Păstrează accesul la adresa de email asociată contului.' }}
       callout={{

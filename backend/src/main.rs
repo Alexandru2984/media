@@ -13,6 +13,7 @@ mod profile_pins;
 mod public_pages;
 mod routes;
 mod safety;
+mod saved_collections;
 mod security;
 mod security_events;
 mod tokens;

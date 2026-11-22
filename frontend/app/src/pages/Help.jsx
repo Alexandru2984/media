@@ -18,6 +18,11 @@ const sections = [
     paragraphs: ['Apasă pictograma de fixare din acțiunile unei postări proprii pentru a o afișa prima pe profil. Poți fixa o singură postare; o alegere nouă o înlocuiește pe cea anterioară. Apasă din nou pentru a anula fixarea. Vizibilitatea rămâne cea a contului, iar feedul păstrează ordinea cronologică.'],
   },
   {
+    id: 'colectii-private',
+    title: 'Colecții private de postări salvate',
+    paragraphs: ['În Salvate poți crea până la 30 de colecții, cu nume de 1–60 de caractere. Alege colecția sub fiecare postare salvată; o postare poate aparține unei singure colecții. Filtrul Fără colecție arată salvările neorganizate. Ștergerea unei colecții păstrează postările salvate. Numele și încadrările sunt private și apar în exportul contului.'],
+  },
+  {
     id: 'notificari',
     title: 'Notificări',
     paragraphs: ['Inboxul din aplicație funcționează independent de email. Din Setări → Notificări poți opri separat cererile de urmărire, acceptările, urmăritorii noi, aprecierile și comentariile. Preferința se aplică evenimentelor viitoare și nu rescrie istoricul existent.'],
@@ -48,7 +53,7 @@ export default function Help() {
       eyebrow="Centru de ajutor"
       title="Răspunsuri directe pentru contul și siguranța ta."
       introduction="Începe cu pașii de mai jos. Ei descriu comportamentul actual al produsului, inclusiv limitările cunoscute, fără să presupună că emailul funcționează."
-      updatedAt="22 noiembrie 2026"
+      updatedAt="23 noiembrie 2026"
       sections={sections}
       notice={{ title: 'Protejează accesul la cont', copy: 'Păstrează accesul la adresa de email asociată contului. Dintr-o sesiune activă poți schimba parola și revoca dispozitivele pe care nu le recunoști.' }}
       callout={{

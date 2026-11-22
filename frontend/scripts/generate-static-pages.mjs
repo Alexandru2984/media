@@ -57,7 +57,7 @@ const routes = [
   },
   {
     path: '/confidentialitate',
-    lastModified: '2026-11-22',
+    lastModified: '2026-11-23',
     changeFrequency: 'monthly',
     title: 'Confidențialitate și date personale — Media',
     description: 'Află ce date prelucrează Media, cum sunt protejate și ce controale ai pentru vizibilitate, export și ștergere.',
@@ -71,6 +71,7 @@ const routes = [
       ['Linkuri de postare', 'Postările au linkuri directe fără cache și fără indexare în motoare de căutare; serviciile externe pot păstra propriul preview după distribuire.'],
       ['Stocare temporară în browser', 'Schițele păstrează numai textul în sessionStorage, separat per cont și filă, pentru maximum 24 de ore; imaginile și descrierile lor nu sunt incluse.'],
       ['Control și ștergere', 'Poți administra sesiunile și preferințele, descărca un export JSON și șterge permanent contul.'],
+      ['Colecții private', 'Numele colecțiilor și încadrarea postărilor salvate sunt vizibile doar proprietarului, sunt incluse în export și se șterg odată cu contul.'],
     ],
   },
   {
@@ -90,7 +91,7 @@ const routes = [
   },
   {
     path: '/ajutor',
-    lastModified: '2026-11-22',
+    lastModified: '2026-11-23',
     changeFrequency: 'monthly',
     title: 'Ajutor și siguranța contului — Media',
     description: 'Ghid pentru conectare, profil privat, notificări, raportare, exportul datelor și ștergerea contului Media.',
@@ -101,6 +102,7 @@ const routes = [
       ['Acces la cont', 'Sesiunile folosesc cookie-uri HttpOnly. Dintr-o sesiune activă poți schimba parola și revoca dispozitivele necunoscute. Recuperarea necesită acces la adresa de email a contului.'],
       ['Notificări și vizibilitate', 'Poți controla separat notificările viitoare și poți limita conținutul prin profilul privat.'],
       ['O postare în prim-plan', 'Poți fixa o singură postare proprie la începutul profilului. O alegere nouă o înlocuiește pe cea anterioară; vizibilitatea contului și ordinea cronologică a feedului rămân aceleași.'],
+      ['Colecții private de postări salvate', 'Poți crea până la 30 de colecții cu nume de 1–60 de caractere. Fiecare salvare are o singură colecție opțională. Ștergerea colecției păstrează postările salvate, iar exportul include numele și încadrările private.'],
       ['Siguranță și date', 'Blocarea, silențierea, raportarea, exportul și ștergerea sunt disponibile din interfața contului.'],
     ],
   },
