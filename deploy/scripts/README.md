@@ -197,3 +197,11 @@ permission for the one production zone. Never pass it as an argument, environmen
 variable, repository file, or journal field. A successful API response is not
 enough: the script polls the public URL and fails unless edge verification also
 passes.
+# Coordinating application releases
+
+Frontend and backend production deployers share the root-owned
+`/var/lib/media/.release.lock`. A simultaneous activation exits with status 75
+before staging, promotion or canaries. Wait for the active release to finish and
+retry with a fresh release ID. This avoids interpreting the API's intentional
+restart as a frontend release failure. Dry runs remain read-only and do not
+take the production lock.

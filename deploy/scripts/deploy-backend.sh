@@ -95,7 +95,14 @@ if [[ $EUID -ne 0 ]]; then
   echo "Production activation requires root; rerun with sudo" >&2
   exit 77
 fi
-for command in curl file find grep install journalctl mariadb sha256sum ss systemctl systemd-run; do
+# Both deployers share this root-owned lock. A frontend canary must not run
+# while the API is deliberately restarting during a backend promotion.
+exec 9>>/var/lib/media/.release.lock
+if ! flock --nonblock 9; then
+  echo "Another Media deployment is active; retry after it completes" >&2
+  exit 75
+fi
+for command in curl file find flock grep install journalctl mariadb sha256sum ss systemctl systemd-run; do
   if ! command -v "$command" >/dev/null; then
     echo "Required command is unavailable: $command" >&2
     exit 69

@@ -90,6 +90,13 @@ if [[ $EUID -ne 0 ]]; then
   exit 77
 fi
 
+# Serialize frontend/backend promotion and their availability canaries.
+exec 9>>/var/lib/media/.release.lock
+if ! flock --nonblock 9; then
+  echo "Another Media deployment is active; retry after it completes" >&2
+  exit 75
+fi
+
 staging_dir=$(mktemp -d -- "$releases_root/.staging-$release_id.XXXXXX")
 next_link="$current_link.next-$release_id"
 rollback_link="$current_link.rollback-$release_id"
