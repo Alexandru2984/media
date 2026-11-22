@@ -109,7 +109,7 @@ def check_saved_collections(base, ids, tokens, sql, database, environment, root,
         results = list(executor.map(lambda folder: assign(a, folder), [first, second]))
     assert all(result["collection_id"] in [first, second] for result in results)
     assert sql(f"SELECT COUNT(*) FROM saved_collection_posts WHERE user_id='{ids['public']}' AND post_id='{a}'", database) == "1"
-    for _ in range(4):
+    for _ in range(12):
         with ThreadPoolExecutor(max_workers=2) as executor:
             move = executor.submit(lambda: request("PUT", assignment_path(c), {"collection_id": first}, expected=None))
             unsave = executor.submit(lambda: request("POST", f"/api/posts/{c}/save"))

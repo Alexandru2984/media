@@ -2788,6 +2788,16 @@ pub async fn save_post(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    // Collection assignment/hide/account deletion lock the saving account.
+    // Take that lock before the post/bookmark so an unsave cannot race an
+    // assignment's FK checks in the reverse order.
+    query_scalar::<_, String>("SELECT id FROM users WHERE id = ? FOR UPDATE")
+        .bind(&user_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+
     // The post lock serializes concurrent toggles and guarantees that the
     // foreign-key target remains present until this transaction completes.
     let post_author_id: Option<String> =
