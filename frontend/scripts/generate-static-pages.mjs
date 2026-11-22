@@ -57,7 +57,7 @@ const routes = [
   },
   {
     path: '/confidentialitate',
-    lastModified: '2026-11-02',
+    lastModified: '2026-11-22',
     changeFrequency: 'monthly',
     title: 'Confidențialitate și date personale — Media',
     description: 'Află ce date prelucrează Media, cum sunt protejate și ce controale ai pentru vizibilitate, export și ștergere.',
@@ -75,7 +75,7 @@ const routes = [
   },
   {
     path: '/termeni',
-    lastModified: '2026-10-30',
+    lastModified: '2026-11-22',
     changeFrequency: 'monthly',
     title: 'Termeni de utilizare — Media',
     description: 'Condițiile clare pentru folosirea Media, publicarea conținutului, conduită, moderare și închiderea contului.',
@@ -90,7 +90,7 @@ const routes = [
   },
   {
     path: '/ajutor',
-    lastModified: '2026-10-30',
+    lastModified: '2026-11-22',
     changeFrequency: 'monthly',
     title: 'Ajutor și siguranța contului — Media',
     description: 'Ghid pentru conectare, profil privat, notificări, raportare, exportul datelor și ștergerea contului Media.',
@@ -98,7 +98,7 @@ const routes = [
     eyebrow: 'Centru de ajutor',
     heading: 'Răspunsuri directe pentru contul și siguranța ta.',
     sections: [
-      ['Acces la cont', 'Sesiunile folosesc cookie-uri HttpOnly. Verificarea și recuperarea prin email sunt afectate momentan de incidentul SMTP Brevo.'],
+      ['Acces la cont', 'Sesiunile folosesc cookie-uri HttpOnly. Dintr-o sesiune activă poți schimba parola și revoca dispozitivele necunoscute. Recuperarea necesită acces la adresa de email a contului.'],
       ['Notificări și vizibilitate', 'Poți controla separat notificările viitoare și poți limita conținutul prin profilul privat.'],
       ['Siguranță și date', 'Blocarea, silențierea, raportarea, exportul și ștergerea sunt disponibile din interfața contului.'],
     ],

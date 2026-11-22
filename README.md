@@ -79,10 +79,11 @@ Browser
 - Email: SMTP for verification and password-reset messages
 - Edge and origin: Cloudflare Tunnel, Nginx, and a systemd-managed API process
 
-> [!WARNING]
-> The 2026-10-30 production canary reconfirmed that the configured SMTP provider
-> currently rejects authentication with `535`. Verification and recovery email
-> delivery remain unavailable until the Brevo credential is rotated and tested.
+> [!NOTE]
+> The operator confirmed on 2026-11-22 that Brevo was retired months ago.
+> Earlier Brevo failures concern legacy configuration and are no longer an
+> active incident or release blocker. Current email delivery has not been
+> verified; provider changes are outside the current work scope.
 
 ## Repository layout
 

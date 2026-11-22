@@ -29,7 +29,7 @@ const sections = [
   {
     id: 'inchidere',
     title: 'Închiderea contului',
-    paragraphs: ['Îți poți exporta datele și șterge contul din setări după confirmarea parolei. Ștergerea este permanentă pentru datele operaționale, sub rezerva cozilor tehnice de eliminare, backupurilor și obligațiilor legale aplicabile. Dacă pierzi accesul la cont, fluxul de recuperare depinde de email și este afectat momentan de incidentul SMTP documentat în pagina de ajutor.'],
+    paragraphs: ['Îți poți exporta datele și șterge contul din setări după confirmarea parolei. Ștergerea este permanentă pentru datele operaționale, sub rezerva cozilor tehnice de eliminare, backupurilor și obligațiilor legale aplicabile. Dacă pierzi accesul la cont, fluxul de recuperare necesită acces la adresa de email a contului. Consultă pagina de ajutor pentru pașii disponibili.'],
   },
 ];
 
@@ -42,7 +42,7 @@ export default function Terms() {
       eyebrow="Termeni de utilizare"
       title="Reguli clare pentru un produs construit responsabil."
       introduction="Aceste condiții descriu relația practică dintre platformă și membrii săi. Nu extind capabilitățile de moderare dincolo de ceea ce produsul poate face astăzi."
-      updatedAt="30 octombrie 2026"
+      updatedAt="22 noiembrie 2026"
       sections={sections}
       callout={{
         eyebrow: 'Standard comun',

@@ -5,7 +5,7 @@ const sections = [
     id: 'acces',
     title: 'Conectare și acces la cont',
     paragraphs: ['Autentificarea folosește un cookie de sesiune HttpOnly, nu un token vizibil în browser. Dacă ești deja conectat, verifică sesiunile active din setările profilului și revocă dispozitivele necunoscute. Nu trimite nimănui parola, cookie-ul sau linkurile de unică folosință.'],
-    items: ['Recuperarea parolei și verificarea emailului sunt momentan afectate de eroarea SMTP Brevo.', 'Dacă sesiunea ta este încă activă, schimbă parola direct din setări și verifică toate sesiunile.', 'Dacă nu mai ai nicio sesiune, nu repeta agresiv cererile de email; acestea nu rezolvă incidentul furnizorului.'],
+    items: ['Recuperarea parolei necesită acces la adresa de email a contului. Dacă mesajul nu apare, verifică și folderul spam.', 'Dacă sesiunea ta este încă activă, schimbă parola direct din setări și verifică toate sesiunile.', 'Dacă nu mai ai nicio sesiune, folosește fluxul de recuperare și evită cererile repetate într-un interval scurt.'],
   },
   {
     id: 'vizibilitate',
@@ -43,9 +43,9 @@ export default function Help() {
       eyebrow="Centru de ajutor"
       title="Răspunsuri directe pentru contul și siguranța ta."
       introduction="Începe cu pașii de mai jos. Ei descriu comportamentul actual al produsului, inclusiv limitările cunoscute, fără să presupună că emailul funcționează."
-      updatedAt="30 octombrie 2026"
+      updatedAt="22 noiembrie 2026"
       sections={sections}
-      notice={{ title: 'Incident activ: email', copy: 'Brevo respinge autentificarea SMTP, iar mesajele de verificare și recuperare nu ajung momentan. Problema este operațională și necesită rotirea credentialului de către proprietarul serviciului.' }}
+      notice={{ title: 'Protejează accesul la cont', copy: 'Păstrează accesul la adresa de email asociată contului. Dintr-o sesiune activă poți schimba parola și revoca dispozitivele pe care nu le recunoști.' }}
       callout={{
         eyebrow: 'Mai întâi, protejează contul',
         title: 'Ai încă o sesiune activă?',

@@ -1,5 +1,11 @@
 # Incident Response Runbook
 
+**2026-11-22 operator correction:** Brevo has been retired for months and is
+excluded from active incidents, provider assumptions and restoration work.
+Brevo references in the dated review records below concern legacy configuration
+and are retained as history, not an active outage. Current email delivery has
+not been verified.
+
 This runbook covers security and availability incidents affecting Media, with a
 specific playbook for hostile or privacy-sensitive image uploads. It contains no
 credentials. The VPS/repository owner is the current incident commander until a
@@ -160,7 +166,7 @@ people/records, likely consequences, containment, and contact channel. Obtain
 qualified legal guidance before external notification; do not delay technical
 containment while that assessment is underway.
 
-Cloudflare, the VPS provider, Brevo SMTP, MySQL hosting on the VPS, GitHub, and
+Cloudflare, the VPS provider, MySQL hosting on the VPS, GitHub, and
 Let's Encrypt may be relevant to evidence or notification. No new processor is
 introduced by the image decoder; its Rust dependencies remain subject to the
 locked dependency and RustSec review.

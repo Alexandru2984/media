@@ -6,15 +6,22 @@
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
+**Operator correction, 2026-11-22:** Brevo was retired months ago. Earlier
+Brevo-related findings describe legacy configuration and are archived, excluded
+from active vendor assumptions, remediation priorities and release blockers.
+Current delivery through an active email provider is unverified; no provider
+restoration or credential rotation is requested. Historical entries below are
+retained as observations rather than assertions about the current service.
+
 **Verdict:** 🟠 Core containment, revocable sessions, versioned migrations,
 bounded image re-encoding, user-facing export/deletion controls, private-account
 audiences, block-aware social relationships, bounded in-app notifications, and
 bounded private trust-and-safety controls are deployed. Least-privilege report
 moderation is also deployed with offline grants, password step-up, reporter
 pseudonymity, self-moderation prevention, transactional transitions, and durable
-action/role audit. SMTP delivery is currently broken, while broader
+action/role audit. Broader
 authorization, appeals/enforcement policy, privacy governance, alerting, and
-recovery work remain
+recovery work remain open.
 
 ## Scope and limitations
 
@@ -39,7 +46,8 @@ for the active build. Chrono also has an unmaintained advisory. These findings
 supersede historical zero-finding statements until the patch release is verified.
 The current locked npm audit reports zero vulnerabilities. Public CSP still
 permits inline scripts for Cloudflare challenges. SMTP delivery was not retried
-against real recipients; its previously documented failure remains unresolved.
+against real recipients. The earlier provider failure is archived following the
+operator's retirement clarification.
 
 The patch updates lettre to 0.11.24, url to 2.5.9 and the SQLx family to 0.9.1,
 with minimum patched versions in Cargo.toml. This removes seven of the eight
@@ -89,8 +97,8 @@ secret environment is root:root 0600, uploads are www-data:www-data 0750, and
 systemd-analyze reports 1.5 exposure (a hardening heuristic, not a vulnerability
 assessment). SMTP still uses a synchronous transport inside async tasks; move
 it onto a bounded blocking worker or an async delivery queue in the next
-operations release. Account-aware abuse throttling and the previously recorded
-SMTP credential repair remain priorities.
+operations release (completed in the follow-up below). Account-aware abuse
+throttling remains a priority; retired-provider restoration is excluded.
 
 ### SMTP runtime isolation follow-up, 2026-11-22
 
@@ -105,8 +113,8 @@ server reply cannot put a recipient or token into the journal.
 
 Three regression tests cover async-runtime responsiveness during a stalled
 job, capacity enforcement after cancellation, failure and panic recovery. The
-suite passes 68 application and five seed tests plus strict Clippy. The existing
-SMTP credential incident is still open; no real email was sent to test it.
+suite passes 68 application and five seed tests plus strict Clippy. The earlier
+provider incident is archived; no real email was sent to test it.
 Cloudflare and Tunnel are explicitly retained by operator instruction; strict
 CSP must be implemented compatibly with that architecture.
 
@@ -505,7 +513,12 @@ backups/legal holds, document lawful bases and processors, add verified operator
 and private contact details, obtain legal approval for the public policy text,
 and test the GDPR incident workflow.
 
-#### SEC-018 — Production email delivery is unavailable
+#### SEC-018 — Historical retired-provider authentication failure
+
+**Current disposition (2026-11-22): archived / out of scope.** The operator
+confirmed Brevo has not been used for months. This is not an active incident,
+release blocker or request to repair the retired provider. The older evidence
+and original remediation proposal are retained below as historical context.
 
 **Status (2026-10-29): open, P1 operational incident.** Registration can still
 create accounts, but both isolated and production canaries received permanent
@@ -1465,7 +1478,7 @@ revenue, incident cost, and control frequency before assigning an ALE.
 GDPR is presumed relevant because the system is operated in the EU and processes
 personal data. A qualifying personal-data breach may require supervisory-authority
 notification within 72 hours. Vendors/processors in observed scope include the
-hosting provider, Cloudflare, Brevo SMTP, Google Drive, GitHub, and Let's Encrypt;
+hosting provider, Cloudflare, Google Drive, GitHub, and Let's Encrypt;
 ownership, DPAs, retention, regions, and last security review are unknown. Rclone
 is also in the backup supply chain and its private OAuth-client migration is P1.
 

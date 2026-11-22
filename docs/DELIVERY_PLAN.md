@@ -10,6 +10,12 @@ and retained by explicit operator instruction. CSP work must remain compatible
 with the deployed Cloudflare protections; replacing or bypassing Cloudflare is
 not a remediation option.
 
+**Retired provider:** the operator confirmed on 2026-11-22 that Brevo has not
+been used for months and must be ignored. Remove it from active incidents,
+vendor assumptions and release blockers. Do not rotate its credentials, send
+test messages or plan restoration. The generic SMTP code is provider-independent;
+a legacy hostname in local configuration is not evidence of an active provider.
+
 ## Delivered and verified in this session
 
 - Direct media authorization, restricted upload namespaces and independent
@@ -44,7 +50,7 @@ artifacts, validation scope, Cloudflare constraint and remaining work.
 | P1, defense in depth | Axum directly serves the entire uploads directory without the audience checks used by Nginx | `main.rs` attaches an unrestricted `ServeDir`; protect both namespaces in the application and reject all other paths. No public bypass has been demonstrated: API listens on loopback. |
 | P2 | Successful direct API responses have no cache prohibition | Observed on loopback readiness; enforce private/no-store in application middleware, including success and failure. |
 | P1 | Outstanding credential links survive password/email changes | Revoke reset/email-change tokens transactionally on credential changes, serialize issuance and consumption with account locks, and check expiration at consumption. Add concurrent reset and old-session regressions. |
-| P1, previously reported | Verification and password recovery depend on an SMTP credential previously rejected by Brevo | Still unresolved in the repository. Needs operator credential rotation and an actual delivery test; do not call the historical failure a freshly reproduced incident. |
+| Retired / excluded | Historical Brevo authentication failures | Superseded by operator clarification: unused for months, excluded from active incidents and release gates. Current email delivery is unverified. |
 | P2 | CSP permits inline scripts for Cloudflare challenges | Current public header confirmed. Coordinate an edge nonce/hash-compatible policy before tightening; do not silently break the challenge. |
 | P2 | Auth throttling depends heavily on shared infrastructure | Add durable account-aware budgets, passkeys/TOTP, breached-password checks and login alerts. |
 | P2 | Automated audience coverage is incomplete | Add a disposable-database matrix for owner, anonymous, follower, removed follower, blocked users, hidden posts, media, exports and moderation. |
@@ -72,9 +78,9 @@ artifacts, validation scope, Cloudflare constraint and remaining work.
 5. **Interaction.** Polls, mentions, threaded replies, notification quiet hours,
    saved searches and transparent suggested follows. Build anti-spam quotas and
    block/private-account enforcement into each feature.
-6. **Identity and operations.** Repair SMTP, add passkeys/MFA and recovery codes,
+6. **Identity and operations.** Add passkeys/MFA and recovery codes,
    account-aware rate limits, least-privilege migration jobs, metrics and alert
-   ownership. Isolate synchronous SMTP delivery from async runtime workers.
+   ownership. SMTP runtime isolation is delivered; Brevo restoration is excluded.
    Verify backup restore and the outstanding exact-URL cache purge.
 7. **Product completion.** Accessible dialogs/toasts, real moderation notices
    and appeals, retention and export jobs, privacy contact/policy approval,

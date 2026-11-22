@@ -487,10 +487,10 @@ rollback-and-restore drill passed. The API now drains in-flight work after
 `SIGTERM`/`SIGINT`, bounded by
 systemd's 15-second stop timeout. Backend release candidates can disable only
 their background upload-maintenance worker through a strict boolean setting,
-preventing health canaries from processing production cleanup state. SMTP
-authentication is currently rejected by Brevo with `535`; rotating and verifying
-that credential is an immediate P1 operational task because verification and
-password-recovery delivery are down.
+preventing health canaries from processing production cleanup state. The older
+Brevo incident is archived: the operator confirmed on 2026-11-22 that the provider
+was retired months ago. Its restoration and credential rotation are excluded
+from the roadmap. Current email delivery has not been verified.
 
 - `/health/live`, `/health/ready`, and dependency-specific readiness checks.
 - Structured JSON logs with request IDs and privacy redaction; define and enforce

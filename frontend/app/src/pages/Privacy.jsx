@@ -35,7 +35,7 @@ const sections = [
   {
     id: 'furnizori',
     title: 'Infrastructură și furnizori',
-    paragraphs: ['Traficul public trece prin Cloudflare Tunnel și Nginx către aplicația găzduită pe un VPS. Datele aplicației sunt stocate în MariaDB, iar Brevo este configurat pentru emailurile de verificare și recuperare. În prezent, autentificarea SMTP Brevo este defectă, astfel încât acele mesaje nu sunt livrate; eroarea nu schimbă controalele contului din aplicație.'],
+    paragraphs: ['Traficul public trece prin Cloudflare Tunnel și Nginx către aplicația găzduită pe un VPS. Datele aplicației sunt stocate în MariaDB. Adresa de email a contului este folosită pentru fluxurile de verificare și recuperare.'],
   },
   {
     id: 'stocare-browser',
@@ -69,9 +69,9 @@ export default function Privacy() {
       eyebrow="Confidențialitate"
       title="Datele tale trebuie să rămână explicabile și controlabile."
       introduction="Această pagină descrie practicile tehnice observabile ale platformei și limitele care mai trebuie formalizate. Preferăm precizia în locul promisiunilor vagi."
-      updatedAt="2 noiembrie 2026"
+      updatedAt="22 noiembrie 2026"
       sections={sections}
-      notice={{ title: 'Transparență operațională', copy: 'Emailurile de verificare și recuperare nu sunt livrate momentan din cauza unei erori de autentificare SMTP Brevo. Sesiunile existente și controalele locale de securitate continuă să funcționeze.' }}
+      notice={{ title: 'Controlul contului', copy: 'Revizuiește vizibilitatea profilului, sesiunile active și datele de contact din setări. Păstrează accesul la adresa de email asociată contului.' }}
       callout={{
         eyebrow: 'Control direct',
         title: 'Verifică setările înainte să publici.',

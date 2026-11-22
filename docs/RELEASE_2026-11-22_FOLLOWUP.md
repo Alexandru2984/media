@@ -72,7 +72,9 @@ Cloudflare canaries. No rollback was needed for this follow-up.
 
 ## Remaining work
 
-Brevo credential rotation and actual delivery verification are still required.
+Operator correction: Brevo was retired months ago. Its restoration and
+credential rotation are excluded from active work and release blockers.
+Current email delivery has not been verified.
 The previous optional, uncompiled SQLite lockfile vulnerability and Chrono
 maintenance warning remain; dependency inputs were unchanged in this follow-up.
 Account-aware abuse controls, passkeys/MFA, durable delivery/retry, broader
