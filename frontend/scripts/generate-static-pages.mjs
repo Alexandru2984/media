@@ -72,6 +72,7 @@ const routes = [
       ['Stocare temporară în browser', 'Schițele păstrează numai textul în sessionStorage, separat per cont și filă, pentru maximum 24 de ore; imaginile și descrierile lor nu sunt incluse.'],
       ['Control și ștergere', 'Poți administra sesiunile și preferințele, descărca un export JSON și șterge permanent contul.'],
       ['Colecții private', 'Numele colecțiilor și încadrarea postărilor salvate sunt vizibile doar proprietarului, sunt incluse în export și se șterg odată cu contul.'],
+      ['Detalii opționale de profil', 'Numele afișat, pronumele, localitatea și website-ul sunt publice inclusiv pentru profiluri private. Le poți elimina prin editare, sunt incluse în export și se șterg odată cu contul.'],
     ],
   },
   {
@@ -103,6 +104,7 @@ const routes = [
       ['Notificări și vizibilitate', 'Poți controla separat notificările viitoare și poți limita conținutul prin profilul privat.'],
       ['O postare în prim-plan', 'Poți fixa o singură postare proprie la începutul profilului. O alegere nouă o înlocuiește pe cea anterioară; vizibilitatea contului și ordinea cronologică a feedului rămân aceleași.'],
       ['Colecții private de postări salvate', 'Poți crea până la 30 de colecții cu nume de 1–60 de caractere. Fiecare salvare are o singură colecție opțională. Ștergerea colecției păstrează postările salvate, iar exportul include numele și încadrările private.'],
+      ['Personalizează profilul', 'Poți adăuga opțional un nume afișat, pronume, o localitate și un website HTTPS. Aceste detalii sunt publice chiar pentru conturi private și pot fi șterse prin editare.'],
       ['Siguranță și date', 'Blocarea, silențierea, raportarea, exportul și ștergerea sunt disponibile din interfața contului.'],
     ],
   },

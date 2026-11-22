@@ -23,6 +23,11 @@ const sections = [
     paragraphs: ['În Salvate poți crea până la 30 de colecții, cu nume de 1–60 de caractere. Alege colecția sub fiecare postare salvată; o postare poate aparține unei singure colecții. Filtrul Fără colecție arată salvările neorganizate. Ștergerea unei colecții păstrează postările salvate. Numele și încadrările sunt private și apar în exportul contului.'],
   },
   {
+    id: 'detalii-profil',
+    title: 'Personalizează profilul',
+    paragraphs: ['Din Editează profilul poți adăuga un nume afișat, pronume, o localitate și un website HTTPS. Sunt opționale și publice, inclusiv pentru un cont privat. Numele de utilizator rămâne identificatorul contului. Șterge câmpurile și salvează pentru a elimina detaliile. Nu publica adrese sau linkuri care conțin informații confidențiale.'],
+  },
+  {
     id: 'notificari',
     title: 'Notificări',
     paragraphs: ['Inboxul din aplicație funcționează independent de email. Din Setări → Notificări poți opri separat cererile de urmărire, acceptările, urmăritorii noi, aprecierile și comentariile. Preferința se aplică evenimentelor viitoare și nu rescrie istoricul existent.'],

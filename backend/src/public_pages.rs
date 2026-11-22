@@ -281,7 +281,8 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
 
 fn render_profile_shell(shell: &str, profile: &ProfileDetail) -> Result<String, &'static str> {
     let canonical_url = format!("{SITE_URL}/profile/{}", profile.id);
-    let title = format!("{} — profil Media", profile.username);
+    let display_name = profile.display_name.as_deref().unwrap_or(&profile.username);
+    let title = format!("{display_name} — profil Media");
     let description = profile
         .bio
         .as_deref()
@@ -302,6 +303,34 @@ fn render_profile_shell(shell: &str, profile: &ProfileDetail) -> Result<String, 
     let escaped_canonical = escape_html(&canonical_url);
     let escaped_social_image = escape_html(DEFAULT_SOCIAL_IMAGE);
     let escaped_username = escape_html(&profile.username);
+    let escaped_display_name = escape_html(display_name);
+    let handle = if profile.display_name.is_some() {
+        format!(r#"<p class="profile-bio">@{escaped_username}</p>"#)
+    } else {
+        String::new()
+    };
+    let mut public_details = String::new();
+    for text in [profile.pronouns.as_deref(), profile.location.as_deref()]
+        .into_iter()
+        .flatten()
+    {
+        public_details.push_str(&format!("<span>{}</span>", escape_html(text)));
+    }
+    if let Some(website) = profile
+        .website_url
+        .as_deref()
+        .and_then(crate::profile_details::public_website)
+    {
+        let host = url::Url::parse(&website)
+            .ok()
+            .and_then(|url| url.host_str().map(str::to_owned))
+            .unwrap_or_default();
+        public_details.push_str(&format!(
+            r#"<a href="{}" target="_blank" rel="noopener noreferrer nofollow ugc">{} ↗</a>"#,
+            escape_html(&website),
+            escape_html(&host)
+        ));
+    }
     let escaped_bio = escape_html(
         profile
             .bio
@@ -384,7 +413,7 @@ fn render_profile_shell(shell: &str, profile: &ProfileDetail) -> Result<String, 
         "inLanguage": "ro-RO",
         "mainEntity": {
             "@type": "Person",
-            "name": profile.username,
+            "name": display_name,
             "description": profile.bio,
         },
         "isPartOf": {
@@ -441,8 +470,9 @@ fn render_profile_shell(shell: &str, profile: &ProfileDetail) -> Result<String, 
         <div class="profile-avatar-wrap">{avatar}</div>
         <div class="profile-action-row"></div>
         <div class="profile-copy">
-          <div class="profile-title-row"><h1>{escaped_username}</h1>{privacy_badge}</div>
-          <p class="profile-bio">{escaped_bio}</p>
+          <div class="profile-title-row"><h1>{escaped_display_name}</h1>{privacy_badge}</div>
+          {handle}<p class="profile-bio">{escaped_bio}</p>
+          <div class="profile-meta">{public_details}</div>
           <div class="profile-meta">
             <span><strong>{posts}</strong> postări</span>
             <span><strong>{followers}</strong> urmăritori</span>
@@ -581,6 +611,10 @@ mod tests {
         ProfileDetail {
             id: "fedcba98-7654-4321-8123-fedcba987654".to_owned(),
             username: "alice".to_owned(),
+            display_name: None,
+            pronouns: None,
+            location: None,
+            website_url: None,
             bio: bio.map(str::to_owned),
             avatar_url: Some("/uploads/avatars/alice.webp".to_owned()),
             posts_count: 3,
@@ -650,6 +684,24 @@ mod tests {
         assert!(safe_avatar_path(Some("/uploads/avatars/safe.webp")).is_some());
         assert!(safe_avatar_path(Some("https://attacker.example/avatar.png")).is_none());
         assert!(safe_avatar_path(Some("/uploads/avatars/../secret")).is_none());
+    }
+
+    #[test]
+    fn public_profile_details_escape_text_and_validate_links_again() {
+        let mut person = profile(Some("Bio"), true);
+        person.display_name = Some("<script>alert(1)</script>".into());
+        person.pronouns = Some("ea/ei & altele".into());
+        person.location = Some("<img src=x onerror=alert(1)>".into());
+        person.website_url = Some("javascript:alert(1)".into());
+        let html = render_profile_shell(&shell(), &person).unwrap();
+        assert!(html.contains("&lt;script&gt;"));
+        assert!(html.contains("ea/ei &amp; altele"));
+        assert!(!html.contains("<img src=x"));
+        assert!(!html.contains("href=\"javascript:"));
+        person.website_url = Some("https://example.com/?a=1&b=2".into());
+        let html = render_profile_shell(&shell(), &person).unwrap();
+        assert!(html.contains("https://example.com/?a=1&amp;b=2"));
+        assert!(html.contains("rel=\"noopener noreferrer nofollow ugc\""));
     }
 
     #[test]

@@ -178,7 +178,7 @@ def check_saved_collections(base, ids, tokens, sql, database, environment, root,
             else:
                 raise AssertionError("Prior API did not start on collection schema")
             rows = request("GET", "/api/saved-posts?limit=50", target_base=old_base)
-            assert "collection_id" not in next(row for row in rows if row["id"] == a)
+            assert next(row for row in rows if row["id"] == a)["is_saved"] is True
             assert request("POST", f"/api/posts/{a}/save", target_base=old_base)["saved"] is False
             assert sql(f"SELECT COUNT(*) FROM saved_collection_posts WHERE user_id='{ids['public']}' AND post_id='{a}'", database) == "0"
             print("collection_rollback_compatibility=passed; prior binary startup, saved reads and unsave cascade")
@@ -204,10 +204,10 @@ def check_saved_collections(base, ids, tokens, sql, database, environment, root,
     assert len(request("GET", folders)) == 30
     request("POST", folders, {"name": "Over cap"}, expected=409)
     exported = request("POST", "/api/users/me/export", {"password": "Export fixture password 2026!"})
-    assert exported["format_version"] == 10
+    assert exported["format_version"] == 11
     assert exported["counts"]["saved_collections"] == len(exported["saved_collections"]) == 30
     assert exported["counts"]["saved_collection_posts"] == len(exported["saved_collection_posts"])
     assert {"post_id": a, "collection_id": second} in [{"post_id": row["post_id"], "collection_id": row["collection_id"]} for row in exported["saved_collection_posts"]]
     assert "Private foreign collection" not in json.dumps(exported)
     assert "password_hash" not in json.dumps(exported) and "token_hash" not in json.dumps(exported)
-    print(f"saved_collection_checks={checks}; passed; privacy, CRUD, validation, quota races, filters, pagination, FK/cascades and export v10")
+    print(f"saved_collection_checks={checks}; passed; privacy, CRUD, validation, quota races, filters, pagination, FK/cascades and export v11")

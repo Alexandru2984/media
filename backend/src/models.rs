@@ -70,6 +70,7 @@ pub struct UpdateUser {
     pub username: Option<String>,
     pub bio: Option<String>,
     pub avatar_url: Option<String>,
+    pub profile_details: Option<crate::profile_details::ProfileDetailsInput>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -161,6 +162,10 @@ pub struct ProfileDetail {
     pub username: String,
     pub bio: Option<String>,
     pub avatar_url: Option<String>,
+    pub display_name: Option<String>,
+    pub pronouns: Option<String>,
+    pub location: Option<String>,
+    pub website_url: Option<String>,
     pub posts_count: i64,
     pub followers_count: i64,
     pub following_count: i64,

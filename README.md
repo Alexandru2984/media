@@ -15,8 +15,14 @@ Post images also accept optional plain-text descriptions of up to 300 Unicode
 characters. Creation, editing, preview, image viewing, public post HTML and
 account export preserve the description under the post's current audience.
 Temporary drafts exclude images and their descriptions. Account exports use
-format version 10, including the profile's pinned-post ID/timestamp and private
+format version 11, including optional public profile details, the pinned-post ID/timestamp and private
 saved-collection names and assignments.
+Profiles support optional display names, pronouns, location and a public HTTPS
+website. The editor explicitly discloses that these details remain public even
+on private accounts. Core profile changes and details save atomically; older
+payloads that omit details preserve them. External links reject credentials,
+local/IP hosts and nonstandard ports, open with safe link attributes, and are
+never fetched by the server. Account export/deletion include this metadata.
 Members can pin one of their own posts at the top of their profile, including
 an older post outside the first page. Pinning preserves private-account,
 block and personal-hide policies and does not reorder chronological feeds.

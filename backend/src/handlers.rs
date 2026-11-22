@@ -213,6 +213,10 @@ struct ExportProfile {
     updated_at: DateTime<Utc>,
     pinned_post_id: Option<String>,
     pinned_post_at: Option<DateTime<Utc>>,
+    display_name: Option<String>,
+    pronouns: Option<String>,
+    location: Option<String>,
+    website_url: Option<String>,
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -990,6 +994,7 @@ pub(crate) async fn visible_profile(
 
     query_as::<_, ProfileDetail>(
         "SELECT u.id, u.username, u.bio, u.avatar_url,
+                details.display_name, details.pronouns, details.location, details.website_url,
                 (SELECT COUNT(*) FROM posts WHERE user_id = u.id) AS posts_count,
                 (SELECT COUNT(*) FROM follows WHERE followed_id = u.id) AS followers_count,
                 (SELECT COUNT(*) FROM follows WHERE follower_id = u.id) AS following_count,
@@ -1031,6 +1036,7 @@ pub(crate) async fn visible_profile(
                 ) ELSE 0 END AS pending_follow_requests_count,
                 u.created_at
          FROM users u
+         LEFT JOIN profile_details details ON details.user_id = u.id
          WHERE u.id = ?",
     )
     .bind(current_user_id.as_deref())
@@ -1947,7 +1953,11 @@ pub async fn export_account_data(
         "SELECT id, username, email, (email_verified <> 0) AS email_verified,
                 bio, avatar_url, (is_private <> 0) AS is_private, role, created_at, updated_at,
                 (SELECT post_id FROM profile_pins WHERE user_id = users.id) AS pinned_post_id,
-                (SELECT pinned_at FROM profile_pins WHERE user_id = users.id) AS pinned_post_at
+                (SELECT pinned_at FROM profile_pins WHERE user_id = users.id) AS pinned_post_at,
+                (SELECT display_name FROM profile_details WHERE user_id=users.id) AS display_name,
+                (SELECT pronouns FROM profile_details WHERE user_id=users.id) AS pronouns,
+                (SELECT location FROM profile_details WHERE user_id=users.id) AS location,
+                (SELECT website_url FROM profile_details WHERE user_id=users.id) AS website_url
          FROM users WHERE id = ?",
     )
     .bind(&authenticated_session.user_id)
@@ -2203,7 +2213,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 10,
+            format_version: 11,
             exported_at,
             profile,
             counts,
@@ -3125,10 +3135,18 @@ pub async fn update_profile(
     let user_id = get_current_user(&pool, &headers).await?;
     let now = Utc::now();
 
-    if payload.username.is_none() && payload.bio.is_none() && payload.avatar_url.is_none() {
+    if payload.username.is_none()
+        && payload.bio.is_none()
+        && payload.avatar_url.is_none()
+        && payload.profile_details.is_none()
+    {
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let details = payload
+        .profile_details
+        .map(|details| details.clean())
+        .transpose()?;
     let username = payload.username.map(|username| username.trim().to_owned());
     let bio = payload.bio.map(|bio| bio.trim().to_owned());
     let avatar_url = payload
@@ -3149,27 +3167,55 @@ pub async fn update_profile(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    query_scalar::<_, String>("SELECT id FROM users WHERE id = ? FOR UPDATE")
+        .bind(&user_id)
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::UNAUTHORIZED)?;
     let mut builder = QueryBuilder::<MySql>::new("UPDATE users SET ");
     {
         let mut updates = builder.separated(", ");
 
         if let Some(username) = username {
-            updates.push("username = ").push_bind(username);
+            updates.push("username = ").push_bind_unseparated(username);
         }
         if let Some(bio) = bio {
-            updates.push("bio = ").push_bind(bio);
+            updates.push("bio = ").push_bind_unseparated(bio);
         }
         if let Some(avatar_url) = avatar_url {
-            updates.push("avatar_url = ").push_bind(avatar_url);
+            updates
+                .push("avatar_url = ")
+                .push_bind_unseparated(avatar_url);
         }
 
-        updates.push("updated_at = ").push_bind(now);
+        updates.push("updated_at = ").push_bind_unseparated(now);
     }
     builder.push(" WHERE id = ").push_bind(&user_id);
 
     builder
         .build()
-        .execute(&pool)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| {
+            if error
+                .as_database_error()
+                .is_some_and(|e| e.is_unique_violation())
+            {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?;
+    if let Some(details) = details {
+        details.store(&mut transaction, &user_id).await?;
+    }
+    transaction
+        .commit()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -4544,7 +4590,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 10,
+            format_version: 11,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),
@@ -4559,6 +4605,10 @@ mod tests {
                 updated_at: now,
                 pinned_post_id: None,
                 pinned_post_at: None,
+                display_name: None,
+                pronouns: None,
+                location: None,
+                website_url: None,
             },
             counts: ExportCounts {
                 posts: 0,

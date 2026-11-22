@@ -294,10 +294,10 @@ class ApiService {
   }
 
   // Update Profile
-  async updateProfile(username, bio, avatarUrl) {
+  async updateProfile(username, bio, avatarUrl, profileDetails) {
     return this.request('/users/me/profile', {
       method: 'PUT',
-      body: JSON.stringify({ username, bio, avatar_url: avatarUrl }),
+      body: JSON.stringify({ username, bio, avatar_url: avatarUrl, profile_details: profileDetails }),
     });
   }
 

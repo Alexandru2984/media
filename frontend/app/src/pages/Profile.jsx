@@ -9,7 +9,10 @@ import ProfileSettings from '../components/ProfileSettings';
 import PageMeta from '../components/PageMeta';
 import ReportDialog from '../components/ReportDialog';
 import ShareLink from '../components/ShareLink';
+import ProfileDetailsFields from '../components/ProfileDetailsFields';
+import { profileCoreIsValid, profileDetailsAreValid, profileDetailsFrom, profileTextLength, publicWebsite } from '../utils/profileDetails';
 import { getImageUrl, loginPath, profilePath } from '../utils/urls';
+import './ProfileDetails.css';
 
 function joinedDate(dateString) {
   const date = new Date(dateString);
@@ -30,12 +33,14 @@ export default function Profile() {
   const [saving, setSaving] = createSignal(false);
   const [username, setUsername] = createSignal('');
   const [bio, setBio] = createSignal('');
+  const [details, setDetails] = createSignal(profileDetailsFrom(null));
   const [activeTab, setActiveTab] = createSignal('posts');
   const [settingsInitialTab, setSettingsInitialTab] = createSignal('privacy');
   const [loadedProfileId, setLoadedProfileId] = createSignal(null);
   const [loadedProfileViewer, setLoadedProfileViewer] = createSignal(undefined);
   let requestVersion = 0;
-  onCleanup(() => { requestVersion += 1; });
+  let saveVersion = 0;
+  onCleanup(() => { requestVersion += 1; saveVersion += 1; });
   const [relationshipPending, setRelationshipPending] = createSignal(false);
 
   const isOwnProfile = () => auth.user()?.id === params.id;
@@ -76,6 +81,7 @@ export default function Profile() {
       setProfile(profileData);
       setUsername(profileData.username);
       setBio(profileData.bio || '');
+      setDetails(profileDetailsFrom(profileData));
       const [profilePosts, pin] = profileData.can_view_content
         ? await Promise.all([api.getUserPosts(userId), api.getProfilePin(userId)])
         : [[], null];
@@ -98,6 +104,7 @@ export default function Profile() {
     setEditing(false);
     setUsername(profile()?.username || '');
     setBio(profile()?.bio || '');
+    setDetails(profileDetailsFrom(profile()));
   };
 
   const refreshPin = async (postId) => {
@@ -110,21 +117,29 @@ export default function Profile() {
 
   const handleSave = async () => {
     const cleanUsername = username().trim();
-    if (cleanUsername.length < 2 || saving()) return;
+    if (!profileCoreIsValid(cleanUsername, bio()) || !profileDetailsAreValid(details()) || saving()) return;
+    const viewer = auth.user()?.id;
+    const userId = params.id;
+    const version = ++saveVersion;
+    const current = () => version === saveVersion && params.id === userId && auth.user()?.id === viewer && !auth.loading();
 
     setSaving(true);
     setError('');
     try {
-      await api.updateProfile(cleanUsername, bio().trim(), null);
-      await loadProfile(params.id, false);
+      await api.updateProfile(cleanUsername, bio().trim(), null, details());
+      if (!current()) return;
+      await loadProfile(userId, false);
+      if (!current()) return;
       const userData = await api.getCurrentUser();
+      if (!current()) return;
       auth.setUser(userData);
       setEditing(false);
     } catch (requestError) {
+      if (!current()) return;
       console.error('Failed to update profile:', requestError);
-      setError('Profilul nu a putut fi actualizat. Numele poate fi deja folosit.');
+      setError(requestError.status === 409 ? 'Numele de utilizator este deja folosit.' : 'Profilul nu a putut fi salvat. Încearcă din nou.');
     } finally {
-      setSaving(false);
+      if (current()) setSaving(false);
     }
   };
 
@@ -222,6 +237,8 @@ export default function Profile() {
       setActiveTab('posts');
       setSettingsInitialTab('privacy');
       setEditing(false);
+      saveVersion += 1;
+      setSaving(false);
       loadProfile(userId);
     }
   });
@@ -229,7 +246,7 @@ export default function Profile() {
   return (
     <>
       <PageMeta
-        title={profile()?.username ? `${profile().username} — Media` : 'Profil — Media'}
+        title={profile()?.username ? `${profile().display_name || profile().username} — Media` : 'Profil — Media'}
         description={profile()?.bio?.trim() || 'Profil de utilizator pe Media.'}
         canonicalPath={profilePath(params.id)}
         openGraphType="profile"
@@ -343,23 +360,24 @@ export default function Profile() {
                     <div class="profile-editor">
                       <div>
                         <label class="field-label" for="profile-username">Nume de utilizator</label>
-                        <input id="profile-username" class="input" value={username()} onInput={(event) => setUsername(event.currentTarget.value)} minlength="2" maxlength="32" />
+                        <input id="profile-username" class="input" value={username()} disabled={saving()} onInput={(event) => setUsername(event.currentTarget.value)} />
                       </div>
                       <div>
                         <label class="field-label" for="profile-bio">Descriere</label>
-                        <textarea id="profile-bio" class="textarea" value={bio()} onInput={(event) => setBio(event.currentTarget.value)} rows="3" maxlength="240" placeholder="Spune comunității câteva lucruri despre tine…" />
-                        <div class="character-count">{bio().length}/240</div>
+                        <textarea id="profile-bio" class="textarea" value={bio()} disabled={saving()} onInput={(event) => setBio(event.currentTarget.value)} rows="3" placeholder="Spune comunității câteva lucruri despre tine…" />
+                        <div class="character-count">{profileTextLength(bio())}/240</div>
                       </div>
+                      <ProfileDetailsFields value={details()} disabled={saving()} onChange={(key, value) => setDetails((previous) => ({ ...previous, [key]: value }))} />
                       <div class="profile-editor-actions">
                         <button type="button" class="btn btn-secondary" onClick={cancelEditing} disabled={saving()}>Anulează</button>
-                        <button type="button" class="btn btn-primary" onClick={handleSave} disabled={saving() || username().trim().length < 2}>{saving() ? 'Se salvează…' : 'Salvează'}</button>
+                        <button type="button" class="btn btn-primary" onClick={handleSave} disabled={saving() || !profileCoreIsValid(username().trim(), bio()) || !profileDetailsAreValid(details())}>{saving() ? 'Se salvează…' : 'Salvează'}</button>
                       </div>
                     </div>
                   }
                 >
                   <div class="profile-copy">
                     <div class="profile-title-row">
-                      <h1 id="profile-name">{profile()?.username}</h1>
+                      <h1 id="profile-name">{profile()?.display_name || profile()?.username}</h1>
                       <Show when={profile()?.is_private}>
                         <span class="privacy-badge" title="Cont privat">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" stroke="currentColor" stroke-width="1.8" /><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8" /></svg>
@@ -367,7 +385,15 @@ export default function Profile() {
                         </span>
                       </Show>
                     </div>
+                    <Show when={profile()?.display_name}><p class="profile-handle">@{profile()?.username}</p></Show>
                     <p class={`profile-bio ${profile()?.bio ? '' : 'is-empty'}`}>{profile()?.bio || 'Acest profil nu are încă o descriere.'}</p>
+                    <Show when={profile()?.pronouns || profile()?.location || publicWebsite(profile()?.website_url)}>
+                      <ul class="profile-public-details" aria-label="Detalii publice">
+                        <Show when={profile()?.pronouns}><li>{profile().pronouns}</li></Show>
+                        <Show when={profile()?.location}><li>{profile().location}</li></Show>
+                        <Show when={publicWebsite(profile()?.website_url)}>{(website) => <li><a href={website()} target="_blank" rel="noopener noreferrer nofollow ugc">{new URL(website()).hostname} ↗</a></li>}</Show>
+                      </ul>
+                    </Show>
                     <div class="profile-meta">
                       <span><strong>{profile()?.posts_count ?? posts().length}</strong> {Number(profile()?.posts_count ?? posts().length) === 1 ? 'postare' : 'postări'}</span>
                       <Show when={!profile()?.is_blocked && profile()?.can_view_content}>

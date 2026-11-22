@@ -7,6 +7,7 @@ const sections = [
     paragraphs: ['Media păstrează numai datele necesare contului, funcțiilor sociale, siguranței și operării serviciului. Parolele nu sunt stocate în clar, iar tokenurile de sesiune și de recuperare sunt păstrate numai sub formă de hash.'],
     items: [
       'Date de cont și profil: adresă de email, nume de utilizator, biografie, avatar și preferințe.',
+      'Detalii opționale de profil: nume afișat, pronume, localitate și website. Sunt publice chiar dacă profilul este privat; le poți elimina prin editare, sunt incluse în export și se șterg odată cu contul.',
       'Conținut și relații: postări, imagini și descrierile lor, comentarii, aprecieri, urmăritori, mesaje și elemente salvate.',
       'Colecții private: numele colecțiilor și încadrarea postărilor salvate sunt vizibile doar proprietarului, sunt incluse în export și se șterg odată cu contul.',
       'Siguranță: sesiuni, evenimente de securitate, blocări, silențieri, raportări și audit de moderare.',
