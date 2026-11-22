@@ -1,5 +1,5 @@
 import { A } from '@solidjs/router';
-import { createEffect, createSignal, For, Show } from 'solid-js';
+import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import { api } from '../api';
 import CreatePost from '../components/CreatePost';
@@ -38,10 +38,17 @@ export default function Home() {
   const [error, setError] = createSignal('');
   const [loadedForUser, setLoadedForUser] = createSignal(null);
   const [feedMode, setFeedMode] = createSignal('discover');
+  const [nextOffset, setNextOffset] = createSignal(0);
+  let requestVersion = 0;
+  onCleanup(() => { requestVersion += 1; });
   const auth = useAuth();
 
   const loadPosts = async ({ append = false, mode = feedMode() } = {}) => {
-    if (append && (loadingMore() || !hasMore())) return;
+    if (append && (loading() || loadingMore() || !hasMore())) return;
+    const userId = auth.user()?.id;
+    if (!userId) return;
+    const version = ++requestVersion;
+    const offset = append ? nextOffset() : 0;
 
     try {
       if (append) {
@@ -49,24 +56,31 @@ export default function Home() {
         setLoadMoreError('');
       } else {
         setLoading(true);
+        setLoadingMore(false);
         setError('');
         setLoadMoreError('');
       }
 
-      const offset = append ? posts().length : 0;
       const data = mode === 'following'
         ? await api.getFollowingFeed(FEED_PAGE_SIZE, offset)
         : await api.getPosts(FEED_PAGE_SIZE, offset);
+      if (version !== requestVersion || auth.user()?.id !== userId) return;
       if (append) {
         setPosts((currentPosts) => {
           const knownIds = new Set(currentPosts.map((post) => post.id));
-          return [...currentPosts, ...data.filter((post) => !knownIds.has(post.id))];
+          return [...currentPosts, ...data.filter((post) => {
+            if (knownIds.has(post.id)) return false;
+            knownIds.add(post.id);
+            return true;
+          })];
         });
       } else {
         setPosts(data);
       }
+      setNextOffset(offset + data.length);
       setHasMore(data.length === FEED_PAGE_SIZE);
     } catch (requestError) {
+      if (version !== requestVersion || auth.user()?.id !== userId) return;
       console.error('Failed to load posts:', requestError);
       if (append) {
         setLoadMoreError('Nu am putut încărca următoarele postări. Încearcă din nou.');
@@ -74,8 +88,10 @@ export default function Home() {
         setError('Nu am putut încărca feedul. Verifică conexiunea și încearcă din nou.');
       }
     } finally {
-      if (append) setLoadingMore(false);
-      else setLoading(false);
+      if (version === requestVersion) {
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
     }
   };
 
@@ -83,6 +99,7 @@ export default function Home() {
     if (mode === feedMode() || loading()) return;
     setFeedMode(mode);
     setPosts([]);
+    setNextOffset(0);
     setHasMore(true);
     void loadPosts({ mode });
   };
@@ -93,10 +110,16 @@ export default function Home() {
   };
 
   createEffect(() => {
-    const userId = auth.user()?.id;
-    if (!auth.loading() && userId && loadedForUser() !== userId) {
+    const userId = auth.user()?.id || null;
+    if (!auth.loading() && loadedForUser() !== userId) {
+      requestVersion += 1;
       setLoadedForUser(userId);
-      loadPosts();
+      setPosts([]);
+      setNextOffset(0);
+      setHasMore(true);
+      setLoadingMore(false);
+      if (userId) void loadPosts();
+      else setLoading(false);
     }
   });
 

@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import { getImageUrl, loginPath, postPath, profilePath } from '../utils/urls';
 import ReportDialog from './ReportDialog';
+import PostText from './PostText';
 
 const MAX_CONTENT_LENGTH = 500;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -309,7 +310,7 @@ export default function PostCard(props) {
       </header>
 
       <Show when={!editing()}>
-        <p class="post-content">{props.post.content}</p>
+        <p class="post-content"><PostText text={props.post.content} /></p>
         <Show when={props.post.image_url}>
           <img
             class="post-media"
@@ -509,7 +510,7 @@ export default function PostCard(props) {
                             </div>
                           </Show>
                         </div>
-                        <p class="comment-copy">{comment.content}</p>
+                        <p class="comment-copy"><PostText text={comment.content} /></p>
                       </Show>
                     </div>
                   )}

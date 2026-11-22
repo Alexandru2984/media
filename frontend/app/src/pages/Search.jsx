@@ -1,64 +1,93 @@
-import { A, useNavigate, useSearchParams } from '@solidjs/router';
-import { createEffect, createSignal, For, Show } from 'solid-js';
+import { A, useLocation, useNavigate, useSearchParams } from '@solidjs/router';
+import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
 import Navbar from '../components/Navbar';
 import PageMeta from '../components/PageMeta';
 import PostCard from '../components/PostCard';
-import { getImageUrl, profilePath } from '../utils/urls';
+import { getImageUrl, loginPath, profilePath } from '../utils/urls';
 
 const MAX_SEARCH_LENGTH = 64;
 
 export default function Search() {
   const auth = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = createSignal('');
   const [results, setResults] = createSignal({ users: [], posts: [] });
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal('');
   const [loadedQuery, setLoadedQuery] = createSignal('');
+  const resultType = () => ['people', 'posts'].includes(searchParams.type) ? searchParams.type : 'all';
+  let requestVersion = 0;
+  let controller;
+  let resultOwner;
+  onCleanup(() => { requestVersion += 1; controller?.abort(); });
 
   const performSearch = async (searchTerm) => {
+    const version = ++requestVersion;
+    const userId = auth.user()?.id;
+    controller?.abort();
+    controller = new AbortController();
     setLoading(true);
     setError('');
+    setLoadedQuery(searchTerm);
+    setResults({ users: [], posts: [] });
     try {
-      const data = await api.search(searchTerm);
+      const data = await api.search(searchTerm, { signal: controller.signal });
+      if (version !== requestVersion || auth.user()?.id !== userId) return;
       setResults({ users: data.users || [], posts: data.posts || [] });
     } catch (requestError) {
+      if (version !== requestVersion || auth.user()?.id !== userId) return;
       console.error('Search failed:', requestError);
       setError('Căutarea nu a putut fi finalizată. Încearcă din nou.');
     } finally {
-      setLoading(false);
+      if (version === requestVersion) setLoading(false);
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     const searchTerm = query().trim();
-    if (searchTerm.length < 2 || searchTerm.length > MAX_SEARCH_LENGTH || loading()) return;
+    if (searchTerm.length < 2 || searchTerm.length > MAX_SEARCH_LENGTH) return;
 
-    setLoadedQuery(searchTerm);
     setSearchParams({ q: searchTerm });
-    await performSearch(searchTerm);
+    if (searchTerm === loadedQuery()) await performSearch(searchTerm);
   };
 
   createEffect(() => {
     if (auth.loading()) return;
     if (!auth.isAuthenticated()) {
-      navigate('/login');
+      requestVersion += 1;
+      controller?.abort();
+      setResults({ users: [], posts: [] });
+      navigate(loginPath(`${location.pathname}${location.search}`), { replace: true });
       return;
     }
 
+    if (resultOwner !== auth.user()?.id) {
+      resultOwner = auth.user()?.id;
+      setLoadedQuery('');
+    }
     const initialQuery = (searchParams.q || '').trim().slice(0, MAX_SEARCH_LENGTH);
     if (initialQuery.length >= 2 && loadedQuery() !== initialQuery) {
       setQuery(initialQuery);
       setLoadedQuery(initialQuery);
       void performSearch(initialQuery);
+    } else if (initialQuery.length < 2 && loadedQuery()) {
+      requestVersion += 1;
+      controller?.abort();
+      setLoadedQuery('');
+      setQuery(initialQuery);
+      setResults({ users: [], posts: [] });
+      setError('');
+      setLoading(false);
     }
   });
 
   const totalResults = () => results().users.length + results().posts.length;
+  const visibleResults = () => resultType() === 'people' ? results().users.length : resultType() === 'posts' ? results().posts.length : totalResults();
 
   return (
     <>
@@ -92,11 +121,20 @@ export default function Search() {
               placeholder="Nume sau cuvinte dintr-o postare"
               autofocus
             />
-            <button type="submit" class="btn btn-primary" disabled={loading() || query().trim().length < 2}>
+            <button type="submit" class="btn btn-primary" disabled={query().trim().length < 2}>
               {loading() ? 'Se caută…' : 'Caută'}
             </button>
           </form>
+          <Show when={!loadedQuery()}>
+            <div class="search-topics"><p>O idee de pornire</p><div class="topic-switches" aria-label="Subiecte de explorat">
+              <For each={['#fotografie', '#tehnologie', '#cărți', '#natură']}>{(topic) => (
+                <button type="button" onClick={() => setSearchParams({ q: topic, type: 'posts' })}>{topic}</button>
+              )}</For>
+            </div></div>
+          </Show>
         </section>
+
+        <Show when={loading()}><p class="search-loading" role="status">Se caută oameni și postări…</p></Show>
 
         <Show when={error()}>
           <div class="surface search-state" role="alert">
@@ -109,17 +147,22 @@ export default function Search() {
           <div class="search-summary" aria-live="polite">
             <strong>{totalResults()}</strong> {totalResults() === 1 ? 'rezultat' : 'rezultate'} pentru „{loadedQuery()}”
           </div>
+          <div class="search-filters topic-switches" role="group" aria-label="Filtrează rezultatele">
+            <For each={[{ value: 'all', label: 'Toate', count: totalResults }, { value: 'people', label: 'Oameni', count: () => results().users.length }, { value: 'posts', label: 'Postări', count: () => results().posts.length }]}>{(filter) => (
+              <button type="button" aria-pressed={resultType() === filter.value} class={resultType() === filter.value ? 'is-active' : ''} onClick={() => setSearchParams({ type: filter.value === 'all' ? undefined : filter.value })}>{filter.label} <span>{filter.count()}</span></button>
+            )}</For>
+          </div>
 
           <Show
-            when={totalResults() > 0}
+            when={visibleResults() > 0}
             fallback={
               <div class="surface search-state">
                 <h2>Niciun rezultat</h2>
-                <p>Încearcă un nume mai scurt sau alte cuvinte-cheie.</p>
+                <p>{totalResults() > 0 ? 'Încearcă alt filtru pentru a vedea celelalte rezultate.' : 'Încearcă un nume mai scurt sau alte cuvinte-cheie.'}</p>
               </div>
             }
           >
-            <Show when={results().users.length > 0}>
+            <Show when={results().users.length > 0 && resultType() !== 'posts'}>
               <section class="search-section" aria-labelledby="people-results-title">
                 <div class="section-heading">
                   <h2 id="people-results-title">Oameni</h2>
@@ -148,7 +191,7 @@ export default function Search() {
               </section>
             </Show>
 
-            <Show when={results().posts.length > 0}>
+            <Show when={results().posts.length > 0 && resultType() !== 'people'}>
               <section class="search-section search-posts" aria-labelledby="post-results-title">
                 <div class="section-heading">
                   <h2 id="post-results-title">Postări</h2>

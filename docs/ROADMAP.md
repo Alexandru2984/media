@@ -12,6 +12,16 @@ authentication and private-account controls remain in place. Chromium verified
 no horizontal overflow and no uncaught JavaScript errors. Frontend tests and the
 production artifact gate pass (123,721 entry JS bytes, 81,567 CSS bytes).
 
+**2026-11-22 discovery update:** posts and comments render bounded Unicode
+hashtags as safe internal search links, retaining all other content as text.
+Search has URL-backed people/post/all filters, counts, topic entry points,
+cancelled superseded requests, stale-response protection and login return URLs.
+Feed continuation tracks the number of server rows consumed independently of
+deduplicated visible posts; outdated requests cannot replace a later feed.
+Chromium checked filters, hashtag navigation, literal markup rendering, racing
+queries, failures, topics and overlapping pagination at 320/390/768/1440 px.
+The frontend passes 31 contract tests and the production artifact gate.
+
 This roadmap is deliberately security-first. A polished interface on top of an
 unpatchable or weakly isolated service only increases the blast radius.
 
@@ -391,10 +401,10 @@ as application-bundle regressions.
    sitemap freshness, and real-user CWV.
 
 The original urgent metadata, MIME-routing, public-route metadata, share-image,
-and soft-404 defects are closed. The highest remaining SEO constraint is
-architectural: user-generated profiles/posts still have no server-rendered public
-pages, and the build-time route list is intentionally limited to stable editorial
-content.
+and soft-404 defects are closed. Profiles and posts now have server-rendered
+previews with current-audience enforcement. They remain deliberately noindex;
+the remaining indexing constraint is explicit account consent and privacy/legal
+review. The build-time route list is limited to stable editorial content.
 
 ## Phase 6 — Reliability, observability, and operations
 

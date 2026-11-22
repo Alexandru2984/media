@@ -307,8 +307,8 @@ class ApiService {
     return this.request(`/users/${encodePathSegment(userId)}/posts`);
   }
 
-  async search(query) {
-    return this.request(withQuery('/search', { q: query }));
+  async search(query, options = {}) {
+    return this.request(withQuery('/search', { q: query }), options);
   }
 
   // Messages
