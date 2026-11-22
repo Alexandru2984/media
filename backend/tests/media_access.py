@@ -65,6 +65,10 @@ def main():
                 "SMTP_SERVER": "smtp.example.invalid", "SMTP_USERNAME": "fixture", "SMTP_PASSWORD": "fixture",
                 "FROM_EMAIL": "fixture@example.invalid", "UPLOAD_MAINTENANCE_ENABLED": "false",
             }
+            import shutil
+            shell = root / "frontend-shell.html"
+            shutil.copyfile(Path(__file__).resolve().parents[2] / "frontend/dist/index.html", shell)
+            environment["FRONTEND_SHELL_PATH"] = str(shell)
             migration_binary = binary.with_name("migrate")
             manifest = subprocess.run([str(migration_binary), "manifest"], capture_output=True, text=True, check=True)
             assert json.loads(manifest.stdout), "empty migration manifest"
@@ -79,8 +83,12 @@ def main():
                 # migration so the complete production runner can be exercised.
                 entries = json.loads(manifest.stdout)
                 latest = entries[-1]["version"]
-                assert latest == 20261030000000, "update runner fixture for the current last migration"
-                sql(f"DROP TABLE notification_preferences; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
+                if latest == 20261030000000:
+                    sql(f"DROP TABLE notification_preferences; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
+                elif latest == 20261122000000:
+                    sql(f"DROP TRIGGER posts_image_alt_cleanup; ALTER TABLE posts DROP CONSTRAINT chk_posts_image_alt, DROP COLUMN image_alt; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
+                else:
+                    raise AssertionError("Update runner fixture for the current last migration")
                 fixture_environment = root / "migration.env"
                 fixture_environment.write_text("DATABASE_URL=" + environment["DATABASE_URL"] + "\n")
                 fixture_environment.chmod(0o600)
@@ -243,6 +251,129 @@ def main():
                 assert sorted(attempts) == [200, 404], f"Concurrent reset statuses: {attempts}"
                 assert_no_credential_tokens()
                 print(f"identity_checks={identity_checks}; passed; credential links revoked, sessions rotated, concurrent reset single winner")
+                alt_checks = 0
+
+                def alt_request(method, path, payload=None, viewer="public", expected=200, target_base=None):
+                    nonlocal alt_checks
+                    headers = {"Origin": "http://127.0.0.1:3005"}
+                    if viewer:
+                        headers["Cookie"] = f"media_session={tokens[viewer]}"
+                    data = None
+                    if payload is not None:
+                        data = json.dumps(payload).encode()
+                        headers["Content-Type"] = "application/json"
+                    request = urllib.request.Request((target_base or base) + path, method=method, data=data, headers=headers)
+                    try:
+                        response = urllib.request.urlopen(request, timeout=10)
+                    except urllib.error.HTTPError as error:
+                        response = error
+                    with response:
+                        body = response.read()
+                        assert response.status == expected, f"{method} {path}: {response.status} != {expected}"
+                        assert response.headers.get("Cache-Control") == "private, no-store"
+                        parsed = json.loads(body) if body else None
+                    alt_checks += 1
+                    return parsed
+
+                def upload_image():
+                    nonlocal alt_checks
+                    import struct, zlib
+                    def chunk(kind, content):
+                        return struct.pack(">I", len(content)) + kind + content + struct.pack(">I", zlib.crc32(kind + content) & 0xffffffff)
+                    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 2, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00\x00\xff\x00" * 2)) + chunk(b"IEND", b"")
+                    boundary = "mediafixture" + secrets.token_hex(8)
+                    body = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"fixture.png\"\r\nContent-Type: image/png\r\n\r\n".encode() + png + f"\r\n--{boundary}--\r\n".encode())
+                    request = urllib.request.Request(base + "/api/posts/upload-image", method="POST", data=body, headers={"Origin": "http://127.0.0.1:3005", "Cookie": f"media_session={tokens['public']}", "Content-Type": f"multipart/form-data; boundary={boundary}"})
+                    with urllib.request.urlopen(request, timeout=10) as response:
+                        result = json.load(response)
+                    alt_checks += 1
+                    return result["image_url"]
+
+                first_image = upload_image()
+                for payload in [
+                    {"content": "descriere", "image_alt": "Fără imagine"},
+                    {"content": "descriere", "image_url": first_image, "image_alt": "📷" * 301},
+                    {"content": "descriere", "image_url": first_image, "image_alt": "control\u0000ascuns"},
+                ]:
+                    alt_request("POST", "/api/posts", payload, expected=400)
+                description = 'Afiș cu "cărți" & <detalii>.'
+                created = alt_request("POST", "/api/posts", {"content": "O descriere de imagine", "image_url": first_image, "image_alt": "  " + description + "  "})
+                post_path = "/api/posts/" + created["id"]
+                assert created["image_alt"] == description
+                alt_request("PUT", post_path, {"content": "Unauthorized metadata", "image_url": None, "image_alt": "Changed"}, viewer=None, expected=401)
+                alt_request("PUT", post_path, {"content": "Unauthorized metadata", "image_url": None, "image_alt": "Changed"}, viewer="follower", expected=403)
+                alt_request("GET", post_path, viewer="outsider", expected=404)
+                assert alt_request("GET", post_path, viewer=None)["image_alt"] == description
+                assert any(item["id"] == created["id"] and item["image_alt"] == description for item in alt_request("GET", "/api/posts", viewer=None))
+                assert any(item["id"] == created["id"] and item["image_alt"] == description for item in alt_request("GET", f"/api/users/{ids['public']}/posts", viewer=None))
+                alt_request("POST", post_path + "/save", viewer="follower")
+                assert any(item["id"] == created["id"] and item["image_alt"] == description for item in alt_request("GET", "/api/saved-posts", viewer="follower"))
+                sql(f"INSERT INTO follows (follower_id,followed_id) VALUES ('{ids['follower']}','{ids['public']}')", database)
+                assert any(item["id"] == created["id"] and item["image_alt"] == description for item in alt_request("GET", "/api/feed/following", viewer="follower"))
+                assert any(item["id"] == created["id"] and item["image_alt"] == description for item in alt_request("GET", "/api/search?q=descriere", viewer="follower")["posts"])
+                import html
+                with urllib.request.urlopen(base + "/post/" + created["id"], timeout=10) as response:
+                    rendered = response.read().decode()
+                    assert f'alt="{html.escape(description, quote=True)}"' in rendered
+                    assert "<detalii>" not in rendered
+                alt_checks += 1
+                assert alt_request("PUT", post_path, {"content": "Descriere păstrată", "image_url": first_image})["image_alt"] == description
+                assert alt_request("PUT", post_path, {"content": "Descriere eliminată", "image_url": first_image, "image_alt": ""})["image_alt"] is None
+                maximum = "📷" * 300
+                assert alt_request("PUT", post_path, {"content": "Descriere lungă", "image_url": first_image, "image_alt": maximum})["image_alt"] == maximum
+                second_image = upload_image()
+                assert alt_request("PUT", post_path, {"content": "Imagine înlocuită", "image_url": second_image, "image_alt": maximum})["image_alt"] == maximum
+                alt_request("PUT", "/api/users/me/privacy", {"is_private": True})
+                hidden = alt_request("GET", post_path, viewer=None, expected=404)
+                assert maximum not in json.dumps(hidden, ensure_ascii=False)
+                assert alt_request("GET", post_path, viewer="follower")["image_alt"] == maximum
+                sql(f"DELETE FROM follows WHERE follower_id='{ids['follower']}' AND followed_id='{ids['public']}'", database)
+                alt_request("GET", post_path, viewer="follower", expected=404)
+                alt_request("PUT", "/api/users/me/privacy", {"is_private": False})
+
+                compatibility = os.environ.get("MEDIA_COMPATIBILITY_BINARY")
+                if compatibility:
+                    with socket.socket() as listener:
+                        listener.bind(("127.0.0.1", 0))
+                        compatibility_port = listener.getsockname()[1]
+                    compatibility_base = f"http://127.0.0.1:{compatibility_port}"
+                    old = subprocess.Popen([compatibility], cwd=root, env={**environment, "SERVER_PORT": str(compatibility_port)}, stdout=log, stderr=log)
+                    try:
+                        for _ in range(100):
+                            try:
+                                with urllib.request.urlopen(compatibility_base + "/api/health/ready", timeout=1) as response:
+                                    if response.status == 200:
+                                        break
+                            except (OSError, urllib.error.URLError):
+                                time.sleep(0.1)
+                        else:
+                            raise AssertionError("Prior API did not start against the new schema")
+                        old_post = alt_request("GET", post_path, target_base=compatibility_base)
+                        assert "image_alt" not in old_post
+                        alt_request("PUT", post_path, {"content": "Imagine eliminată de versiunea veche", "image_url": None}, target_base=compatibility_base)
+                        assert alt_request("GET", post_path)["image_alt"] is None
+                        third_image = upload_image()
+                        alt_request("PUT", post_path, {"content": "Imagine nouă", "image_url": third_image, "image_alt": description})
+                        fourth_image = upload_image()
+                        alt_request("PUT", post_path, {"content": "Înlocuită de versiunea veche", "image_url": fourth_image}, target_base=compatibility_base)
+                        assert alt_request("GET", post_path)["image_alt"] is None
+                        second_image = fourth_image
+                        print("rollback_compatibility=passed; old binary startup, reads, image removal/replacement metadata cleanup")
+                    finally:
+                        old.terminate()
+                        old.wait(timeout=15)
+
+                alt_request("PUT", post_path, {"content": "Descriere pentru export", "image_url": second_image, "image_alt": description})
+                reset = secrets.token_hex(24)
+                reset_hash = hashlib.sha256(reset.encode()).hexdigest()
+                sql(f"INSERT INTO email_tokens (id,user_id,token,token_type,expires_at) VALUES ('{uuid.uuid4()}','{ids['public']}','{reset_hash}','password_reset',DATE_ADD(NOW(),INTERVAL 1 HOUR))", database)
+                alt_request("POST", "/api/auth/reset-password", {"token": reset, "password": "Export fixture password 2026!"}, viewer=None)
+                _, public_cookie = identity_request("/api/auth/login", {"email": "public@example.invalid", "password": "Export fixture password 2026!"})
+                tokens["public"] = public_cookie.split("=", 1)[1]
+                exported = alt_request("POST", "/api/users/me/export", {"password": "Export fixture password 2026!"})
+                assert exported["format_version"] == 8
+                assert any(item["id"] == created["id"] and item["image_alt"] == description for item in exported["posts"])
+                print(f"image_alt_checks={alt_checks}; passed; validation, upload, feeds, search, saved, privacy, escaping, replacement and export v8")
                 process.terminate()
                 process.wait(timeout=15)
                 process = None

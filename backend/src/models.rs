@@ -36,6 +36,7 @@ pub struct Post {
     pub user_id: String,
     pub content: String,
     pub image_url: Option<String>,
+    pub image_alt: Option<String>,
     pub likes_count: i64,
     pub comments_count: i64,
     pub created_at: DateTime<Utc>,
@@ -46,6 +47,7 @@ pub struct Post {
 pub struct CreatePost {
     pub content: String,
     pub image_url: Option<String>,
+    pub image_alt: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -107,6 +109,7 @@ pub struct OneTimeTokenRequest {
 pub struct UpdatePost {
     pub content: String,
     pub image_url: Option<String>,
+    pub image_alt: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -200,6 +203,7 @@ pub struct PostWithUser {
     pub id: String,
     pub content: String,
     pub image_url: Option<String>,
+    pub image_alt: Option<String>,
     pub likes_count: i64,
     pub comments_count: i64,
     pub created_at: DateTime<Utc>,

@@ -69,7 +69,7 @@ const routes = [
       ['Vizibilitate', 'Conturile private limitează conținutul la proprietar și urmăritorii acceptați, iar raportările rămân private.'],
       ['Profiluri și linkuri publice', 'Profilul de bază poate fi deschis fără autentificare, inclusiv pentru conturile private, dar nu intră în sitemap și are instrucțiuni de neindexare; preview-ul folosește imaginea generică Media.'],
       ['Linkuri de postare', 'Postările au linkuri directe fără cache și fără indexare în motoare de căutare; serviciile externe pot păstra propriul preview după distribuire.'],
-      ['Stocare temporară în browser', 'Schițele păstrează numai textul în sessionStorage, separat per cont și filă, pentru maximum 24 de ore; imaginile nu sunt incluse.'],
+      ['Stocare temporară în browser', 'Schițele păstrează numai textul în sessionStorage, separat per cont și filă, pentru maximum 24 de ore; imaginile și descrierile lor nu sunt incluse.'],
       ['Control și ștergere', 'Poți administra sesiunile și preferințele, descărca un export JSON și șterge permanent contul.'],
     ],
   },

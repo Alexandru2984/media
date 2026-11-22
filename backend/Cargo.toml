@@ -2,6 +2,7 @@
 name = "social-media-backend"
 version = "0.1.0"
 edition = "2021"
+include = ["Cargo.toml", "Cargo.lock", "build.rs", "src/**", "migrations/*.sql", "tests/**"]
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }

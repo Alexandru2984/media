@@ -130,10 +130,10 @@ class ApiService {
     return this.request(withQuery('/feed/following', { limit, offset }));
   }
 
-  async createPost(content, imageUrl = null) {
+  async createPost(content, imageUrl = null, imageAlt = '') {
     return this.request('/posts', {
       method: 'POST',
-      body: JSON.stringify({ content, image_url: imageUrl }),
+      body: JSON.stringify({ content, image_url: imageUrl, image_alt: imageAlt }),
     });
   }
 
@@ -290,10 +290,10 @@ class ApiService {
   }
 
   // Post Management
-  async updatePost(postId, content, imageUrl) {
+  async updatePost(postId, content, imageUrl, imageAlt = '') {
     return this.request(`/posts/${encodePathSegment(postId)}`, {
       method: 'PUT',
-      body: JSON.stringify({ content, image_url: imageUrl }),
+      body: JSON.stringify({ content, image_url: imageUrl, image_alt: imageAlt }),
     });
   }
 

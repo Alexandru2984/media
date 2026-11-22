@@ -9,6 +9,8 @@ import {
 } from '../utils/postDraft';
 import { getImageUrl } from '../utils/urls';
 import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid } from '../utils/postContent';
+import { imageAltIsValid } from '../utils/imageAlt';
+import ImageAltField from './ImageAltField';
 
 const MAX_CONTENT_LENGTH = POST_CHARACTER_LIMIT;
 const ComposerPreview = lazy(() => import('./ComposerPreview'));
@@ -21,6 +23,9 @@ export default function CreatePost(props) {
   const [submitting, setSubmitting] = createSignal(false);
   const [imageFile, setImageFile] = createSignal(null);
   const [imagePreview, setImagePreview] = createSignal(null);
+  const [imageAlt, setImageAlt] = createSignal('');
+  let imageReadVersion = 0;
+  onCleanup(() => { imageReadVersion += 1; });
   const [error, setError] = createSignal('');
   const [recoverableDraft, setRecoverableDraft] = createSignal(null);
   const [draftStatus, setDraftStatus] = createSignal('');
@@ -104,8 +109,10 @@ export default function CreatePost(props) {
   };
 
   const clearImage = () => {
+    imageReadVersion += 1;
     setImageFile(null);
     setImagePreview(null);
+    setImageAlt('');
     if (fileInput) fileInput.value = '';
   };
 
@@ -126,9 +133,12 @@ export default function CreatePost(props) {
     }
 
     setImageFile(file);
+    setImageAlt('');
+    const version = ++imageReadVersion;
     const reader = new FileReader();
-    reader.onload = () => setImagePreview(reader.result);
+    reader.onload = () => { if (version === imageReadVersion) setImagePreview(reader.result); };
     reader.onerror = () => {
+      if (version !== imageReadVersion) return;
       clearImage();
       setError('Imaginea nu a putut fi citită.');
     };
@@ -138,7 +148,7 @@ export default function CreatePost(props) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     const postContent = content().trim();
-    if (!postContentIsValid(postContent) || recoverableDraft() || submitting()) return;
+    if (!postContentIsValid(postContent) || !imageAltIsValid(imageAlt()) || recoverableDraft() || submitting()) return;
 
     setSubmitting(true);
     setError('');
@@ -149,7 +159,7 @@ export default function CreatePost(props) {
         imageUrl = result.image_url;
       }
 
-      await api.createPost(postContent, imageUrl);
+      await api.createPost(postContent, imageUrl, imageFile() ? imageAlt().trim() : '');
       const draftRemoved = removePostDraft(auth.user()?.id);
       if (draftRemoved) clearDraftExpiryTimer();
       setContent('');
@@ -230,6 +240,9 @@ export default function CreatePost(props) {
                 </button>
               </div>
             </Show>
+            <Show when={imageFile()}>
+              <ImageAltField id="post-image-alt" value={imageAlt()} onInput={setImageAlt} disabled={submitting()} />
+            </Show>
           </div>
         </div>
 
@@ -260,7 +273,7 @@ export default function CreatePost(props) {
           <button
             type="submit"
             class="btn btn-primary"
-            disabled={Boolean(recoverableDraft()) || submitting() || !postContentIsValid(content())}
+            disabled={Boolean(recoverableDraft()) || submitting() || !postContentIsValid(content()) || !imageAltIsValid(imageAlt())}
           >
             <Show when={submitting()} fallback="Publică">
               <svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -281,7 +294,7 @@ export default function CreatePost(props) {
         <Show when={showPreview()}>
           <div id="post-publish-preview">
             <Suspense fallback={<p class="comments-status" role="status">Se încarcă previzualizarea…</p>}>
-              <ComposerPreview content={content()} image={imagePreview()} user={auth.user()} />
+              <ComposerPreview content={content()} image={imagePreview()} imageAlt={imageAlt()} user={auth.user()} />
             </Suspense>
           </div>
         </Show>
@@ -301,7 +314,7 @@ export default function CreatePost(props) {
             </svg>
             <span>
               {draftStatus() === 'saved'
-                ? (imageFile() ? 'Text salvat temporar; imaginea nu este inclusă în schiță.' : 'Schiță salvată temporar în această filă.')
+                ? (imageFile() ? 'Text salvat temporar; imaginea și descrierea ei nu sunt incluse în schiță.' : 'Schiță salvată temporar în această filă.')
                 : (draftStatus() === 'too-long'
                   ? 'Schița se salvează din nou când textul este valid și are maximum 500 de caractere.'
                   : (draftStatus() === 'expired'

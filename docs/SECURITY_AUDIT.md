@@ -25,6 +25,30 @@ recovery work remain open.
 
 ## Scope and limitations
 
+### Image descriptions and migration isolation, 2026-11-22
+
+Optional image descriptions are bounded to 300 Unicode characters, reject
+embedded controls, require an owned/claimed image and inherit the parent's
+audience everywhere. SQL uses bound values; frontend attributes and server HTML /
+social metadata escape descriptions as text. Owner-only export v8 includes them,
+while per-tab drafts omit both image and description. Non-owner mutation,
+unauthenticated writes, blocked reads and revoked private reads are rejected.
+
+API startup performs read-only migration-history/checksum verification. The
+offline migration binary verifies its expected database; the root-only runner
+matches its embedded manifest to reviewed source and installed history, accepts
+at most one pending migration, serializes with deployers and verifies a retained
+database backup through an isolated restore before applying schema changes in a
+sandboxed one-shot job. The API tolerates later successful additive migrations
+for rollback, while rejecting missing/changed/failed or unexpected older rows.
+The runtime DB account's legacy DDL grants are not removed by this release.
+
+The new nullable column and compatibility trigger were tested with the preceding
+API binary on a disposable database. Old image removal/replacement clears the
+new metadata; new replacements retain explicitly supplied descriptions even
+when their text matches the old description. No schema down-migration or
+automatic production database overwrite is used during binary rollback.
+
 The 2026-11-22 re-audit confirmed an application-layer upload authorization gap:
 the backend's raw `ServeDir` exposed every upload namespace to direct loopback
 requests without Nginx's current post-audience check. The production listener is

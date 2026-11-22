@@ -33,7 +33,7 @@ use crate::{
     },
     uploads::{process_uploaded_image, ImageProcessingError, ImagePurpose},
     validation::{
-        bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
+        bounded_text_is_valid, email_change_address_is_valid, email_is_valid, image_alt_is_valid,
         one_time_token_is_valid, password_is_safe_to_verify, password_is_valid,
         search_query_is_valid, stored_image_path_belongs_to_user, username_is_valid,
         MAXIMUM_BIO_CHARACTERS, MAXIMUM_COMMENT_CHARACTERS, MAXIMUM_MESSAGE_CHARACTERS,
@@ -73,6 +73,7 @@ struct PostFeedRow {
     id: String,
     content: String,
     image_url: Option<String>,
+    image_alt: Option<String>,
     likes_count: i64,
     comments_count: i64,
     created_at: DateTime<Utc>,
@@ -357,6 +358,7 @@ fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
         id: row.id,
         content: row.content,
         image_url: row.image_url,
+        image_alt: row.image_alt,
         likes_count: row.likes_count,
         comments_count: row.comments_count,
         created_at: row.created_at,
@@ -1910,7 +1912,7 @@ pub async fn export_account_data(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let posts = query_as::<_, Post>(
-        "SELECT id, user_id, content, image_url, likes_count, comments_count,
+        "SELECT id, user_id, content, image_url, image_alt, likes_count, comments_count,
                 created_at, updated_at
          FROM posts WHERE user_id = ? ORDER BY created_at ASC, id ASC",
     )
@@ -2152,7 +2154,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 7,
+            format_version: 8,
             exported_at,
             profile,
             counts,
@@ -2307,6 +2309,19 @@ pub async fn delete_account(
     ))
 }
 
+fn normalized_image_alt(
+    image_url: Option<&str>,
+    description: Option<&str>,
+) -> Result<Option<String>, StatusCode> {
+    let Some(description) = description.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    if image_url.is_none() || !image_alt_is_valid(description) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    Ok(Some(description.to_owned()))
+}
+
 // Post handlers
 pub async fn create_post(
     State(pool): State<MySqlPool>,
@@ -2324,6 +2339,9 @@ pub async fn create_post(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let image_alt =
+        normalized_image_alt(payload.image_url.as_deref(), payload.image_alt.as_deref())?;
+
     let post_id = Uuid::new_v4().to_string();
     let now = Utc::now();
     let mut transaction = pool.begin().await.map_err(|error| {
@@ -2332,13 +2350,14 @@ pub async fn create_post(
     })?;
 
     query(
-        "INSERT INTO posts (id, user_id, content, image_url, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO posts (id, user_id, content, image_url, image_alt, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&post_id)
     .bind(&user_id)
     .bind(content)
     .bind(&payload.image_url)
+    .bind(&image_alt)
     .bind(now)
     .bind(now)
     .execute(&mut *transaction)
@@ -2384,7 +2403,7 @@ pub(crate) async fn visible_post(
 ) -> Result<Option<PostWithUser>, StatusCode> {
     let current_user_id = get_current_user(pool, headers).await.ok();
     let row = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -2465,7 +2484,7 @@ pub async fn get_posts(
         bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -2536,7 +2555,7 @@ pub async fn get_following_feed(
         bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -2772,7 +2791,7 @@ pub async fn get_saved_posts(
         bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -3538,8 +3557,24 @@ pub async fn update_post(
         return Err(StatusCode::FORBIDDEN);
     }
     let previous_image_url = post.image_url.clone();
+    // Older clients omit this field. Preserve it only for the same image;
+    // an explicit empty string clears it and a replacement gets a fresh value.
+    let description = if payload.image_alt.is_none() && post.image_url == payload.image_url {
+        post.image_alt.as_deref()
+    } else {
+        payload.image_alt.as_deref()
+    };
+    let image_alt = normalized_image_alt(payload.image_url.as_deref(), description)?;
 
     if previous_image_url != payload.image_url {
+        // Distinguish an explicit replacement description from old clients
+        // that know only image_url. The compatibility trigger sees NULL as
+        // the old value while the final pair is written in this transaction.
+        query("UPDATE posts SET image_alt = NULL WHERE id = ?")
+            .bind(&post_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         if let Some(previous_image_url) = previous_image_url.as_deref() {
             mark_post_upload_deleting(&mut transaction, &post_id, previous_image_url)
                 .await
@@ -3550,14 +3585,17 @@ pub async fn update_post(
         }
     }
 
-    query("UPDATE posts SET content = ?, image_url = ?, updated_at = ? WHERE id = ?")
-        .bind(content)
-        .bind(&payload.image_url)
-        .bind(now)
-        .bind(&post_id)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    query(
+        "UPDATE posts SET content = ?, image_url = ?, image_alt = ?, updated_at = ? WHERE id = ?",
+    )
+    .bind(content)
+    .bind(&payload.image_url)
+    .bind(&image_alt)
+    .bind(now)
+    .bind(&post_id)
+    .execute(&mut *transaction)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if previous_image_url != payload.image_url {
         if let Some(image_url) = payload.image_url.as_deref() {
@@ -3905,7 +3943,7 @@ pub async fn get_user_posts(
         bounded_pagination(&params, 50, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -3989,7 +4027,7 @@ pub async fn search(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let post_rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -4394,7 +4432,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 7,
+            format_version: 8,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),

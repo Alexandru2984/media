@@ -1,4 +1,4 @@
-import { For, Show, createSignal } from 'solid-js';
+import { For, Show, createSignal, onCleanup } from 'solid-js';
 import { A, useNavigate } from '@solidjs/router';
 import { api } from '../api';
 import { useAuth } from '../AuthContext';
@@ -7,6 +7,8 @@ import ReportDialog from './ReportDialog';
 import PostText from './PostText';
 import PostImage from './PostImage';
 import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid } from '../utils/postContent';
+import { imageAltIsValid } from '../utils/imageAlt';
+import ImageAltField from './ImageAltField';
 
 const MAX_CONTENT_LENGTH = POST_CHARACTER_LIMIT;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -52,6 +54,9 @@ export default function PostCard(props) {
   const [editCommentText, setEditCommentText] = createSignal('');
   const [editImageFile, setEditImageFile] = createSignal(null);
   const [editImagePreview, setEditImagePreview] = createSignal(null);
+  const [editImageAlt, setEditImageAlt] = createSignal(props.post.image_alt || '');
+  let imageReadVersion = 0;
+  onCleanup(() => { imageReadVersion += 1; });
   const [removeImage, setRemoveImage] = createSignal(false);
   const [error, setError] = createSignal('');
   const [hidden, setHidden] = createSignal(false);
@@ -156,17 +161,19 @@ export default function PostCard(props) {
   };
 
   const resetEditor = () => {
+    imageReadVersion += 1;
     setEditing(false);
     setEditContent(props.post.content);
     setEditImageFile(null);
     setEditImagePreview(null);
+    setEditImageAlt(props.post.image_alt || '');
     setRemoveImage(false);
     if (editFileInput) editFileInput.value = '';
   };
 
   const handleEditPost = async () => {
     const content = editContent().trim();
-    if (!postContentIsValid(content) || saving()) return;
+    if (!postContentIsValid(content) || !imageAltIsValid(editImageAlt()) || saving()) return;
 
     setSaving(true);
     setError('');
@@ -177,7 +184,7 @@ export default function PostCard(props) {
         imageUrl = result.image_url;
       }
 
-      await api.updatePost(props.post.id, content, imageUrl);
+      await api.updatePost(props.post.id, content, imageUrl, imageUrl ? editImageAlt().trim() : '');
       resetEditor();
       await props.onUpdate?.();
     } catch (requestError) {
@@ -200,15 +207,19 @@ export default function PostCard(props) {
 
     setEditImageFile(file);
     setRemoveImage(false);
+    setEditImageAlt('');
+    const version = ++imageReadVersion;
     const reader = new FileReader();
-    reader.onload = () => setEditImagePreview(reader.result);
-    reader.onerror = () => setError('Imaginea nu a putut fi citită.');
+    reader.onload = () => { if (version === imageReadVersion) setEditImagePreview(reader.result); };
+    reader.onerror = () => { if (version === imageReadVersion) setError('Imaginea nu a putut fi citită.'); };
     reader.readAsDataURL(file);
   };
 
   const handleRemoveEditImage = () => {
+    imageReadVersion += 1;
     setEditImageFile(null);
     setEditImagePreview(null);
+    setEditImageAlt('');
     setRemoveImage(true);
     if (editFileInput) editFileInput.value = '';
   };
@@ -286,7 +297,7 @@ export default function PostCard(props) {
 
         <Show when={isOwn() && !editing()}>
           <div class="post-owner-actions" aria-label="Acțiuni postare">
-            <button type="button" class="icon-button" onClick={() => setEditing(true)} aria-label="Editează postarea" title="Editează">
+            <button type="button" class="icon-button" onClick={() => { resetEditor(); setError(''); setEditing(true); }} aria-label="Editează postarea" title="Editează">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m14 5 5 5M4 20l3.5-.7L20 6.8a2.1 2.1 0 0 0-3-3L4.7 16.3 4 20Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
             </button>
             <button type="button" class="icon-button danger" onClick={handleDeletePost} aria-label="Șterge postarea" title="Șterge">
@@ -314,7 +325,7 @@ export default function PostCard(props) {
       <Show when={!editing()}>
         <p class="post-content"><PostText text={props.post.content} /></p>
         <Show when={props.post.image_url}>
-          <PostImage src={props.post.image_url} author={props.post.user.username} />
+          <PostImage src={props.post.image_url} description={props.post.image_alt} author={props.post.user.username} />
         </Show>
       </Show>
 
@@ -337,12 +348,16 @@ export default function PostCard(props) {
             <div class="post-editor-preview">
               <img
                 src={editImagePreview() || getImageUrl(props.post.image_url)}
-                alt="Previzualizarea imaginii postării"
+                alt={editImageAlt().trim() || 'Previzualizarea imaginii postării'}
               />
               <button type="button" class="media-remove" onClick={handleRemoveEditImage} aria-label="Elimină imaginea">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
               </button>
             </div>
+          </Show>
+
+          <Show when={(props.post.image_url || editImageFile()) && !removeImage()}>
+            <ImageAltField id={`edit-image-alt-${props.post.id}`} value={editImageAlt()} onInput={setEditImageAlt} disabled={saving()} />
           </Show>
 
           <div class="editor-tools">
@@ -370,7 +385,7 @@ export default function PostCard(props) {
               type="button"
               class="btn btn-primary"
               onClick={handleEditPost}
-              disabled={saving() || !postContentIsValid(editContent())}
+              disabled={saving() || !postContentIsValid(editContent()) || !imageAltIsValid(editImageAlt())}
             >
               {saving() ? 'Se salvează…' : 'Salvează'}
             </button>

@@ -1,5 +1,22 @@
 # Product, Security, Design, and SEO Roadmap
 
+**2026-11-22 image descriptions:** optional 300-character Unicode image
+descriptions now flow through create/edit, previews, thumbnails, the image viewer,
+public post HTML/social metadata, all existing post DTOs and export v8. They are
+validated as single-line text, escaped in HTML/metadata and excluded from
+temporary drafts. Removing/replacing an image clears its previous description;
+an additive database trigger preserves that behavior for the preceding API
+binary during rollback. Missing fields from older clients preserve a description
+only when its image remains the same; an explicit empty string clears it.
+
+API startup now validates migrations without running DDL. A separate compiled
+migration command and backup/restore-verified production runner support reviewed
+additive changes. The runtime DB account still has legacy DDL privileges;
+separating account grants remains open. Source packaging excludes runtime data,
+and build tracking includes newly added migration files. The isolated suite
+checks full migration application and previous-binary reads/writes on the new
+schema. Eight viewport/theme cases pass for image description workflows.
+
 **2026-11-22 sharing and dialogs follow-up:** profiles now have native share,
 clipboard copy and an accessible manual-copy fallback. Post links use the same
 flow; only the canonical link and title are passed to native sharing. URL
@@ -283,7 +300,7 @@ bottom bar, preserving the 320 px layout even for moderator controls.
 
 - Semantic landmarks and headings, skip link ✅, keyboard-visible focus, logical
   tab order, labeled controls, status announcements, and dialog focus trapping.
-- Alt-text workflow, captions/transcripts for media, reduced motion, contrast,
+- Image alt-text workflow ✅; captions/transcripts for media, reduced motion, contrast,
   error summaries, and screen-reader regression tests.
 - Replace decorative emoji controls with accessible SVG icons and text labels.
 
@@ -341,7 +358,7 @@ search. It disappears at 100% instead of becoming permanent dashboard clutter.
 
 - Text posts with bounded per-tab temporary drafts and autosave ✅. Add opt-in
   durable drafts, mentions, hashtags, link previews, and polls.
-- Multi-image carousel, cropping, alt text, captions, and later short video.
+- Image alt text ✅. Add multi-image carousel, cropping, captions and later short video.
 - Edit history, delete/restore window, scheduling, audience, and content warnings.
 - Private bookmarks and a saved feed. ✅ Add named collections, reposts, quote
   posts, richer reactions, and share links.

@@ -131,6 +131,14 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
     let escaped_social_image = escape_html(&social_image);
     let escaped_username = escape_html(&post.user.username);
     let escaped_content = escape_html(&post.content);
+    let image_description = post
+        .image_alt
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("Imagine publicată de {}", post.user.username));
+    let escaped_image_description = escape_html(&image_description);
+
     let published_at = post.created_at.to_rfc3339_opts(SecondsFormat::Secs, true);
     let displayed_at = post.created_at.format("%d.%m.%Y, %H:%M UTC").to_string();
     let mut html = shell.to_owned();
@@ -157,7 +165,7 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
         (
             "property",
             "og:image:alt",
-            "Imaginea postării distribuite pe Media",
+            escaped_image_description.as_str(),
         ),
         ("name", "twitter:title", escaped_title.as_str()),
         ("name", "twitter:description", escaped_description.as_str()),
@@ -165,7 +173,7 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
         (
             "name",
             "twitter:image:alt",
-            "Imaginea postării distribuite pe Media",
+            escaped_image_description.as_str(),
         ),
     ] {
         replace_tag_with_attribute(
@@ -232,7 +240,7 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
     let image = post.image_url.as_deref().and_then(|path| {
         absolute_post_image(Some(path)).map(|_| {
             format!(
-                r#"<img class="post-media" src="{}" alt="Imagine publicată de {escaped_username}" loading="eager" />"#,
+                r#"<img class="post-media" src="{}" alt="{escaped_image_description}" loading="eager" />"#,
                 escape_html(path),
             )
         })
@@ -551,6 +559,7 @@ mod tests {
             id: "01234567-89ab-4def-8123-456789abcdef".to_owned(),
             content: content.to_owned(),
             image_url: image_url.map(str::to_owned),
+            image_alt: None,
             likes_count: 4,
             comments_count: 2,
             created_at: Utc.with_ymd_and_hms(2026, 11, 2, 10, 30, 0).unwrap(),
@@ -618,6 +627,16 @@ mod tests {
         assert!(!rendered.contains("</script><img"));
         assert!(rendered.contains("&lt;/script&gt;&lt;img"));
         assert!(rendered.contains("\\u003c/script\\u003e\\u003cimg"));
+    }
+
+    #[test]
+    fn image_description_is_escaped_in_attributes_and_social_metadata() {
+        let mut sample = post("Un gând", Some("/uploads/posts/example.webp"));
+        sample.image_alt = Some("Cadru cu \"cărți\" & <detalii>".to_owned());
+        let rendered = render_post_shell(&shell(), &sample).unwrap();
+        assert!(rendered.contains("alt=\"Cadru cu &quot;cărți&quot; &amp; &lt;detalii&gt;\""));
+        assert!(rendered.contains("content=\"Cadru cu &quot;cărți&quot; &amp; &lt;detalii&gt;\""));
+        assert!(!rendered.contains("<detalii>"));
     }
 
     #[test]

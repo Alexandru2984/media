@@ -4948,3 +4948,5 @@ body:has(dialog[open]) { overflow: hidden; }
 .report-dialog::backdrop { background: rgb(3 7 18 / 62%); backdrop-filter: blur(4px); }
 .report-dialog .btn { min-height: 44px; }
 .report-dialog-actions:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }
+.image-alt-field { margin-top: 12px; }
+.image-alt-field .field-hint { margin: 8px 0 0; color: var(--text-muted); font-size: .8125rem; line-height: 1.6; }

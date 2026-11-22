@@ -11,6 +11,11 @@ Follow-up releases add a local post preview, Ctrl/Cmd+Enter publishing, matching
 Unicode character limits, profile sharing with manual-copy fallback, and native
 accessible report/moderation dialogs. SMTP delivery now runs in a bounded blocking
 pool. Cloudflare edge and Tunnel remain mandatory parts of the architecture.
+Post images also accept optional plain-text descriptions of up to 300 Unicode
+characters. Creation, editing, preview, image viewing, public post HTML and
+account export preserve the description under the post's current audience.
+Temporary drafts exclude images and their descriptions. Account exports use
+format version 8.
 The application currently provides account management, email verification and
 password recovery, user profiles, avatars, posts, image uploads, likes, and
 comments. It also includes a paginated feed, community search, responsive mobile

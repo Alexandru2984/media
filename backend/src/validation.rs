@@ -7,6 +7,7 @@ pub const MAXIMUM_EMAIL_BYTES: usize = 254;
 pub const MAXIMUM_USERNAME_CHARACTERS: usize = 32;
 pub const MAXIMUM_BIO_CHARACTERS: usize = 240;
 pub const MAXIMUM_POST_CHARACTERS: usize = 500;
+pub const MAXIMUM_IMAGE_ALT_CHARACTERS: usize = 300;
 pub const MAXIMUM_COMMENT_CHARACTERS: usize = 500;
 pub const MAXIMUM_MESSAGE_CHARACTERS: usize = 2_000;
 pub const MAXIMUM_SEARCH_CHARACTERS: usize = 64;
@@ -36,6 +37,11 @@ pub fn bounded_text_is_valid(value: &str, minimum: usize, maximum: usize) -> boo
         && !trimmed
             .chars()
             .any(|character| character.is_control() && !matches!(character, '\n' | '\t'))
+}
+
+pub fn image_alt_is_valid(value: &str) -> bool {
+    let value = value.trim();
+    value.chars().count() <= MAXIMUM_IMAGE_ALT_CHARACTERS && !value.chars().any(char::is_control)
 }
 
 pub fn username_is_valid(username: &str) -> bool {
@@ -80,6 +86,17 @@ pub fn one_time_token_is_valid(token: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn validates_plain_image_descriptions_by_unicode_characters() {
+        assert!(super::image_alt_is_valid(&"📷".repeat(300)));
+        assert!(!super::image_alt_is_valid(&"📷".repeat(301)));
+        assert!(super::image_alt_is_valid(
+            "Un afiș cu textul <Salut> și \"cărți\"."
+        ));
+        assert!(super::image_alt_is_valid(""));
+        assert!(!super::image_alt_is_valid("ascuns\0aici"));
+        assert!(!super::image_alt_is_valid("două\nrânduri"));
+    }
     use super::{
         bounded_text_is_valid, email_change_address_is_valid, email_is_valid,
         one_time_token_is_valid, password_is_safe_to_verify, password_is_valid,
