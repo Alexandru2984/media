@@ -1,0 +1,65 @@
+# Media — delivery plan, 2026-11-22
+
+This plan supplements ROADMAP.md with the next concrete releases. A feature is
+finished only after its failure states, authorization boundaries, responsive
+layout, checks, release and rollback are verified. Commits use the repository
+owner's existing identity without generated-by or coauthor attribution.
+
+## Findings from the current re-audit
+
+| Priority | Finding | Evidence / action |
+| --- | --- | --- |
+| P1, defense in depth | Axum directly serves the entire uploads directory without the audience checks used by Nginx | `main.rs` attaches an unrestricted `ServeDir`; protect both namespaces in the application and reject all other paths. No public bypass has been demonstrated: API listens on loopback. |
+| P2 | Successful direct API responses have no cache prohibition | Observed on loopback readiness; enforce private/no-store in application middleware, including success and failure. |
+| P1, previously reported | Verification and password recovery depend on an SMTP credential previously rejected by Brevo | Still unresolved in the repository. Needs operator credential rotation and an actual delivery test; do not call the historical failure a freshly reproduced incident. |
+| P2 | CSP permits inline scripts for Cloudflare challenges | Current public header confirmed. Coordinate an edge nonce/hash-compatible policy before tightening; do not silently break the challenge. |
+| P2 | Auth throttling depends heavily on shared infrastructure | Add durable account-aware budgets, passkeys/TOTP, breached-password checks and login alerts. |
+| P2 | Automated audience coverage is incomplete | Add a disposable-database matrix for owner, anonymous, follower, removed follower, blocked users, hidden posts, media, exports and moderation. |
+| Product | Landing uses generic gradients, floating example cards and repeated promises | Replace with an editorial layout, stronger typography, a clear product demonstration and truthful calls to action. |
+| Product / correctness | Search can display stale responses after a later query; feed offsets derive from deduplicated visible rows | Add request sequencing and explicit server offsets before expanding discovery. |
+
+## Release sequence
+
+1. **Application security boundary.** Guard direct uploads, reject unsupported
+   paths/methods, override forged media-path headers, reuse current audience
+   policy, enforce no-store and security headers, add regression checks and
+   release canaries. No database migration.
+2. **Editorial redesign.** Replace landing structure and decorative preview
+   cards; retain the Media identity and all account flows. Make the presentation
+   work at 320, 390, 768 and 1440 CSS pixels in both themes. Use actual product
+   capabilities, readable copy, keyboard focus and reduced-motion support.
+3. **Useful discovery.** Search filters for people/posts, topic entry points,
+   safe hashtag navigation, clear result/empty/error states, stale-request
+   protection, and correct feed continuation. No fabricated trends or members.
+4. **Publishing and profiles.** Alt text, multiple images with derivatives,
+   pinned posts, named private bookmark collections, richer profiles, content
+   warnings and accessible image viewing. Design each storage migration and its
+   rollback separately.
+5. **Interaction.** Polls, mentions, threaded replies, notification quiet hours,
+   saved searches and transparent suggested follows. Build anti-spam quotas and
+   block/private-account enforcement into each feature.
+6. **Identity and operations.** Repair SMTP, add passkeys/MFA and recovery codes,
+   account-aware rate limits, least-privilege migration jobs, metrics and alert
+   ownership. Verify backup restore and the outstanding exact-URL cache purge.
+7. **Product completion.** Accessible dialogs/toasts, real moderation notices
+   and appeals, retention and export jobs, privacy contact/policy approval,
+   installation flows and a safe offline shell.
+8. **SEO and CI, last as requested.** Add browser/audience regression CI,
+   migration validation, dependency/secret checks and release automation.
+   Expand public indexing only with explicit account consent and privacy
+   review; validate structured data, sitemap policy and Core Web Vitals.
+
+## Verification and deployment
+
+- Rust: format, strict Clippy, locked tests/build and current RustSec audit.
+- Frontend: Node contract tests, production build, existing artifact budgets,
+  locked npm audit and browser checks on representative sizes/themes.
+- Production: use the existing isolated candidate and atomic release scripts;
+  verify origin and Cloudflare boundaries, health, rejection paths and rollback
+  artifacts. Keep runtime secrets, uploads, accounts and generated files out of
+  Git. Avoid scanning or changing unrelated VPS applications.
+- Report confirmed findings separately from historical incidents, architectural
+  limitations and proposed features. No security audit proves absence of flaws.
+
+References: [OWASP uploads](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+and [OWASP CSP](https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html).
