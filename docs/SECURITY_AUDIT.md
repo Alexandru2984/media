@@ -25,6 +25,32 @@ recovery work remain open.
 
 ## Scope and limitations
 
+### Profile pins, 2026-11-22
+
+The new pin endpoints require an authenticated owner and the exact configured
+origin for writes. A per-account database lock serializes competing choices;
+conditional unpin cannot clear a different post chosen later. A primary key
+limits each profile to one pin, and a composite foreign key enforces ownership.
+Post/account deletion cascades without relying on application cleanup, including
+through the preceding production binary on the new schema.
+
+The profile pin read reuses profile audience policy and the full-post audience /
+personal-hide query with the already verified viewer identity. Private profiles
+return the same rejection whether pinned or empty; no public endpoint reveals a
+hidden pin ID. All full-post queries include pin state under their existing
+audience filters. Owner-only export v9 includes the pin ID and timestamp.
+Unauthenticated/foreign-origin/foreign-owner writes, removed-follower access,
+both block directions, hides, concurrent replacement, stale unpin, older posts,
+export and deletion cascades pass the disposable HTTP suite. Production smoke
+checks cover rejection/cache boundaries without creating production accounts.
+
+The reviewed additive migration is live as version `20261122001000`, after a
+backup restored and verified in isolation. Fourteen migration records succeed;
+the API applies no DDL at startup. See the
+[release report](RELEASE_2026-11-22_PINS.md) for checksums and rollback artifacts.
+This increment does not close the existing runtime DB grant, CSP/edge-policy,
+identity throttling, optional SQLite lockfile or Chrono maintenance findings.
+
 ### Image descriptions and migration isolation, 2026-11-22
 
 Optional image descriptions are bounded to 300 Unicode characters, reject

@@ -42,10 +42,18 @@ a legacy hostname in local configuration is not evidence of an active provider.
   export v8, with previous-binary compatibility verified on the new schema.
   Offline migration application now has a compiled manifest, shared lock and
   restore-verified backup; API startup performs read-only schema validation.
+- One owned post can now be pinned to a profile, including outside the first
+  page, without duplication or reordering chronological feeds. The API enforces
+  owner/audience/block/hide rules, atomic replacement and conditional unpin;
+  database foreign keys enforce ownership and deletion cascades. Export is now
+  v9. The suite passes 79 Rust, 40 Node and 139 isolated HTTP checks, plus eight
+  pin viewport/theme cases and a stale-route case. See the
+  [verified pinned-post release](RELEASE_2026-11-22_PINS.md) for current artifacts.
 
 This is a verified release increment, not completion of every backlog item.
-The [follow-up release report](RELEASE_2026-11-22_FOLLOWUP.md) records the current
-artifacts, validation scope, Cloudflare constraint and remaining work.
+The [pinned-post release report](RELEASE_2026-11-22_PINS.md) records the current
+artifacts, validation scope, Cloudflare constraint and remaining work. Earlier
+release reports are historical snapshots.
 
 ## Findings from the current re-audit
 
@@ -75,9 +83,9 @@ artifacts, validation scope, Cloudflare constraint and remaining work.
 3. **Useful discovery.** Search filters for people/posts, topic entry points,
    safe hashtag navigation, clear result/empty/error states, stale-request
    protection, and correct feed continuation. No fabricated trends or members.
-4. **Publishing and profiles.** Image descriptions and accessible viewing are
-   delivered. Next: multiple images with derivatives, pinned posts, named private
-   bookmark collections, richer profiles and content warnings. Design each
+4. **Publishing and profiles.** Image descriptions, accessible viewing and pinned
+   posts are delivered. Next: named private bookmark collections, richer profiles,
+   multiple images with derivatives and content warnings. Design each
    storage migration and its rollback separately.
 5. **Interaction.** Polls, mentions, threaded replies, notification quiet hours,
    saved searches and transparent suggested follows. Build anti-spam quotas and

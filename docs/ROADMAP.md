@@ -1,5 +1,22 @@
 # Product, Security, Design, and SEO Roadmap
 
+**2026-11-22 pinned profiles:** a member can feature one owned post, replace it
+atomically or remove that specific pin. The profile fetches it independently of
+the first 50 posts and shows one copy. Feed ordering is unchanged. Private-account
+approval, blocks and personal hides still govern every read; ownership is also
+enforced by a composite database foreign key. Post/account deletion clears pins,
+including through the preceding production API after rollback. Export v9 records
+the profile's pin and timestamp. Keyboard focus survives reordering, pin controls
+serialize requests within the tab, and long names fit the mobile header.
+
+The additive migration and its restored backup were verified before production
+application. All 79 Rust, 40 Node and 139 disposable HTTP checks pass; browser QA
+covers eight pin viewport/theme cases, a stale pinned-post route response and
+eight image-description regressions. Live origin/Cloudflare checks pass. See
+[current production artifacts and remaining work](RELEASE_2026-11-22_PINS.md).
+The next product increment is named private bookmark collections; SEO expansion
+and CI setup remain in the final phase.
+
 **2026-11-22 image descriptions:** optional 300-character Unicode image
 descriptions now flow through create/edit, previews, thumbnails, the image viewer,
 public post HTML/social metadata, full-post responses and export v8. They are
@@ -351,17 +368,18 @@ search. It disappears at 100% instead of becoming permanent dashboard clutter.
 - Account-level block across authenticated surfaces plus discreet mute, private
   report intake, and personal post hide. ✅ Add restrict, moderator-visible
   aggregates, and more granular audience controls.
-- Four-step profile completion checklist ✅. Add QR/share card, pinned posts,
-  richer profile fields, and expanded profile search.
+- Four-step profile completion checklist, canonical profile sharing and one
+  pinned owned post ✅. Add QR/share cards, richer profile fields and expanded
+  profile search.
 
 ### Publishing
 
-- Text posts with bounded per-tab temporary drafts and autosave ✅. Add opt-in
-  durable drafts, mentions, hashtags, link previews, and polls.
+- Text posts with bounded per-tab temporary drafts, autosave and Unicode hashtag
+  links ✅. Add opt-in durable drafts, mentions, link previews and polls.
 - Image alt text ✅. Add multi-image carousel, cropping, captions and later short video.
 - Edit history, delete/restore window, scheduling, audience, and content warnings.
-- Private bookmarks and a saved feed. ✅ Add named collections, reposts, quote
-  posts, richer reactions, and share links.
+- Private bookmarks, a saved feed and canonical post sharing ✅. Add named
+  collections, reposts, quote posts and richer reactions.
 - Threaded comments, mentions, sorting, pagination, editing, and moderation.
 - Optimistic updates with correct rollback and offline draft recovery. Temporary
   refresh/crash recovery is deployed; true offline publication remains open.

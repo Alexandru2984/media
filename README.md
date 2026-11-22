@@ -126,15 +126,15 @@ Generated artifacts and runtime data must stay out of Git.
 
 The next project goals are:
 
-1. Add login alerts, MFA/passkeys, breached-password screening, and stronger
+1. Add named private bookmark collections, richer profiles and content warnings,
+   preserving ownership, audience, pagination and export/deletion contracts.
+2. Add login alerts, MFA/passkeys, breached-password screening, and stronger
    reauthentication for high-risk account changes.
-2. Add database integration tests, browser CI, migration checks, and automated
-   release/rollback workflows around the deployed versioned migrations.
 3. Add responsive image derivatives, deduplication, decoder telemetry, and a
    separate cookieless media origin on top of the deployed decode/re-encode,
    quota, ownership, and abandoned-upload lifecycle.
-4. Add metrics, alerts, retention policy, and restore drills around the deployed
-   health endpoints and privacy-redacted JSON request logs.
+4. Add metrics, alert ownership and retention policy around the deployed health
+   endpoints, privacy-redacted request logs, backup checks and restore drills.
 5. Extend the deployed least-privilege moderation workflow with appeals,
    transparent notices, approved retention/legal-hold policy, workload alerts,
    repeat-abuse signals, and carefully separated enforcement actions; continue
@@ -148,6 +148,9 @@ The next project goals are:
    previews into sitemaps; then add Search Console integration, structured-data
    validation, authorization-regression alerts, and real-user Core Web Vitals
    monitoring.
+8. Automate the existing disposable HTTP/database, browser, migration and release
+   checks in CI, with dependency/secret checks and authorization regressions.
+   SEO expansion and CI setup are the final phase, as requested by the operator.
 
 See the [security audit](docs/SECURITY_AUDIT.md) and the
 [implementation roadmap](docs/ROADMAP.md) for the current findings, priorities,
