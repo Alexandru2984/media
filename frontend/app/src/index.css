@@ -4538,9 +4538,7 @@ body.command-palette-open {
 
 
   .report-dialog {
-    width: 100%;
-    max-height: calc(100vh - 24px);
-    border-radius: 22px 22px 0 0;
+    max-height: calc(100dvh - 24px);
   }
 
   .report-dialog-actions {
@@ -4948,3 +4946,5 @@ body:has(dialog[open]) { overflow: hidden; }
 .composer-preview-notice { margin: 0 0 14px; color: var(--text-muted); font-size: .75rem; line-height: 1.6; }
 .composer-preview-notice:last-child { margin: 14px 0 0; }
 .report-dialog::backdrop { background: rgb(3 7 18 / 62%); backdrop-filter: blur(4px); }
+.report-dialog .btn { min-height: 44px; }
+.report-dialog-actions:has(> :only-child) { grid-template-columns: minmax(0, 1fr); }

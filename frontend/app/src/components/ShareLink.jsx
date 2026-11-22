@@ -43,10 +43,13 @@ export default function ShareLink(props) {
     </button>
     <Modal open={Boolean(manualUrl())} onClose={() => { setManualUrl(''); trigger?.focus({ preventScroll: true }); }} label="Copiază linkul">
       <div class="report-dialog-head"><h2>Copiază linkul</h2><button type="button" class="icon-button" aria-label="Închide copierea linkului" onClick={() => setManualUrl('')}>×</button></div>
-      <p class="report-privacy-note">Selectează și copiază linkul. Accesul la conținut respectă în continuare setările contului.</p>
-      <label class="field-label" for={inputId}>Link de distribuit</label>
-      <input id={inputId} class="input" type="url" readonly value={manualUrl()} autofocus onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} />
-      <div class="report-dialog-actions"><button type="button" class="btn btn-primary" onClick={() => setManualUrl('')}>Gata</button></div>
+      <div class="report-form">
+        <p class="report-privacy-note">Selectează și copiază linkul. Accesul la conținut respectă în continuare setările contului.</p>
+        <div><label class="field-label" for={inputId}>Link de distribuit</label>
+          <input id={inputId} class="input" type="url" readonly value={manualUrl()} autofocus onFocus={(event) => event.currentTarget.select()} onClick={(event) => event.currentTarget.select()} />
+        </div>
+        <div class="report-dialog-actions"><button type="button" class="btn btn-primary" onClick={() => setManualUrl('')}>Gata</button></div>
+      </div>
     </Modal>
   </>;
 }
