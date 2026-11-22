@@ -1,6 +1,12 @@
 # Media
 
 Media is a social platform hosted at [media.micutu.com](https://media.micutu.com).
+The 2026-11-22 release adds an editorial landing with interactive conversation
+examples, Unicode hashtag links in posts/comments, people/post search filters,
+topic entry points, cancelled stale searches and reliable feed continuation.
+Application-level upload checks now enforce post audiences even on direct
+backend reads; successful API responses prohibit caching independently of Nginx.
+See the [current delivery plan](docs/DELIVERY_PLAN.md) for priorities and scope.
 The application currently provides account management, email verification and
 password recovery, user profiles, avatars, posts, image uploads, likes, and
 comments. It also includes a paginated feed, community search, responsive mobile
@@ -164,6 +170,23 @@ cargo test --locked --manifest-path backend/Cargo.toml
 cargo build --release --locked --manifest-path backend/Cargo.toml
 cargo audit --file backend/Cargo.lock
 ```
+
+The 2026-11-22 patched graph resolves seven RustSec vulnerability reports.
+The full lockfile audit still reports the optional, uncompiled SQLite binding
+`libsqlite3-sys` and an unmaintained Chrono warning; these are documented in the
+security audit and are not silently ignored. The active backend builds MySQL.
+
+After building, a MariaDB socket administrator can run the disposable HTTP/media
+authorization suite. It creates and removes its own randomly named database,
+database user and temporary uploads, without reading the production `.env`:
+
+```bash
+sudo python3 backend/tests/media_access.py
+```
+
+Its 19 checks cover owner/follower/anonymous/outsider access, immediate follow
+and privacy revocation, blocks in both directions, forged headers, conditional
+and range requests, unsupported paths/methods, avatars and cache policy.
 
 The complete local environment, frontend release flow, migrations, health
 checks, and incident-response procedures still need consolidation. Production

@@ -53,6 +53,15 @@ unmaintained warning also remains and needs a deliberate storage/API-compatible
 date-library migration. Locked tests (65 application + 5 seed), strict Clippy,
 format checks and the optimized backend build pass after the updates.
 
+The reproducible `backend/tests/media_access.py` suite additionally passes 19
+real HTTP checks against the optimized binary, embedded migrations and a
+disposable MariaDB database. It verifies owner, approved follower, outsider,
+anonymous and blocked-viewer decisions; immediate unfollow and public/private
+revocation; spoofed probe paths; range/conditional requests; unsupported
+namespaces, traversal and methods; public avatars; and cache/header policy.
+The temporary database, database identity, listener and uploads are removed.
+No production accounts, images or environment secrets are used.
+
 The review covered the deployed frontend bundle, the compiled Rust backend,
 public HTTP behavior, Nginx virtual-host configuration, the systemd service,
 filesystem permissions, TLS behavior, and recoverable Rust dependency metadata.
