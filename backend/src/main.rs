@@ -3,6 +3,7 @@ mod database;
 mod email;
 mod handlers;
 mod health;
+mod media;
 mod models;
 mod moderation;
 mod notifications;
@@ -21,7 +22,6 @@ mod validation;
 use axum::http::{header, HeaderValue, Method};
 use std::net::{IpAddr, SocketAddr};
 use tower_http::cors::CorsLayer;
-use tower_http::services::ServeDir;
 use tracing_subscriber::EnvFilter;
 
 fn parse_upload_maintenance_enabled(value: Option<&str>) -> Result<bool, &'static str> {
@@ -118,9 +118,7 @@ async fn main() {
         ])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
 
-    let app = routes::create_routes(db_pool, cors_origin)
-        .nest_service("/uploads", ServeDir::new("uploads"))
-        .layer(cors);
+    let app = routes::create_routes(db_pool, cors_origin).layer(cors);
 
     // Run our app with hyper
     let addr = SocketAddr::new(server_host, server_port);

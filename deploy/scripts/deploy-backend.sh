@@ -198,6 +198,8 @@ if ! wait_for_ready "http://127.0.0.1:$canary_port/api/health/ready" \
     || ! require_status candidate-live 200 "http://127.0.0.1:$canary_port/api/health/live" \
     || ! require_status candidate-posts 200 "http://127.0.0.1:$canary_port/api/posts?limit=1&offset=0" \
     || ! require_status candidate-auth-boundary 401 "http://127.0.0.1:$canary_port/api/auth/me" \
+    || ! require_status candidate-media-boundary 403 "http://127.0.0.1:$canary_port/uploads/posts/release-canary.webp" \
+    || ! require_status candidate-upload-namespace 404 "http://127.0.0.1:$canary_port/uploads/private/release-canary.png" \
     || ! require_status candidate-pagination-boundary 400 "http://127.0.0.1:$canary_port/api/posts?limit=101&offset=0"; then
   echo "Isolated candidate canary failed; live binary was not changed" >&2
   exit 1
@@ -243,6 +245,8 @@ promote_and_canary() {
   require_status direct-live 200 'http://127.0.0.1:8083/api/health/live' || return 1
   require_status direct-posts 200 'http://127.0.0.1:8083/api/posts?limit=1&offset=0' || return 1
   require_status direct-auth-boundary 401 'http://127.0.0.1:8083/api/auth/me' || return 1
+  require_status direct-media-boundary 403 'http://127.0.0.1:8083/uploads/posts/release-canary.webp' || return 1
+  require_status direct-upload-namespace 404 'http://127.0.0.1:8083/uploads/private/release-canary.png' || return 1
   require_status direct-pagination-boundary 400 'http://127.0.0.1:8083/api/posts?limit=101&offset=0' || return 1
   require_status tunnel-ready 200 --resolve "$resolve_origin" "$origin/api/health/ready?release=$release_id" || return 1
   require_status public-ready 200 "$origin/api/health/ready?release=$release_id" || return 1

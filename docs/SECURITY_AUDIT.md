@@ -2,7 +2,7 @@
 
 **System:** Media (`media.micutu.com`)
 
-**Audit date:** 2026-10-30
+**Audit date:** 2026-10-30; targeted re-audit 2026-11-22
 
 **Status:** Living audit; initial P0 containment complete, application hardening in progress
 
@@ -17,6 +17,29 @@ authorization, appeals/enforcement policy, privacy governance, alerting, and
 recovery work remain
 
 ## Scope and limitations
+
+The 2026-11-22 re-audit confirmed an application-layer upload authorization gap:
+the backend's raw `ServeDir` exposed every upload namespace to direct loopback
+requests without Nginx's current post-audience check. The production listener is
+loopback-only; no public exploitation or public proxy bypass was demonstrated.
+The application now allowlists flat JPEG/PNG/WebP paths, reuses post audience
+authorization before serving bytes, overwrites caller-supplied probe paths,
+rejects other namespaces and writes, and fails closed on database failure.
+Avatars retain their documented public profile-metadata policy. Media responses
+also enforce sandbox/nosniff/same-origin and private/no-store headers. Successful
+API responses now prohibit caching in the application, independently of Nginx.
+Regression tests exercise actual temporary files, spoofed probe headers, GET,
+HEAD, unsupported methods/namespaces, database failures and public avatar reads;
+release canaries enforce direct-backend rejection boundaries.
+
+The current dependency audit reports eight RustSec findings in the old lockfile:
+six in lettre 0.11.23, one in url 2.5.8, and one in libsqlite3-sys 0.37.0.
+The SQLite dependency is present in the lockfile but absent from `cargo tree -i`
+for the active build. Chrono also has an unmaintained advisory. These findings
+supersede historical zero-finding statements until the patch release is verified.
+The current locked npm audit reports zero vulnerabilities. Public CSP still
+permits inline scripts for Cloudflare challenges. SMTP delivery was not retried
+against real recipients; its previously documented failure remains unresolved.
 
 The review covered the deployed frontend bundle, the compiled Rust backend,
 public HTTP behavior, Nginx virtual-host configuration, the systemd service,

@@ -61,6 +61,16 @@ pub async fn api_response_policy(request: Request, next: Next) -> Response {
     response
         .headers_mut()
         .insert(REQUEST_ID_HEADER, response_request_id.clone());
+    // Sensitive successful responses need the same protection as failures,
+    // even when a client reaches the backend without the Nginx proxy policy.
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-store"),
+    );
+    response.headers_mut().insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
 
     let status = response.status();
     if status.is_client_error() || status.is_server_error() {
@@ -79,9 +89,6 @@ pub async fn api_response_policy(request: Request, next: Next) -> Response {
             header::CONTENT_TYPE,
             HeaderValue::from_static("application/problem+json"),
         );
-        response
-            .headers_mut()
-            .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
         response.headers_mut().remove(header::CONTENT_LENGTH);
         *response.body_mut() = if is_head {
             Body::empty()
@@ -266,7 +273,7 @@ mod tests {
         );
         assert_eq!(
             response.headers().get(header::CACHE_CONTROL).unwrap(),
-            "no-store"
+            "private, no-store"
         );
         assert_eq!(
             response.headers().get(REQUEST_ID_HEADER).unwrap(),
@@ -350,6 +357,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers()[header::CACHE_CONTROL],
+            "private, no-store"
+        );
+        assert_eq!(
+            response.headers()[header::X_CONTENT_TYPE_OPTIONS],
+            "nosniff"
+        );
         assert_eq!(
             response.headers().get(header::CONTENT_TYPE).unwrap(),
             "application/json"

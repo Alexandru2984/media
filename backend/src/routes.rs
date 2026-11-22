@@ -7,9 +7,10 @@ use axum::{
 };
 use sqlx::MySqlPool;
 
-use crate::{handlers, health, moderation, notifications, public_pages, safety, security};
+use crate::{handlers, health, media, moderation, notifications, public_pages, safety, security};
 
 pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
+    let media_routes = media::routes(pool.clone(), "uploads");
     let api_routes = Router::new()
         // Operational health routes expose no dependency detail.
         .route("/health/live", get(health::live))
@@ -171,5 +172,8 @@ pub fn create_routes(pool: MySqlPool, expected_origin: HeaderValue) -> Router {
         .layer(middleware::from_fn(security::api_response_policy))
         .layer(middleware::from_fn(security::request_observability));
 
-    Router::new().merge(public_routes).nest("/api", api_routes)
+    Router::new()
+        .merge(public_routes)
+        .merge(media_routes)
+        .nest("/api", api_routes)
 }
