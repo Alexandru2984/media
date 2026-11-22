@@ -2,7 +2,7 @@
 
 **2026-11-22 image descriptions:** optional 300-character Unicode image
 descriptions now flow through create/edit, previews, thumbnails, the image viewer,
-public post HTML/social metadata, all existing post DTOs and export v8. They are
+public post HTML/social metadata, full-post responses and export v8. They are
 validated as single-line text, escaped in HTML/metadata and excluded from
 temporary drafts. Removing/replacing an image clears its previous description;
 an additive database trigger preserves that behavior for the preceding API

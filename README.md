@@ -176,6 +176,10 @@ changes. Initialize a development database explicitly with the `migrate` binary
 (`cargo run --locked --manifest-path backend/Cargo.toml --bin migrate -- apply
 EXPECTED_DATABASE`) and its development `DATABASE_URL`. Production uses the
 [backup-verified migration workflow](deploy/scripts/README.md#backend).
+Create source packages from a sanitized checkout without production runtime
+directories. Cargo's Git-status inspection can fail on the protected uploads
+directory in this VPS checkout; keep those permissions intact. The source
+allowlist includes code, tests and migrations, excluding uploads and secrets.
 
 Backend checks and a release build can now be reproduced with Cargo:
 

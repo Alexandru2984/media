@@ -38,6 +38,10 @@ a legacy hostname in local configuration is not evidence of an active provider.
   viewer, and real public Cloudflare rendering at 390/1440 px in both themes.
 - Frontend/backend deployers now reject overlapping activations before mutation.
   SEO expansion and CI setup remain in the final planned phase.
+- Image descriptions are delivered across publishing, viewing, public HTML and
+  export v8, with previous-binary compatibility verified on the new schema.
+  Offline migration application now has a compiled manifest, shared lock and
+  restore-verified backup; API startup performs read-only schema validation.
 
 This is a verified release increment, not completion of every backlog item.
 The [follow-up release report](RELEASE_2026-11-22_FOLLOWUP.md) records the current
@@ -71,10 +75,10 @@ artifacts, validation scope, Cloudflare constraint and remaining work.
 3. **Useful discovery.** Search filters for people/posts, topic entry points,
    safe hashtag navigation, clear result/empty/error states, stale-request
    protection, and correct feed continuation. No fabricated trends or members.
-4. **Publishing and profiles.** Alt text, multiple images with derivatives,
-   pinned posts, named private bookmark collections, richer profiles, content
-   warnings and accessible image viewing. Design each storage migration and its
-   rollback separately.
+4. **Publishing and profiles.** Image descriptions and accessible viewing are
+   delivered. Next: multiple images with derivatives, pinned posts, named private
+   bookmark collections, richer profiles and content warnings. Design each
+   storage migration and its rollback separately.
 5. **Interaction.** Polls, mentions, threaded replies, notification quiet hours,
    saved searches and transparent suggested follows. Build anti-spam quotas and
    block/private-account enforcement into each feature.
