@@ -1,5 +1,17 @@
 # Product, Security, Design, and SEO Roadmap
 
+See [the current delivery plan](DELIVERY_PLAN.md) for the 2026-11-22 re-audit,
+remaining dependency findings and the next concrete releases.
+
+**2026-11-22 design update:** the public landing replaces gradient orbs, floating
+fake social cards and repeated feature panels with an editorial composition,
+original inline vector artwork, a clear invitation, concise product explanations
+and four interactive, explicitly labeled conversation examples. Existing brand,
+authentication and private-account controls remain in place. Chromium verified
+320/390/768/1440 px in light and dark mode, topic switching, 44 px topic controls,
+no horizontal overflow and no uncaught JavaScript errors. Frontend tests and the
+production artifact gate pass (123,721 entry JS bytes, 81,567 CSS bytes).
+
 This roadmap is deliberately security-first. A polished interface on top of an
 unpatchable or weakly isolated service only increases the blast radius.
 
