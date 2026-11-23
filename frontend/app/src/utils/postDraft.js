@@ -1,6 +1,6 @@
-import { postContentIsValid } from './postContent.js';
+import { postContentIsValid, postWarningIsValid } from './postContent.js';
 
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 const MAX_STORED_CODE_UNITS = 2048;
 export const POST_DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
@@ -8,7 +8,8 @@ const MAX_CLOCK_SKEW_MS = 5 * 60 * 1000;
 function draftKey(userId) {
   const normalizedUserId = String(userId ?? '').trim();
   if (!normalizedUserId || normalizedUserId.length > 128) return null;
-  return `media:post-draft:v${DRAFT_VERSION}:${encodeURIComponent(normalizedUserId)}`;
+  // Keep the namespace so logout/deletion clears either schema version.
+  return `media:post-draft:v1:${encodeURIComponent(normalizedUserId)}`;
 }
 
 function removeStoredDraft(storage, key) {
@@ -38,9 +39,11 @@ export function readPostDraft(userId, environment = globalThis, now = Date.now()
       removeStoredDraft(storage, key);
       return null;
     }
+    const warning = draft?.version === 1 ? '' : draft?.content_warning;
     const valid = draft
-      && draft.version === DRAFT_VERSION
+      && (draft.version === 1 || draft.version === DRAFT_VERSION)
       && postContentIsValid(draft.content)
+      && postWarningIsValid(warning)
       && Number.isFinite(draft.savedAt)
       && draft.savedAt <= now + MAX_CLOCK_SKEW_MS
       && now - draft.savedAt <= POST_DRAFT_MAX_AGE_MS;
@@ -50,24 +53,25 @@ export function readPostDraft(userId, environment = globalThis, now = Date.now()
       return null;
     }
 
-    return { content: draft.content, savedAt: draft.savedAt };
+    return { content: draft.content, savedAt: draft.savedAt, ...(warning ? { content_warning: warning } : {}) };
   } catch {
     return null;
   }
 }
 
-export function storePostDraft(userId, content, environment = globalThis, now = Date.now()) {
+export function storePostDraft(userId, content, environment = globalThis, now = Date.now(), warning = '') {
   const key = draftKey(userId);
   if (
     !key
     || !postContentIsValid(content)
+    || !postWarningIsValid(warning)
     || !Number.isFinite(now)
   ) return false;
 
   try {
     const storage = environment.sessionStorage;
     if (!storage) return false;
-    storage.setItem(key, JSON.stringify({ version: DRAFT_VERSION, content, savedAt: now }));
+    storage.setItem(key, JSON.stringify({ version: DRAFT_VERSION, content, content_warning: warning, savedAt: now }));
     return true;
   } catch {
     return false;

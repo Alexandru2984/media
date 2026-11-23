@@ -142,10 +142,10 @@ class ApiService {
     return this.request(withQuery('/feed/following', { limit, offset }));
   }
 
-  async createPost(content, imageUrl = null, imageAlt = '') {
+  async createPost(content, imageUrl = null, imageAlt = '', contentWarning = '') {
     return this.request('/posts', {
       method: 'POST',
-      body: JSON.stringify({ content, image_url: imageUrl, image_alt: imageAlt }),
+      body: JSON.stringify({ content, image_url: imageUrl, image_alt: imageAlt, content_warning: contentWarning }),
     });
   }
 
@@ -302,10 +302,10 @@ class ApiService {
   }
 
   // Post Management
-  async updatePost(postId, content, imageUrl, imageAlt = '') {
+  async updatePost(postId, content, imageUrl, imageAlt = '', contentWarning) {
     return this.request(`/posts/${encodePathSegment(postId)}`, {
       method: 'PUT',
-      body: JSON.stringify({ content, image_url: imageUrl, image_alt: imageAlt }),
+      body: JSON.stringify({ content, image_url: imageUrl, image_alt: imageAlt, content_warning: contentWarning }),
     });
   }
 

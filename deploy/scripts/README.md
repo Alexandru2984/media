@@ -104,6 +104,13 @@ The production action requires the root-owned mode-`0600` environment file and
 active API, Nginx, and Tunnel services. It never prints configuration or secrets,
 does not mutate migrations, and does not delete candidates or backups.
 
+Content-warning compatibility: schema `20261123001000` is additive, but binaries
+before that version do not render warnings or generic warning previews. Once any
+post has `content_warning IS NOT NULL`, use a warning-aware binary/frontend for
+rollback. Retain the current immutable warning-aware release as the baseline for
+future upgrades. The preceding profile-only binary is suitable only before
+warned posts exist; storage compatibility alone does not preserve the UI behavior.
+
 ## Database restore drill
 
 `drill-database-restore.sh` takes a transaction-consistent, root-only temporary

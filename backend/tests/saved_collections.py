@@ -204,10 +204,10 @@ def check_saved_collections(base, ids, tokens, sql, database, environment, root,
     assert len(request("GET", folders)) == 30
     request("POST", folders, {"name": "Over cap"}, expected=409)
     exported = request("POST", "/api/users/me/export", {"password": "Export fixture password 2026!"})
-    assert exported["format_version"] == 11
+    assert exported["format_version"] == 12
     assert exported["counts"]["saved_collections"] == len(exported["saved_collections"]) == 30
     assert exported["counts"]["saved_collection_posts"] == len(exported["saved_collection_posts"])
     assert {"post_id": a, "collection_id": second} in [{"post_id": row["post_id"], "collection_id": row["collection_id"]} for row in exported["saved_collection_posts"]]
     assert "Private foreign collection" not in json.dumps(exported)
     assert "password_hash" not in json.dumps(exported) and "token_hash" not in json.dumps(exported)
-    print(f"saved_collection_checks={checks}; passed; privacy, CRUD, validation, quota races, filters, pagination, FK/cascades and export v11")
+    print(f"saved_collection_checks={checks}; passed; privacy, CRUD, validation, quota races, filters, pagination, FK/cascades and export v12")

@@ -9,9 +9,10 @@ import {
 } from '../utils/postDraft';
 import { getImageUrl } from '../utils/urls';
 import { fulfillComposerFocus } from '../utils/composerFocus';
-import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid } from '../utils/postContent';
+import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid, postWarningIsValid } from '../utils/postContent';
 import { imageAltIsValid } from '../utils/imageAlt';
 import ImageAltField from './ImageAltField';
+import { WarningField as ContentWarningField } from './ContentNotice';
 
 const MAX_CONTENT_LENGTH = POST_CHARACTER_LIMIT;
 const ComposerPreview = lazy(() => import('./ComposerPreview'));
@@ -25,6 +26,7 @@ export default function CreatePost(props) {
   const [imageFile, setImageFile] = createSignal(null);
   const [imagePreview, setImagePreview] = createSignal(null);
   const [imageAlt, setImageAlt] = createSignal('');
+  const [contentWarning, setContentWarning] = createSignal('');
   let imageReadVersion = 0;
   onCleanup(() => { imageReadVersion += 1; });
   const [error, setError] = createSignal('');
@@ -67,30 +69,39 @@ export default function CreatePost(props) {
     window.requestAnimationFrame(() => contentInput?.focus({ preventScroll: true }));
   };
 
-  const handleContentInput = (event) => {
-    const nextContent = event.currentTarget.value;
-    setContent(nextContent);
+  const persistDraft = (nextContent, warning) => {
 
     if (!nextContent.trim()) {
       const removed = removePostDraft(auth.user()?.id);
       if (removed) clearDraftExpiryTimer();
       setDraftStatus(removed ? '' : 'unavailable');
-    } else if (!postContentIsValid(nextContent)) {
+    } else if (!postContentIsValid(nextContent) || !postWarningIsValid(warning)) {
       const removed = removePostDraft(auth.user()?.id);
       if (removed) clearDraftExpiryTimer();
       setDraftStatus(removed ? 'too-long' : 'unavailable');
     } else {
       const savedAt = Date.now();
-      const stored = storePostDraft(auth.user()?.id, nextContent, globalThis, savedAt);
+      const stored = storePostDraft(auth.user()?.id, nextContent, globalThis, savedAt, warning);
       setDraftStatus(stored ? 'saved' : 'unavailable');
       if (stored) scheduleDraftExpiry(savedAt);
     }
+  };
+
+  const handleContentInput = (event) => {
+    const value = event.currentTarget.value;
+    setContent(value);
+    persistDraft(value, contentWarning());
+  };
+  const handleWarningInput = (value) => {
+    setContentWarning(value);
+    persistDraft(content(), value);
   };
 
   const restoreDraft = () => {
     const draft = recoverableDraft();
     if (!draft) return;
     setContent(draft.content);
+    setContentWarning(draft.content_warning || '');
     setRecoverableDraft(null);
     setDraftStatus('saved');
     scheduleDraftExpiry(draft.savedAt);
@@ -149,7 +160,7 @@ export default function CreatePost(props) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     const postContent = content().trim();
-    if (!postContentIsValid(postContent) || !imageAltIsValid(imageAlt()) || recoverableDraft() || submitting()) return;
+    if (!postContentIsValid(postContent) || !imageAltIsValid(imageAlt()) || !postWarningIsValid(contentWarning()) || recoverableDraft() || submitting()) return;
 
     setSubmitting(true);
     setError('');
@@ -160,10 +171,11 @@ export default function CreatePost(props) {
         imageUrl = result.image_url;
       }
 
-      await api.createPost(postContent, imageUrl, imageFile() ? imageAlt().trim() : '');
+      await api.createPost(postContent, imageUrl, imageFile() ? imageAlt().trim() : '', contentWarning().trim());
       const draftRemoved = removePostDraft(auth.user()?.id);
       if (draftRemoved) clearDraftExpiryTimer();
       setContent('');
+      setContentWarning('');
       setShowPreview(false);
       setDraftStatus(draftRemoved ? '' : 'clear-failed');
       clearImage();
@@ -194,7 +206,7 @@ export default function CreatePost(props) {
           </span>
           <div class="composer-draft-copy" role="status">
             <strong id="composer-draft-title">Am găsit o schiță nestrimisă</strong>
-            <small>Salvată temporar la {draftSavedTime()}. Doar textul a fost păstrat în această filă.</small>
+            <small>Salvată temporar la {draftSavedTime()}. Textul și avertismentul au fost păstrate în această filă.</small>
           </div>
           <div class="composer-draft-actions">
             <button type="button" class="btn btn-secondary" onClick={discardDraft}>Șterge</button>
@@ -245,6 +257,7 @@ export default function CreatePost(props) {
             <Show when={imageFile()}>
               <ImageAltField id="post-image-alt" value={imageAlt()} onInput={setImageAlt} disabled={submitting()} />
             </Show>
+            <ContentWarningField id="post-content-warning" value={contentWarning()} onInput={handleWarningInput} disabled={Boolean(recoverableDraft()) || submitting()} />
           </div>
         </div>
 
@@ -275,7 +288,7 @@ export default function CreatePost(props) {
           <button
             type="submit"
             class="btn btn-primary"
-            disabled={Boolean(recoverableDraft()) || submitting() || !postContentIsValid(content()) || !imageAltIsValid(imageAlt())}
+            disabled={Boolean(recoverableDraft()) || submitting() || !postContentIsValid(content()) || !imageAltIsValid(imageAlt()) || !postWarningIsValid(contentWarning())}
           >
             <Show when={submitting()} fallback="Publică">
               <svg class="spinner" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -296,7 +309,7 @@ export default function CreatePost(props) {
         <Show when={showPreview()}>
           <div id="post-publish-preview">
             <Suspense fallback={<p class="comments-status" role="status">Se încarcă previzualizarea…</p>}>
-              <ComposerPreview content={content()} image={imagePreview()} imageAlt={imageAlt()} user={auth.user()} />
+              <ComposerPreview content={content()} image={imagePreview()} imageAlt={imageAlt()} contentWarning={contentWarning()} user={auth.user()} />
             </Suspense>
           </div>
         </Show>
@@ -318,7 +331,7 @@ export default function CreatePost(props) {
               {draftStatus() === 'saved'
                 ? (imageFile() ? 'Text salvat temporar; imaginea și descrierea ei nu sunt incluse în schiță.' : 'Schiță salvată temporar în această filă.')
                 : (draftStatus() === 'too-long'
-                  ? 'Schița se salvează din nou când textul este valid și are maximum 500 de caractere.'
+                  ? 'Schița se salvează din nou când textul și avertismentul respectă limitele afișate.'
                   : (draftStatus() === 'expired'
                     ? 'Copia temporară a expirat. Modifică textul pentru a o salva din nou.'
                     : (draftStatus() === 'clear-failed' ? 'Copia temporară nu a putut fi ștearsă. Verifică setările browserului și încearcă din nou.' : 'Salvarea temporară nu este disponibilă în acest browser.')))}

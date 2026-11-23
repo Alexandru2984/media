@@ -6,7 +6,8 @@ import { getImageUrl, loginPath, postPath, profilePath } from '../utils/urls';
 import ReportDialog from './ReportDialog';
 import PostText from './PostText';
 import PostImage from './PostImage';
-import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid } from '../utils/postContent';
+import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid, postWarningIsValid } from '../utils/postContent';
+import ContentNotice, { WarningField as ContentWarningField } from './ContentNotice';
 import { imageAltIsValid } from '../utils/imageAlt';
 import ImageAltField from './ImageAltField';
 import ProfilePinButton from './ProfilePinButton';
@@ -51,6 +52,7 @@ export default function PostCard(props) {
   const [editing, setEditing] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [editContent, setEditContent] = createSignal(props.post.content);
+  const [editWarning, setEditWarning] = createSignal(props.post.content_warning || '');
   const [editingCommentId, setEditingCommentId] = createSignal(null);
   const [editCommentText, setEditCommentText] = createSignal('');
   const [editImageFile, setEditImageFile] = createSignal(null);
@@ -165,6 +167,7 @@ export default function PostCard(props) {
     imageReadVersion += 1;
     setEditing(false);
     setEditContent(props.post.content);
+    setEditWarning(props.post.content_warning || '');
     setEditImageFile(null);
     setEditImagePreview(null);
     setEditImageAlt(props.post.image_alt || '');
@@ -174,7 +177,7 @@ export default function PostCard(props) {
 
   const handleEditPost = async () => {
     const content = editContent().trim();
-    if (!postContentIsValid(content) || !imageAltIsValid(editImageAlt()) || saving()) return;
+    if (!postContentIsValid(content) || !imageAltIsValid(editImageAlt()) || !postWarningIsValid(editWarning()) || saving()) return;
 
     setSaving(true);
     setError('');
@@ -185,7 +188,7 @@ export default function PostCard(props) {
         imageUrl = result.image_url;
       }
 
-      await api.updatePost(props.post.id, content, imageUrl, imageUrl ? editImageAlt().trim() : '');
+      await api.updatePost(props.post.id, content, imageUrl, imageUrl ? editImageAlt().trim() : '', editWarning().trim());
       resetEditor();
       await props.onUpdate?.();
     } catch (requestError) {
@@ -324,6 +327,7 @@ export default function PostCard(props) {
         </Show>
       </header>
 
+      <ContentNotice label={props.post.content_warning} resetKey={`${props.post.id}:${auth.user()?.id || ''}`} forceOpen={editing()}>
       <Show when={!editing()}>
         <p class="post-content"><PostText text={props.post.content} /></p>
         <Show when={props.post.image_url}>
@@ -342,6 +346,7 @@ export default function PostCard(props) {
             onInput={(event) => setEditContent(event.currentTarget.value)}
             rows="4"
           />
+          <ContentWarningField id={`edit-warning-${props.post.id}`} value={editWarning()} onInput={setEditWarning} disabled={saving()} />
           <div class={`character-count ${countPostCharacters(editContent()) > MAX_CONTENT_LENGTH ? 'is-over' : ''}`}>
             {countPostCharacters(editContent())}/{MAX_CONTENT_LENGTH}
           </div>
@@ -387,7 +392,7 @@ export default function PostCard(props) {
               type="button"
               class="btn btn-primary"
               onClick={handleEditPost}
-              disabled={saving() || !postContentIsValid(editContent()) || !imageAltIsValid(editImageAlt())}
+              disabled={saving() || !postContentIsValid(editContent()) || !imageAltIsValid(editImageAlt()) || !postWarningIsValid(editWarning())}
             >
               {saving() ? 'Se salvează…' : 'Salvează'}
             </button>
@@ -535,6 +540,7 @@ export default function PostCard(props) {
           </Show>
         </section>
       </Show>
+      </ContentNotice>
     </article>
     </Show>
   );

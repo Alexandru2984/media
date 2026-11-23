@@ -63,6 +63,7 @@ export default function PageMeta(props) {
     const canonicalUrl = `${SITE_URL}${canonicalPath}`;
     const schemaType = props.schemaType || 'WebPage';
     const socialImage = safeSocialImage(props.imageUrl);
+    const socialImageAlt = props.imageAlt || DEFAULT_TITLE;
     const openGraphType = props.openGraphType || 'website';
     const robots = props.noIndex
       ? 'noindex, nofollow, noarchive'
@@ -78,9 +79,11 @@ export default function PageMeta(props) {
     setMeta('meta[property="og:type"]', openGraphType);
     setMeta('meta[property="og:image"]', socialImage);
     setMeta('meta[property="og:image:secure_url"]', socialImage);
+    setMeta('meta[property="og:image:alt"]', socialImageAlt);
     setMeta('meta[name="twitter:title"]', title);
     setMeta('meta[name="twitter:description"]', description);
     setMeta('meta[name="twitter:image"]', socialImage);
+    setMeta('meta[name="twitter:image:alt"]', socialImageAlt);
     setStructuredData(props.noIndex
       ? null
       : buildStructuredData({ title, description, canonicalUrl, schemaType }));
@@ -97,9 +100,11 @@ export default function PageMeta(props) {
     setMeta('meta[property="og:type"]', 'website');
     setMeta('meta[property="og:image"]', SOCIAL_IMAGE_URL);
     setMeta('meta[property="og:image:secure_url"]', SOCIAL_IMAGE_URL);
+    setMeta('meta[property="og:image:alt"]', DEFAULT_TITLE);
     setMeta('meta[name="twitter:title"]', DEFAULT_TITLE);
     setMeta('meta[name="twitter:description"]', DEFAULT_DESCRIPTION);
     setMeta('meta[name="twitter:image"]', SOCIAL_IMAGE_URL);
+    setMeta('meta[name="twitter:image:alt"]', DEFAULT_TITLE);
     setStructuredData(buildStructuredData({
       title: DEFAULT_TITLE,
       description: DEFAULT_DESCRIPTION,

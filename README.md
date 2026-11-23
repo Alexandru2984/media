@@ -15,7 +15,7 @@ Post images also accept optional plain-text descriptions of up to 300 Unicode
 characters. Creation, editing, preview, image viewing, public post HTML and
 account export preserve the description under the post's current audience.
 Temporary drafts exclude images and their descriptions. Account exports use
-format version 11, including optional public profile details, the pinned-post ID/timestamp and private
+format version 12, including post content-warning labels, optional public profile details, the pinned-post ID/timestamp and private
 saved-collection names and assignments.
 Profiles support optional display names, pronouns, location and a public HTTPS
 website. The editor explicitly discloses that these details remain public even
@@ -23,6 +23,13 @@ on private accounts. Core profile changes and details save atomically; older
 payloads that omit details preserve them. External links reject credentials,
 local/IP hosts and nonstandard ports, open with safe link attributes, and are
 never fetched by the server. Account export/deletion include this metadata.
+Post authors can add a 100-character content warning. The current UI and public
+HTML use a closed native disclosure; declared social previews use the label and
+a generic image. Warnings are advisory and do not change access permissions.
+Edits that omit the field preserve it; an empty string removes it. Temporary
+drafts retain warning text, including safe migration of prior text-only drafts.
+Older readers do not implement the disclosure or preview behavior; do not
+downgrade to a pre-warning API once labeled posts exist.
 Members can pin one of their own posts at the top of their profile, including
 an older post outside the first page. Pinning preserves private-account,
 block and personal-hide policies and does not reorder chronological feeds.
@@ -257,6 +264,14 @@ the local preview URL. The script mocks API responses and checks both themes at
 `node frontend/scripts/check-saved-collections.cjs` uses the same preview and
 Playwright variables to check collection CRUD, modal focus, Unicode bounds,
 failure/retry, filing, paging offsets, stale filter/viewer requests and quota UI.
+`check-profile-details.cjs` covers public details, safe websites, Unicode bounds
+and atomic-edit failure/retry UI. `check-content-warnings.cjs` covers native
+disclosure, warning editing, draft restore, previews, metadata and delayed-editor
+navigation focus. Both accept the same preview/Playwright environment variables.
+The composer loads separately; the entry/CSS budgets remain 130,000/85,000 bytes.
+The total optional-module budget is now 310,000 bytes for the added profile and
+warning flows. Production builds remove handled console diagnostics; development
+diagnostics, visible UI errors and server request logging remain available.
 
 The complete local environment, frontend release flow, migrations, health
 checks, and incident-response procedures still need consolidation. Production

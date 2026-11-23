@@ -2680,6 +2680,9 @@ body.command-palette-open {
 .post-card {
   overflow: hidden;
 }
+.post-warning > summary { margin: 16px; padding: 12px; cursor: pointer; border: 1px solid var(--border); border-radius: 12px; overflow-wrap: anywhere; }
+.warning-field { margin-block: 12px; }
+.warning-field > summary { cursor: pointer; }
 
 .post-header {
   display: flex;

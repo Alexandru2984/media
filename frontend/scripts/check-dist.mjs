@@ -12,7 +12,8 @@ const requiredRouteCopy = new Map([
 const budgets = {
   entryJavaScript: 130_000,
   stylesheet: 85_000,
-  totalJavaScript: 300_000,
+  // Bounded optional profile/publishing modules; entry/CSS budgets stay fixed.
+  totalJavaScript: 310_000,
 };
 const requiredPwaIcons = [
   { src: '/icons/icon-192.png', size: 192, purpose: 'any' },

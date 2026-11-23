@@ -28,6 +28,11 @@ const sections = [
     paragraphs: ['Din Editează profilul poți adăuga un nume afișat, pronume, o localitate și un website HTTPS. Sunt opționale și publice, inclusiv pentru un cont privat. Numele de utilizator rămâne identificatorul contului. Șterge câmpurile și salvează pentru a elimina detaliile. Nu publica adrese sau linkuri care conțin informații confidențiale.'],
   },
   {
+    id: 'avertismente',
+    title: 'Avertismente de conținut',
+    paragraphs: ['Deschide Avertisment de conținut în editor și adaugă o etichetă de până la 100 de caractere, de exemplu pentru spoilere. Cititorii pot deschide explicit conținutul. Audiența stabilește în continuare cine are acces; avertismentul nu face o postare publică privată. Eticheta se păstrează în schiță și poate fi modificată sau eliminată prin editare. Previzualizările declarate folosesc o imagine generică; serviciile externe pot păstra copii mai vechi.'],
+  },
+  {
     id: 'notificari',
     title: 'Notificări',
     paragraphs: ['Inboxul din aplicație funcționează independent de email. Din Setări → Notificări poți opri separat cererile de urmărire, acceptările, urmăritorii noi, aprecierile și comentariile. Preferința se aplică evenimentelor viitoare și nu rescrie istoricul existent.'],

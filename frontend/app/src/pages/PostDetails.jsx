@@ -64,9 +64,10 @@ export default function PostDetails() {
     <>
       <PageMeta
         title={post() ? `Postare de ${post().user.username} — Media` : 'Postare — Media'}
-        description={post() ? postDescription(post().content) : 'Postare distribuită pe Media.'}
+        description={post()?.content_warning ? `Avertisment: ${post().content_warning}. Deschide postarea pentru a citi conținutul.` : post() ? postDescription(post().content) : 'Postare distribuită pe Media.'}
         canonicalPath={postPath(params.id)}
-        imageUrl={post()?.image_url ? getImageUrl(post().image_url) : null}
+        imageUrl={!post()?.content_warning && post()?.image_url ? getImageUrl(post().image_url) : null}
+        imageAlt={!post()?.content_warning ? post()?.image_alt : null}
         openGraphType="article"
         noIndex
       />

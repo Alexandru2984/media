@@ -122,8 +122,11 @@ fn json_for_html(value: &Value) -> Result<String, serde_json::Error> {
 fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'static str> {
     let canonical_url = format!("{SITE_URL}/post/{}", post.id);
     let title = format!("Postare de {} — Media", post.user.username);
-    let description = condensed_text(&post.content, 180);
-    let social_image = absolute_post_image(post.image_url.as_deref())
+    let warning = post.content_warning.as_deref();
+    let description = warning
+        .map(|label| format!("Avertisment: {label}. Deschide postarea pentru a citi conținutul."))
+        .unwrap_or_else(|| condensed_text(&post.content, 180));
+    let social_image = absolute_post_image(post.image_url.as_deref().filter(|_| warning.is_none()))
         .unwrap_or_else(|| DEFAULT_SOCIAL_IMAGE.to_owned());
     let escaped_title = escape_html(&title);
     let escaped_description = escape_html(&description);
@@ -134,9 +137,15 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
     let image_description = post
         .image_alt
         .as_deref()
-        .filter(|value| !value.trim().is_empty())
+        .filter(|value| warning.is_none() && !value.trim().is_empty())
         .map(str::to_owned)
-        .unwrap_or_else(|| format!("Imagine publicată de {}", post.user.username));
+        .unwrap_or_else(|| {
+            if warning.is_some() {
+                "Media — conținut cu avertisment".to_owned()
+            } else {
+                format!("Imagine publicată de {}", post.user.username)
+            }
+        });
     let escaped_image_description = escape_html(&image_description);
 
     let published_at = post.created_at.to_rfc3339_opts(SecondsFormat::Secs, true);
@@ -210,7 +219,7 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
         "@context": "https://schema.org",
         "@type": "SocialMediaPosting",
         "headline": title,
-        "articleBody": post.content,
+        "articleBody": if warning.is_some() { &description } else { &post.content },
         "datePublished": published_at,
         "url": canonical_url,
         "inLanguage": "ro-RO",
@@ -237,14 +246,29 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
         ),
     )?;
 
-    let image = post.image_url.as_deref().and_then(|path| {
-        absolute_post_image(Some(path)).map(|_| {
-            format!(
-                r#"<img class="post-media" src="{}" alt="{escaped_image_description}" loading="eager" />"#,
-                escape_html(path),
-            )
+    let image = post
+        .image_url
+        .as_deref()
+        .and_then(|path| {
+            absolute_post_image(Some(path)).map(|_| {
+                format!(
+                    r#"<img class="post-media" src="{}" alt="{}" loading="{}" />"#,
+                    escape_html(path),
+                    escape_html(post.image_alt.as_deref().unwrap_or("Imagine publicată")),
+                    if warning.is_some() { "lazy" } else { "eager" },
+                )
+            })
         })
-    }).unwrap_or_default();
+        .unwrap_or_default();
+    let body = format!(r#"<p class="post-content">{escaped_content}</p>{image}"#);
+    let body = if let Some(label) = warning {
+        format!(
+            r#"<details class="post-warning"><summary>Avertisment: {}</summary>{body}</details>"#,
+            escape_html(label)
+        )
+    } else {
+        body
+    };
     let static_root = format!(
         r#"{ROOT_START}<div id="root">
   <main class="post-detail-page app-container" id="main-content">
@@ -253,8 +277,7 @@ fn render_post_shell(shell: &str, post: &PostWithUser) -> Result<String, &'stati
       <header class="post-header">
         <span class="post-author-copy"><strong class="post-author-name">{escaped_username}</strong><time class="post-time" datetime="{published_at}">{displayed_at}</time></span>
       </header>
-      <p class="post-content">{escaped_content}</p>
-      {image}
+      {body}
       <div class="post-actions" aria-label="Activitatea postării">
         <span class="post-action">{likes} aprecieri</span>
         <span class="post-action">{comments} comentarii</span>
@@ -590,6 +613,7 @@ mod tests {
             content: content.to_owned(),
             image_url: image_url.map(str::to_owned),
             image_alt: None,
+            content_warning: None,
             likes_count: 4,
             comments_count: 2,
             created_at: Utc.with_ymd_and_hms(2026, 11, 2, 10, 30, 0).unwrap(),
@@ -702,6 +726,25 @@ mod tests {
         let html = render_profile_shell(&shell(), &person).unwrap();
         assert!(html.contains("https://example.com/?a=1&amp;b=2"));
         assert!(html.contains("rel=\"noopener noreferrer nofollow ugc\""));
+    }
+
+    #[test]
+    fn warned_post_metadata_uses_generic_preview_and_native_disclosure() {
+        let mut sample = post(
+            "Text sensibil care nu intră în metadate",
+            Some("/uploads/posts/post_test.webp"),
+        );
+        sample.content_warning = Some("Violență & <detalii>".into());
+        sample.image_alt = Some("Descriere sensibilă".into());
+        let html = render_post_shell(&shell(), &sample).unwrap();
+        assert!(html.contains(
+            "<details class=\"post-warning\"><summary>Avertisment: Violență &amp; &lt;detalii&gt;"
+        ));
+        let metadata = html.split("<!--media-app-root-start-->").next().unwrap();
+        assert!(!metadata.contains("Text sensibil"));
+        assert!(!metadata.contains("Descriere sensibilă"));
+        assert!(!metadata.contains("post_test.webp"));
+        assert!(metadata.contains(DEFAULT_SOCIAL_IMAGE));
     }
 
     #[test]

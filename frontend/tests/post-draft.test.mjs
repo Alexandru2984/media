@@ -34,6 +34,22 @@ test('rejects empty, oversized, and invalid user drafts', () => {
   assert.equal(storePostDraft('x'.repeat(129), 'text', environment), false);
 });
 
+test('warning drafts retain labels, read legacy drafts and reject invalid labels', () => {
+  const sessionStorage = memoryStorage();
+  const environment = { sessionStorage };
+  const now = Date.now();
+  assert(storePostDraft('user', 'Text cu avertisment', environment, now, 'Spoilere'));
+  assert.equal(readPostDraft('user', environment, now).content_warning, 'Spoilere');
+  const key = 'media:post-draft:v1:user';
+  assert.equal(JSON.parse(sessionStorage.getItem(key)).version, 2);
+  assert(!storePostDraft('user', 'Text', environment, now, '📚'.repeat(101)));
+  sessionStorage.setItem(key, JSON.stringify({ version: 1, content: 'Schiță veche', savedAt: now }));
+  assert.deepEqual(readPostDraft('user', environment, now), { content: 'Schiță veche', savedAt: now });
+  sessionStorage.setItem(key, JSON.stringify({ version: 2, content: 'Text', content_warning: 'Bad\nlabel', savedAt: now }));
+  assert.equal(readPostDraft('user', environment, now), null);
+  assert.equal(sessionStorage.getItem(key), null);
+});
+
 test('expires drafts after 24 hours and removes malformed values', () => {
   const now = Date.UTC(2026, 10, 2, 12, 0, 0);
   const key = 'media:post-draft:v1:user';

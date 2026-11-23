@@ -37,6 +37,7 @@ pub struct Post {
     pub content: String,
     pub image_url: Option<String>,
     pub image_alt: Option<String>,
+    pub content_warning: Option<String>,
     pub likes_count: i64,
     pub comments_count: i64,
     pub created_at: DateTime<Utc>,
@@ -48,6 +49,7 @@ pub struct CreatePost {
     pub content: String,
     pub image_url: Option<String>,
     pub image_alt: Option<String>,
+    pub content_warning: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -111,6 +113,7 @@ pub struct UpdatePost {
     pub content: String,
     pub image_url: Option<String>,
     pub image_alt: Option<String>,
+    pub content_warning: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -209,6 +212,7 @@ pub struct PostWithUser {
     pub content: String,
     pub image_url: Option<String>,
     pub image_alt: Option<String>,
+    pub content_warning: Option<String>,
     pub likes_count: i64,
     pub comments_count: i64,
     pub created_at: DateTime<Utc>,

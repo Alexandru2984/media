@@ -81,7 +81,7 @@ def check_profile_details(base, ids, tokens, sql, database, environment, root, l
     assert sql(f"SELECT COUNT(*) FROM profile_details WHERE user_id='{ids['public']}'", database) == "0"
     request("PUT", update, {"profile_details": details})
     exported = request("POST", "/api/users/me/export", {"password": "Export fixture password 2026!"})
-    assert exported["format_version"] == 11
+    assert exported["format_version"] == 12
     assert exported["profile"]["display_name"] == details["display_name"]
     assert exported["profile"]["location"] == details["location"]
     compatibility = os.environ.get("MEDIA_COMPATIBILITY_BINARY")

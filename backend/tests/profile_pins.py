@@ -124,7 +124,7 @@ def check_profile_pins(base, ids, tokens, sql, database, environment, root, log)
     stale = b if current == a else a
     assert request("DELETE", pin_path(stale))["pinned_post_id"] == current
     exported = request("POST", "/api/users/me/export", {"password": "Export fixture password 2026!"})
-    assert exported["format_version"] == 11
+    assert exported["format_version"] == 12
     assert exported["profile"]["pinned_post_id"] == current
     assert exported["profile"]["pinned_post_at"] is not None
     assert "password_hash" not in json.dumps(exported) and "token_hash" not in json.dumps(exported)

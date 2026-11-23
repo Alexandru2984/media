@@ -42,9 +42,9 @@ const sections = [
   {
     id: 'stocare-browser',
     title: 'Ce rămâne temporar în browser',
-    paragraphs: ['Sesiunea contului folosește un cookie HttpOnly, care nu este citit de codul JavaScript al interfeței. Preferința de temă este păstrată local în browser. Când scrii o postare, Media poate păstra temporar numai textul schiței în sessionStorage, separat pentru contul curent și fila curentă, ca să îl poți recupera după un refresh sau o eroare. Imaginea selectată și descrierea ei nu intră în schiță.'],
+    paragraphs: ['Sesiunea contului folosește un cookie HttpOnly, care nu este citit de codul JavaScript al interfeței. Preferința de temă este păstrată local în browser. Când scrii o postare, Media poate păstra temporar textul și eticheta avertismentului în sessionStorage, separat pentru contul curent și fila curentă, ca să le poți recupera după un refresh sau o eroare. Imaginea selectată și descrierea ei nu intră în schiță.'],
     items: [
-      'Schița este limitată la 500 de caractere și nu este trimisă către server înainte de publicare.',
+      'Textul schiței este limitat la 500 de caractere, avertismentul la 100; nu sunt trimise către server înainte de publicare.',
       'Restaurarea este o alegere explicită; poți șterge schița fără să o încarci în editor.',
       'Copia temporară este eliminată la publicare, ștergere, golirea textului sau logout și expiră după maximum 24 de ore.',
       'Dacă browserul blochează sessionStorage, postarea poate fi scrisă și publicată, dar recuperarea temporară nu este disponibilă.',

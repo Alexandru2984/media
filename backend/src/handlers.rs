@@ -75,6 +75,7 @@ struct PostFeedRow {
     content: String,
     image_url: Option<String>,
     image_alt: Option<String>,
+    content_warning: Option<String>,
     likes_count: i64,
     comments_count: i64,
     created_at: DateTime<Utc>,
@@ -380,6 +381,7 @@ fn post_feed_row_to_response(row: PostFeedRow) -> PostWithUser {
         content: row.content,
         image_url: row.image_url,
         image_alt: row.image_alt,
+        content_warning: row.content_warning,
         likes_count: row.likes_count,
         comments_count: row.comments_count,
         created_at: row.created_at,
@@ -1966,7 +1968,7 @@ pub async fn export_account_data(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let posts = query_as::<_, Post>(
-        "SELECT id, user_id, content, image_url, image_alt, likes_count, comments_count,
+        "SELECT id, user_id, content, image_url, image_alt, content_warning, likes_count, comments_count,
                 created_at, updated_at
          FROM posts WHERE user_id = ? ORDER BY created_at ASC, id ASC",
     )
@@ -2213,7 +2215,7 @@ pub async fn export_account_data(
         response_headers,
         Json(AccountDataExport {
             format: "media-account-data",
-            format_version: 11,
+            format_version: 12,
             exported_at,
             profile,
             counts,
@@ -2383,6 +2385,16 @@ fn normalized_image_alt(
     Ok(Some(description.to_owned()))
 }
 
+fn normalized_content_warning(value: Option<&str>) -> Result<Option<String>, StatusCode> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.chars().any(char::is_control) || value.trim().chars().count() > 100 {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    Ok((!value.trim().is_empty()).then(|| value.trim().to_owned()))
+}
+
 // Post handlers
 pub async fn create_post(
     State(pool): State<MySqlPool>,
@@ -2403,6 +2415,7 @@ pub async fn create_post(
     let image_alt =
         normalized_image_alt(payload.image_url.as_deref(), payload.image_alt.as_deref())?;
 
+    let content_warning = normalized_content_warning(payload.content_warning.as_deref())?;
     let post_id = Uuid::new_v4().to_string();
     let now = Utc::now();
     let mut transaction = pool.begin().await.map_err(|error| {
@@ -2411,14 +2424,15 @@ pub async fn create_post(
     })?;
 
     query(
-        "INSERT INTO posts (id, user_id, content, image_url, image_alt, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO posts (id, user_id, content, image_url, image_alt, content_warning, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&post_id)
     .bind(&user_id)
     .bind(content)
     .bind(&payload.image_url)
     .bind(&image_alt)
+    .bind(&content_warning)
     .bind(now)
     .bind(now)
     .execute(&mut *transaction)
@@ -2472,7 +2486,7 @@ pub(crate) async fn visible_post_for_viewer(
     post_id: &str,
 ) -> Result<Option<PostWithUser>, StatusCode> {
     let row = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.content_warning, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -2554,7 +2568,7 @@ pub async fn get_posts(
         bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.content_warning, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -2626,7 +2640,7 @@ pub async fn get_following_feed(
         bounded_pagination(&params, 10, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.content_warning, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -2908,7 +2922,7 @@ pub async fn get_saved_posts(
         }
     };
     let rows = query_as::<_, SavedPostCollectionRow>(
-        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.content_warning, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -3721,6 +3735,12 @@ pub async fn update_post(
     if post.user_id != user_id {
         return Err(StatusCode::FORBIDDEN);
     }
+    let content_warning = normalized_content_warning(
+        payload
+            .content_warning
+            .as_deref()
+            .or(post.content_warning.as_deref()),
+    )?;
     let previous_image_url = post.image_url.clone();
     // Older clients omit this field. Preserve it only for the same image;
     // an explicit empty string clears it and a replacement gets a fresh value.
@@ -3751,11 +3771,12 @@ pub async fn update_post(
     }
 
     query(
-        "UPDATE posts SET content = ?, image_url = ?, image_alt = ?, updated_at = ? WHERE id = ?",
+        "UPDATE posts SET content = ?, image_url = ?, image_alt = ?, content_warning = ?, updated_at = ? WHERE id = ?",
     )
     .bind(content)
     .bind(&payload.image_url)
     .bind(&image_alt)
+    .bind(&content_warning)
     .bind(now)
     .bind(&post_id)
     .execute(&mut *transaction)
@@ -4099,7 +4120,7 @@ pub async fn get_user_posts(
         bounded_pagination(&params, 50, MAXIMUM_PAGE_SIZE, MAXIMUM_STANDARD_OFFSET)?;
 
     let rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.content_warning, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -4184,7 +4205,7 @@ pub async fn search(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let post_rows = query_as::<_, PostFeedRow>(
-        "SELECT p.id, p.content, p.image_url, p.image_alt, p.likes_count, p.comments_count, p.created_at,
+        "SELECT p.id, p.content, p.image_url, p.image_alt, p.content_warning, p.likes_count, p.comments_count, p.created_at,
                 u.id AS user_id, u.username, u.bio, u.avatar_url,
                 post_counts.posts_count AS user_posts_count,
                 u.created_at AS user_created_at,
@@ -4562,10 +4583,32 @@ pub async fn reset_password(
 #[cfg(test)]
 mod tests {
     use super::{
-        account_deletion_confirmation_is_valid, post_media_path_is_valid, AccountDataExport,
-        ExportCounts, ExportNotificationPreferences, ExportProfile,
+        account_deletion_confirmation_is_valid, normalized_content_warning,
+        post_media_path_is_valid, AccountDataExport, ExportCounts, ExportNotificationPreferences,
+        ExportProfile,
     };
     use chrono::Utc;
+
+    #[test]
+    fn content_warnings_are_optional_bounded_single_line_text() {
+        assert!(normalized_content_warning(None).unwrap().is_none());
+        assert!(normalized_content_warning(Some("  ")).unwrap().is_none());
+        assert_eq!(
+            normalized_content_warning(Some("  Spoilere  "))
+                .unwrap()
+                .as_deref(),
+            Some("Spoilere")
+        );
+        assert!(normalized_content_warning(Some(&"📚".repeat(100))).is_ok());
+        for value in [
+            "📚".repeat(101),
+            "Bad\nlabel".into(),
+            "\tHidden".into(),
+            "Bad\u{85}".into(),
+        ] {
+            assert!(normalized_content_warning(Some(&value)).is_err());
+        }
+    }
 
     #[test]
     fn destructive_confirmation_is_exact() {
@@ -4590,7 +4633,7 @@ mod tests {
         let now = Utc::now();
         let export = AccountDataExport {
             format: "media-account-data",
-            format_version: 11,
+            format_version: 12,
             exported_at: now,
             profile: ExportProfile {
                 id: "user-id".to_owned(),

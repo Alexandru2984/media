@@ -93,6 +93,8 @@ def main():
                     sql(f"DROP TABLE saved_collection_posts; DROP TABLE saved_collections; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
                 elif latest == 20261123000000:
                     sql(f"DROP TABLE profile_details; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
+                elif latest == 20261123001000:
+                    sql(f"ALTER TABLE posts DROP CONSTRAINT chk_posts_content_warning, DROP COLUMN content_warning; DELETE FROM _sqlx_migrations WHERE version={latest}", database)
                 else:
                     raise AssertionError("Update runner fixture for the current last migration")
                 fixture_environment = root / "migration.env"
@@ -377,9 +379,11 @@ def main():
                 _, public_cookie = identity_request("/api/auth/login", {"email": "public@example.invalid", "password": "Export fixture password 2026!"})
                 tokens["public"] = public_cookie.split("=", 1)[1]
                 exported = alt_request("POST", "/api/users/me/export", {"password": "Export fixture password 2026!"})
-                assert exported["format_version"] == 11
+                assert exported["format_version"] == 12
                 assert any(item["id"] == created["id"] and item["image_alt"] == description for item in exported["posts"])
-                print(f"image_alt_checks={alt_checks}; passed; validation, upload, feeds, search, saved, privacy, escaping, replacement and export v11")
+                print(f"image_alt_checks={alt_checks}; passed; validation, upload, feeds, search, saved, privacy, escaping, replacement and export v12")
+                from content_warnings import check_content_warnings
+                check_content_warnings(base, ids, tokens, sql, database, environment, root, log)
                 from profile_details import check_profile_details
                 check_profile_details(base, ids, tokens, sql, database, environment, root, log)
                 from saved_collections import check_saved_collections
