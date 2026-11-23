@@ -2,7 +2,6 @@ import { A } from '@solidjs/router';
 import { createEffect, createSignal, For, lazy, onCleanup, Show, Suspense } from 'solid-js';
 import { useAuth } from '../AuthContext';
 import { api } from '../api';
-import CreatePost from '../components/CreatePost';
 import Navbar from '../components/Navbar';
 import PostCard from '../components/PostCard';
 import PageMeta from '../components/PageMeta';
@@ -10,6 +9,7 @@ import { getImageUrl, profilePath, withQuery } from '../utils/urls';
 
 const FEED_PAGE_SIZE = 10;
 const Landing = lazy(() => import('../components/Landing'));
+const CreatePost = lazy(() => import('../components/CreatePost'));
 
 function LoadingFeed(props) {
   return (
@@ -203,7 +203,7 @@ export default function Home() {
                   </button>
                 </div>
 
-                <CreatePost onPostCreated={handlePostCreated} />
+                <Suspense fallback={<div class="surface state-card" role="status">Se încarcă editorul…</div>}><CreatePost onPostCreated={handlePostCreated} /></Suspense>
 
                 <Show when={loading()}><LoadingFeed /></Show>
 

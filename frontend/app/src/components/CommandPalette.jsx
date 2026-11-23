@@ -2,6 +2,7 @@ import { useNavigate } from '@solidjs/router';
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { useAuth } from '../AuthContext';
+import { requestComposerFocus } from '../utils/composerFocus';
 import { useTheme } from '../ThemeContext';
 import {
   buildCommandPaletteCommands,
@@ -78,7 +79,7 @@ export default function CommandPalette() {
   };
 
   const focusRoute = (selector = '#route-content') => {
-    window.setTimeout(() => document.querySelector(selector)?.focus({ preventScroll: true }), 100);
+    window.setTimeout(() => selector === '#new-post-content' ? requestComposerFocus(auth.user()?.id) : document.querySelector(selector)?.focus({ preventScroll: true }), 100);
   };
 
   const runCommand = (command) => {

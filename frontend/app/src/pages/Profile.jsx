@@ -12,6 +12,7 @@ import ShareLink from '../components/ShareLink';
 import ProfileDetailsFields from '../components/ProfileDetailsFields';
 import { profileCoreIsValid, profileDetailsAreValid, profileDetailsFrom, profileTextLength, publicWebsite } from '../utils/profileDetails';
 import { getImageUrl, loginPath, profilePath } from '../utils/urls';
+import { requestComposerFocus } from '../utils/composerFocus';
 import './ProfileDetails.css';
 
 function joinedDate(dateString) {
@@ -46,7 +47,7 @@ export default function Profile() {
   const isOwnProfile = () => auth.user()?.id === params.id;
 
   const focusAfterNavigation = (selector) => {
-    window.setTimeout(() => document.querySelector(selector)?.focus({ preventScroll: true }), 100);
+    window.setTimeout(() => selector === '#new-post-content' ? requestComposerFocus(auth.user()?.id) : document.querySelector(selector)?.focus({ preventScroll: true }), 100);
   };
 
   const openAvatarSettings = () => {

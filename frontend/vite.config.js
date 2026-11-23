@@ -2,8 +2,10 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import solid from 'vite-plugin-solid';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [solid()],
+  // Keep development diagnostics; production reports handled failures in the UI.
+  esbuild: command === 'build' ? { drop: ['console', 'debugger'] } : undefined,
   root: fileURLToPath(new URL('./app', import.meta.url)),
   publicDir: fileURLToPath(new URL('./public', import.meta.url)),
   envDir: fileURLToPath(new URL('.', import.meta.url)),
@@ -26,4 +28,4 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
   },
-});
+}));

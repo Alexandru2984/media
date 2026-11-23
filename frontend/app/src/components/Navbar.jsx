@@ -1,6 +1,7 @@
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { api } from '../api';
+import { requestComposerFocus } from '../utils/composerFocus';
 import { useAuth } from '../AuthContext';
 import { useTheme } from '../ThemeContext';
 import { getImageUrl, profilePath } from '../utils/urls';
@@ -81,7 +82,7 @@ export default function Navbar() {
   const handleCompose = () => {
     if (location.pathname !== '/') navigate('/');
     window.setTimeout(() => {
-      document.getElementById('new-post-content')?.focus();
+      requestComposerFocus(auth.user()?.id);
     }, 100);
   };
 

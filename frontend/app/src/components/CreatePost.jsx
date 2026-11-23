@@ -8,6 +8,7 @@ import {
   storePostDraft,
 } from '../utils/postDraft';
 import { getImageUrl } from '../utils/urls';
+import { fulfillComposerFocus } from '../utils/composerFocus';
 import { countPostCharacters, POST_CHARACTER_LIMIT, postContentIsValid } from '../utils/postContent';
 import { imageAltIsValid } from '../utils/imageAlt';
 import ImageAltField from './ImageAltField';
@@ -179,6 +180,7 @@ export default function CreatePost(props) {
     const draft = readPostDraft(auth.user()?.id);
     setRecoverableDraft(draft);
     if (draft) scheduleDraftExpiry(draft.savedAt);
+    fulfillComposerFocus(auth.user()?.id, draft ? document.querySelector('.composer-draft-recovery button') : contentInput);
   });
 
   onCleanup(clearDraftExpiryTimer);
