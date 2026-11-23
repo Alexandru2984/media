@@ -1,4 +1,4 @@
-# Media — delivery plan, 2026-11-22
+# Media — delivery plan, updated 2026-11-23
 
 This plan supplements ROADMAP.md with the next concrete releases. A feature is
 finished only after its failure states, authorization boundaries, responsive
@@ -59,9 +59,17 @@ a legacy hostname in local configuration is not evidence of an active provider.
 - Backend canaries now default to free loopback port 18085, with a validated
   override and occupied-port checks in dry-run and activation. Nginx's existing
   18084 listener was preserved. No Cloudflare routing or policy was changed.
+- Optional public profile details and advisory content warnings are live.
+  Profiles add display names, pronouns, location and validated HTTPS links, with
+  atomic edits and explicit public-data disclosure. Post warnings use native
+  closed disclosures, generic declared previews and warning-preserving drafts.
+  Export is now v12. The observed assignment/unsave race and profile UPDATE
+  construction are fixed. Current checks pass 85 Rust, 46 Node and 377 actual
+  HTTP checks, plus responsive profile/warning browser workflows. See the
+  [current release record](RELEASE_2026-11-23_PROFILES_WARNINGS.md).
 
 This is a verified release increment, not completion of every backlog item.
-The [collection release report](RELEASE_2026-11-23_COLLECTIONS.md) records the current
+The [profile/warning release report](RELEASE_2026-11-23_PROFILES_WARNINGS.md) records the current
 artifacts, validation scope, Cloudflare constraint and remaining work. Earlier
 release reports are historical snapshots.
 
@@ -69,16 +77,16 @@ release reports are historical snapshots.
 
 | Priority | Finding | Evidence / action |
 | --- | --- | --- |
-| P1, defense in depth | Axum directly serves the entire uploads directory without the audience checks used by Nginx | `main.rs` attaches an unrestricted `ServeDir`; protect both namespaces in the application and reject all other paths. No public bypass has been demonstrated: API listens on loopback. |
-| P2 | Successful direct API responses have no cache prohibition | Observed on loopback readiness; enforce private/no-store in application middleware, including success and failure. |
-| P1 | Outstanding credential links survive password/email changes | Revoke reset/email-change tokens transactionally on credential changes, serialize issuance and consumption with account locks, and check expiration at consumption. Add concurrent reset and old-session regressions. |
+| P1 — fixed | Direct uploads needed independent audience checks | Application authorization now covers direct media, namespaces and forged headers; actual HTTP and loopback/public canaries pass. |
+| P2 — fixed | Direct API success/failure responses needed cache protection | Application responses use private/no-store independently of Nginx; public responses also prohibit storage. |
+| P1 — fixed | Outstanding credential links survived credential changes | Transactional revocation, account locks, expiry and concurrent-reset/session regressions are delivered. |
 | Retired / excluded | Historical Brevo authentication failures | Superseded by operator clarification: unused for months, excluded from active incidents and release gates. Current email delivery is unverified. |
 | P2 | CSP permits inline scripts for Cloudflare challenges | Current public header confirmed. Coordinate an edge nonce/hash-compatible policy before tightening; do not silently break the challenge. |
 | P2 | Auth throttling depends heavily on shared infrastructure | Add durable account-aware budgets, passkeys/TOTP, breached-password checks and login alerts. |
-| P2 | Automated audience coverage is incomplete | Add a disposable-database matrix for owner, anonymous, follower, removed follower, blocked users, hidden posts, media, exports and moderation. |
-| Supply chain | New audit: eight vulnerable lockfile reports and a Chrono maintenance warning | Patched seven reports with lettre 0.11.24, url 2.5.9 and SQLx 0.9.1. Optional, uncompiled SQLite binding still requires an upstream-compatible update; keep the full audit failure visible. Plan a Chrono replacement. |
-| Product | Landing uses generic gradients, floating example cards and repeated promises | Replace with an editorial layout, stronger typography, a clear product demonstration and truthful calls to action. |
-| Product / correctness | Search can display stale responses after a later query; feed offsets derive from deduplicated visible rows | Add request sequencing and explicit server offsets before expanding discovery. |
+| P2 — expanded; CI pending | Audience coverage still needs broader automation | The current disposable matrix has 377 HTTP checks across media, identity, posts, profiles and collections; broader moderation/operational CI remains in the final phase. |
+| Supply chain — open | One optional SQLite lockfile finding and a Chrono maintenance warning remain | Seven earlier findings were patched. Fresh RustSec audit still reports the uncompiled SQLite binding and Chrono warning; npm audit reports zero. No full-lockfile clean-audit claim. |
+| Product — delivered | Editorial landing replaced the earlier generic presentation | Interactive product examples and responsive light/dark layouts are live and browser-verified. |
+| Correctness — fixed | Search and list continuation needed sequencing/offset fixes | Stale query/viewer responses are guarded; consumed-row offsets and saved-list refresh after removal are implemented. Cursor pagination remains future work. |
 
 ## Release sequence
 
@@ -94,8 +102,9 @@ release reports are historical snapshots.
    safe hashtag navigation, clear result/empty/error states, stale-request
    protection, and correct feed continuation. No fabricated trends or members.
 4. **Publishing and profiles.** Image descriptions, accessible viewing, pinned
-   posts and named private bookmark collections are delivered. Next: richer
-   profiles, content warnings and multiple images with derivatives. Design each
+   posts, named private bookmark collections, optional public profile details and
+   content warnings are delivered. Next: multiple images with derivatives,
+   mentions and notification quiet hours. Design each
    storage migration and its rollback separately.
 5. **Interaction.** Polls, mentions, threaded replies, notification quiet hours,
    saved searches and transparent suggested follows. Build anti-spam quotas and

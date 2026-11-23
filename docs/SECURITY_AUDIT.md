@@ -25,6 +25,48 @@ recovery work remain open.
 
 ## Scope and limitations
 
+### Public profile details, warnings and bookmark serialization, 2026-11-23
+
+Optional display names, pronouns and locations are bounded single-line Unicode
+text. Website inputs require explicit public HTTPS, standard ports, no userinfo,
+no local/IP hosts and a bounded normalized URL. The server never fetches those
+URLs. Client and server HTML validate links before rendering and use
+`noopener noreferrer nofollow ugc`. Text/attributes/JSON-LD are escaped. The editor
+and privacy copy disclose that optional details remain public for private
+accounts, matching the existing basic-profile policy. Owner-only writes lock the
+account and update core/detail data atomically; unknown nested fields are rejected.
+Omitting details preserves them; export/account deletion include the new data.
+
+The profile UPDATE builder now uses unseparated parameter bindings correctly;
+duplicate usernames return 409 without a partial detail change. An observed 500
+under concurrent bookmark assignment/unsave is addressed by taking the saving
+account lock before post/bookmark operations. The regression now runs twelve
+assignment/unsave rounds and passes, alongside delete/quota races. This does not
+prove absence of every possible transaction conflict elsewhere.
+
+Post warnings are owner-controlled advisory text, bounded to 100 Unicode scalars
+with controls rejected. They inherit existing private/follower/block/hide/mute
+read policies and grant no additional access. Current UI/public HTML use closed
+native disclosures; declared social and structured metadata use generic previews
+without warned body/image/alt text. Client navigation resets stale image-alt
+metadata. Authorized API bodies still contain the post content. Third-party and
+pre-warning readers may display it directly: warnings are not a privacy barrier.
+Do not use a pre-warning binary/frontend after warned posts exist. Storage
+compatibility was tested separately from disclosure/preview behavior.
+
+Draft schema v2 retains labels with text under the same account/tab key and
+24-hour limit; previous text drafts remain readable. Unsupported older readers
+reject v2 rather than silently restoring a warned draft without its label.
+Export v12 contains the warning and profile data. Both migrations were applied
+only after isolated restore-verified backups; 17 successful records are installed.
+
+Current dependency checks: npm reports zero vulnerabilities. Full RustSec audit
+remains nonzero for `libsqlite3-sys` / `RUSTSEC-2026-0459`; the locked MySQL graph
+does not compile it (`cargo tree -i libsqlite3-sys` prints no dependency path).
+Chrono retains maintenance warning `RUSTSEC-2026-0543`. These findings remain
+visible; no dependency versions or suppression settings changed. See the
+[verified release and remaining work](RELEASE_2026-11-23_PROFILES_WARNINGS.md).
+
 ### Private bookmark collections, 2026-11-23
 
 Collection list/create/rename/delete and bookmark assignment require an active

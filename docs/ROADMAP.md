@@ -1,5 +1,28 @@
 # Product, Security, Design, and SEO Roadmap
 
+**2026-11-23 profile details and content warnings:** profiles now support an
+optional display name, pronouns, location and a validated public HTTPS website.
+The editor discloses that these fields remain public on private accounts. Core
+and detail edits are atomic, respect Unicode scalar limits and preserve details
+when older JSON clients omit them. External links reject credentials, local/IP
+hosts and custom ports; safe link attributes are applied without server fetches.
+
+Posts accept an optional 100-character advisory label. Current client and public
+HTML use native closed disclosures; declared previews omit warned text, image
+URLs and image descriptions. Draft schema v2 retains labels and reads prior
+text-only drafts. Export v12 includes metadata. Warnings do not change audiences
+or prevent authorized API reads, and older readers do not implement disclosure.
+The release record specifies the warning-aware rollback requirement.
+
+Profile SQL construction and the observed bookmark assignment/unsave race are
+fixed. The composer loads separately, with compose-navigation focus preserved
+for empty editors and recoverable drafts. Validation passes 85 Rust, 46 Node and
+377 real disposable HTTP checks. Browser checks cover both themes and
+320/390/768/1440 px locally and on Cloudflare assets with API fixtures. See the
+[current artifacts and limits](RELEASE_2026-11-23_PROFILES_WARNINGS.md).
+Next: multiple images, responsive derivatives, mentions and notification quiet
+hours. SEO expansion and CI setup remain in the final phase.
+
 **2026-11-23 private collections:** saved posts can be organized into up to 30
 owner-only collections, with 1–60 Unicode character names. Create, rename, delete,
 move and all/collection/unfiled filters are delivered. A bookmark has one optional
@@ -19,8 +42,8 @@ with API fixtures, while separate real API canaries verify auth/origin/cache
 boundaries. Canary-port conflicts are detected in dry runs and can use a validated
 alternative without changing other listeners. See the
 [current release](RELEASE_2026-11-23_COLLECTIONS.md) for artifacts and limitations.
-Next: richer profiles, content warnings and multiple images. SEO and CI remain
-in the final phase.
+Public profile details and content warnings followed in the next release.
+Multiple images remain open; SEO and CI remain in the final phase.
 
 **2026-11-22 pinned profiles:** a member can feature one owned post, replace it
 atomically or remove that specific pin. The profile fetches it independently of
@@ -384,7 +407,8 @@ search. It disappears at 100% instead of becoming permanent dashboard clutter.
 
 ### Profiles and relationships
 
-- Unique handles, display names, pronouns, bio, links, avatar, cover, and badges.
+- Unique handles, optional profile display names/pronouns/location/HTTPS links,
+  bio and avatars ✅. Add custom covers and carefully defined badges.
 - Follow/unfollow, followers/following lists, private accounts, and bounded
   follow-request approval/cancellation. ✅ Add close-friends/custom audiences.
 - Account-level block across authenticated surfaces plus discreet mute, private
@@ -399,7 +423,8 @@ search. It disappears at 100% instead of becoming permanent dashboard clutter.
 - Text posts with bounded per-tab temporary drafts, autosave and Unicode hashtag
   links ✅. Add opt-in durable drafts, mentions, link previews and polls.
 - Image alt text ✅. Add multi-image carousel, cropping, captions and later short video.
-- Edit history, delete/restore window, scheduling, audience, and content warnings.
+- Advisory content warnings ✅. Add edit history, a delete/restore window,
+  scheduling and more granular audiences.
 - Private bookmarks, named private collections, a saved feed and canonical post
   sharing ✅. Add reposts, quote posts and richer reactions.
 - Threaded comments, mentions, sorting, pagination, editing, and moderation.

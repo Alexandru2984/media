@@ -149,7 +149,7 @@ Generated artifacts and runtime data must stay out of Git.
 
 The next project goals are:
 
-1. Add richer profiles, content warnings and multiple-image publishing,
+1. Add multiple-image publishing, responsive derivatives and notification quiet hours,
    preserving ownership, audience, pagination and export/deletion contracts.
 2. Add login alerts, MFA/passkeys, breached-password screening, and stronger
    reauthentication for high-risk account changes.
