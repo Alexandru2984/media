@@ -192,7 +192,7 @@ export default function CreatePost(props) {
     const draft = readPostDraft(auth.user()?.id);
     setRecoverableDraft(draft);
     if (draft) scheduleDraftExpiry(draft.savedAt);
-    fulfillComposerFocus(auth.user()?.id, draft ? document.querySelector('.composer-draft-recovery button') : contentInput);
+    window.requestAnimationFrame(() => fulfillComposerFocus(auth.user()?.id, draft ? document.getElementById('restore-post-draft') : contentInput));
   });
 
   onCleanup(clearDraftExpiryTimer);
@@ -210,7 +210,7 @@ export default function CreatePost(props) {
           </div>
           <div class="composer-draft-actions">
             <button type="button" class="btn btn-secondary" onClick={discardDraft}>Șterge</button>
-            <button type="button" class="btn btn-primary" onClick={restoreDraft}>Restaurează</button>
+            <button type="button" id="restore-post-draft" class="btn btn-primary" onClick={restoreDraft}>Restaurează</button>
           </div>
         </aside>
       </Show>
